@@ -111,9 +111,8 @@ export default function HomePage() {
         <div className="max-w-screen-2xl mx-auto px-3 sm:px-6 py-3 flex flex-wrap items-center gap-2">
           {/* Logo / Title */}
           <div className="flex items-center gap-2 mr-auto">
-            <span className="text-lg sm:text-xl font-bold text-blue-700">오레곤 벧엘장로교회</span>
-            <span className="hidden sm:inline text-gray-400">|</span>
-            <span className="hidden sm:inline text-sm text-gray-500">장소 예약 현황</span>
+            <span className="text-lg sm:text-xl font-bold text-blue-700">오레곤벧엘장로교회 장소예약시스템</span>
+
           </div>
 
           {/* Right buttons */}
