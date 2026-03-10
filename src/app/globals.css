@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Pending reservation hatching pattern */
+.reservation-pending {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 4px,
+    rgba(255, 255, 255, 0.45) 4px,
+    rgba(255, 255, 255, 0.45) 8px
+  );
+}
+
+/* Scrollbar styling for week view */
+.calendar-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.calendar-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+.calendar-scroll::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 3px;
+}
+
+/* Prevent text selection on calendar clicks */
+.calendar-grid {
+  user-select: none;
+}
