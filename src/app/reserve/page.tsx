@@ -11,6 +11,7 @@ interface FormData {
   start_time: string;
   end_time: string;
   person_in_charge: string;
+  email: string;
   notes: string;
 }
 
@@ -21,6 +22,7 @@ interface FormErrors {
   start_time?: string;
   end_time?: string;
   person_in_charge?: string;
+  email?: string;
   conflict?: string;
   general?: string;
 }
@@ -53,6 +55,7 @@ function ReserveForm() {
     start_time: '09:00',
     end_time: '10:00',
     person_in_charge: '',
+    email: '',
     notes: '',
   });
   const [errors, setErrors] = useState<FormErrors>({});
@@ -77,6 +80,11 @@ function ReserveForm() {
       errs.end_time = '종료 시간은 시작 시간보다 늦어야 합니다.';
     }
     if (!form.person_in_charge.trim()) errs.person_in_charge = '담당자를 입력해주세요.';
+    if (!form.email.trim()) {
+      errs.email = '이메일을 입력해주세요.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      errs.email = '올바른 이메일 형식이 아닙니다.';
+    }
     return errs;
   }
 
@@ -102,6 +110,7 @@ function ReserveForm() {
           start_time,
           end_time,
           person_in_charge: form.person_in_charge.trim(),
+          email: form.email.trim(),
           notes: form.notes.trim() || undefined,
         }),
       });
@@ -164,6 +173,7 @@ function ReserveForm() {
                   start_time: '09:00',
                   end_time: '10:00',
                   person_in_charge: '',
+                  email: '',
                   notes: '',
                 });
               }}
@@ -327,6 +337,23 @@ function ReserveForm() {
               }`}
             />
             {errors.person_in_charge && <p className="mt-1 text-xs text-red-500">{errors.person_in_charge}</p>}
+          </div>
+
+          {/* Email */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              이메일 <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => handleChange('email', e.target.value)}
+              placeholder="example@email.com"
+              className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                errors.email ? 'border-red-400 bg-red-50' : 'border-gray-300'
+              }`}
+            />
+            {errors.email && <p className="mt-1 text-xs text-red-500">{errors.email}</p>}
           </div>
 
           {/* Notes */}

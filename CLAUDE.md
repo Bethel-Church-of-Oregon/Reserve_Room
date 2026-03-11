@@ -54,5 +54,4 @@ npm run build && npm start  # 프로덕션 (포트 8000)
 
 ## Git / 배포
 - GitHub repo: `https://github.com/Bethel-Church-of-Oregon/Reserve_Room`
-- 인증: Personal Access Token (비밀번호 로그인 미지원)
-- `git config --global credential.helper store` 로 토큰 저장 가능
+

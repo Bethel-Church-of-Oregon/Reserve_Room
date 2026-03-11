@@ -39,12 +39,20 @@ function initSchema(db: Database.Database) {
       start_time        TEXT    NOT NULL,
       end_time          TEXT    NOT NULL,
       person_in_charge  TEXT    NOT NULL,
+      email             TEXT    NOT NULL DEFAULT '',
       notes             TEXT,
       status            TEXT    NOT NULL DEFAULT 'pending',
       rejection_reason  TEXT,
       created_at        TEXT    NOT NULL DEFAULT (datetime('now','localtime'))
     );
   `);
+
+  // 기존 DB에 email 컬럼이 없을 경우 추가 (마이그레이션)
+  try {
+    db.exec("ALTER TABLE reservations ADD COLUMN email TEXT NOT NULL DEFAULT ''");
+  } catch {
+    // 이미 존재하면 무시
+  }
 }
 
 function seedRooms(db: Database.Database) {
@@ -93,6 +101,7 @@ export interface Reservation {
   start_time: string;
   end_time: string;
   person_in_charge: string;
+  email: string;
   notes: string | null;
   status: ReservationStatus;
   rejection_reason: string | null;
@@ -148,11 +157,12 @@ export function createReservation(data: {
   start_time: string;
   end_time: string;
   person_in_charge: string;
+  email: string;
   notes?: string;
 }): Reservation {
   const stmt = getDb().prepare(`
-    INSERT INTO reservations (title, room_id, start_time, end_time, person_in_charge, notes)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO reservations (title, room_id, start_time, end_time, person_in_charge, email, notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
   const result = stmt.run(
     data.title,
@@ -160,6 +170,7 @@ export function createReservation(data: {
     data.start_time,
     data.end_time,
     data.person_in_charge,
+    data.email,
     data.notes ?? null
   );
   return getDb().prepare('SELECT * FROM reservations WHERE id = ?').get(result.lastInsertRowid) as Reservation;

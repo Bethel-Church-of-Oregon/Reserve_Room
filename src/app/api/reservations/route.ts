@@ -17,11 +17,16 @@ export function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { title, room_id, start_time, end_time, person_in_charge, notes } = body;
+    const { title, room_id, start_time, end_time, person_in_charge, email, notes } = body;
 
     // Validate required fields
-    if (!title || !room_id || !start_time || !end_time || !person_in_charge) {
+    if (!title || !room_id || !start_time || !end_time || !person_in_charge || !email) {
       return NextResponse.json({ error: '필수 항목을 모두 입력해주세요.' }, { status: 400 });
+    }
+
+    // Validate email format
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
+      return NextResponse.json({ error: '올바른 이메일 형식이 아닙니다.' }, { status: 400 });
     }
 
     if (new Date(start_time) >= new Date(end_time)) {
@@ -37,7 +42,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const reservation = createReservation({ title, room_id, start_time, end_time, person_in_charge, notes });
+    const reservation = createReservation({ title, room_id, start_time, end_time, person_in_charge, email, notes });
     return NextResponse.json(reservation, { status: 201 });
   } catch (e) {
     console.error(e);
