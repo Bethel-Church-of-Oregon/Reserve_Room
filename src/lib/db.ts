@@ -142,6 +142,16 @@ export function getReservations(from?: string, to?: string): ReservationWithRoom
   return (params.length === 0 ? stmt.all() : params.length === 1 ? stmt.all(params[0]) : stmt.all(params[0], params[1])) as ReservationWithRoom[];
 }
 
+export function getReservationById(id: number): ReservationWithRoom | null {
+  const row = getDb().prepare(`
+    SELECT r.*, rm.name as room_name, rm.color as room_color
+    FROM reservations r
+    JOIN rooms rm ON r.room_id = rm.id
+    WHERE r.id = ?
+  `).get(id) as ReservationWithRoom | undefined;
+  return row ?? null;
+}
+
 export function getAllReservationsForAdmin(): ReservationWithRoom[] {
   return getDb().prepare(`
     SELECT r.*, rm.name as room_name, rm.color as room_color

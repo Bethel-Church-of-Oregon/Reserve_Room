@@ -8,6 +8,7 @@
 - **장소별 색상** — 15개 장소 각각 다른 색상으로 구분
 - **예약 신청** — 누구나 비밀번호 없이 신청 가능 (15분 단위 시간 선택)
 - **중복 방지** — 동일 장소·시간 충돌 시 즉시 안내
+- **이메일 알림** — 관리자 승인/거절 시 신청자 이메일로 자동 안내 발송
 - **관리자 모드** — 비밀번호 입력 후 승인/거절/삭제 처리
 - **반응형 디자인** — 데스크탑, 태블릿, 스마트폰 모두 지원
 
@@ -19,6 +20,7 @@
 | 언어 | TypeScript |
 | 스타일 | Tailwind CSS |
 | 데이터베이스 | SQLite (`better-sqlite3`) |
+| 이메일 | Nodemailer + Gmail SMTP |
 
 ## 시작하기
 
@@ -30,13 +32,24 @@ npm install
 
 ### 2. 환경 설정
 
-`.env.local` 파일에서 관리자 비밀번호를 변경합니다.
+`.env.local` 파일을 설정합니다.
 
 ```env
+# 관리자 비밀번호 (기본값: bethel2024)
 ADMIN_PASSWORD=원하는비밀번호
+
+# Gmail 앱 비밀번호 (이메일 알림 기능에 필요)
+GMAIL_APP_PASSWORD=발급받은앱비밀번호
 ```
 
-기본값은 `bethel2024`입니다.
+#### Gmail 앱 비밀번호 발급 방법
+
+1. [myaccount.google.com](https://myaccount.google.com) → **보안**
+2. **2단계 인증** 활성화 (필수)
+3. 검색창에 "앱 비밀번호" 검색 → **앱 비밀번호 생성**
+4. 앱 이름 입력 후 생성 → 16자리 비밀번호를 `GMAIL_APP_PASSWORD`에 입력
+
+> `GMAIL_APP_PASSWORD`를 설정하지 않으면 이메일 발송이 건너뛰어지며, 예약 승인/거절 자체는 정상 동작합니다.
 
 ### 3. 개발 서버 실행
 
@@ -78,9 +91,10 @@ npm start
 | 날짜 | ✅ |
 | 예약 시간 (15분 단위) | ✅ |
 | 담당자 | ✅ |
+| 이메일 | ✅ |
 | 기타 노트 | — |
 
-신청 후 관리자 승인 시 확정 처리됩니다.
+신청 후 관리자 승인 시 확정 처리되며, 이메일로 결과가 안내됩니다.
 
 ### 관리자 모드 (`/admin`)
 
@@ -105,3 +119,18 @@ npm start
 
 장소 추가·수정은 `src/lib/db.ts`의 `seedRooms` 함수에서 변경한 뒤,
 `data/reservations.db` 파일을 삭제하고 앱을 재시작하면 적용됩니다.
+
+## GitHub
+
+- **저장소**: [Bethel-Church-of-Oregon/Reserve_Room](https://github.com/Bethel-Church-of-Oregon/Reserve_Room)
+
+```bash
+# 변경사항 푸시
+git add .
+git commit -m "커밋 메시지"
+git push
+```
+
+> GitHub는 비밀번호 로그인을 지원하지 않습니다.
+> Personal Access Token을 발급받아 비밀번호 대신 입력하세요.
+> `git config --global credential.helper store` 로 한 번만 입력하면 이후 자동 저장됩니다.

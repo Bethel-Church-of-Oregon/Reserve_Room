@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { approveReservation, rejectReservation, deleteReservation } from '@/lib/db';
+import { approveReservation, rejectReservation, deleteReservation, getReservationById } from '@/lib/db';
+import { sendApprovalEmail, sendRejectionEmail } from '@/lib/email';
 import { cookies } from 'next/headers';
 
 function isAdminAuthed(): boolean {
@@ -18,8 +19,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const { action, reason } = body;
 
     if (action === 'approve') {
+      // 승인 전에 예약 정보 조회
+      const reservation = getReservationById(id);
       const ok = approveReservation(id);
       if (!ok) return NextResponse.json({ error: '승인할 수 없습니다.' }, { status: 400 });
+
+      // 이메일 발송 (실패해도 승인은 유지)
+      if (reservation) {
+        sendApprovalEmail(reservation).catch((e) =>
+          console.error('[email] 승인 이메일 발송 실패:', e)
+        );
+      }
+
       return NextResponse.json({ success: true });
     }
 
@@ -27,8 +38,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       if (!reason?.trim()) {
         return NextResponse.json({ error: '거절 사유를 입력해주세요.' }, { status: 400 });
       }
+
+      // 거절 전에 예약 정보 조회
+      const reservation = getReservationById(id);
       const ok = rejectReservation(id, reason);
       if (!ok) return NextResponse.json({ error: '거절할 수 없습니다.' }, { status: 400 });
+
+      // 이메일 발송 (실패해도 거절은 유지)
+      if (reservation) {
+        sendRejectionEmail(reservation, reason).catch((e) =>
+          console.error('[email] 거절 이메일 발송 실패:', e)
+        );
+      }
+
       return NextResponse.json({ success: true });
     }
 
