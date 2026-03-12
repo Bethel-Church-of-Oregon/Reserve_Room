@@ -41,6 +41,8 @@ export default function HomePage() {
   const [reservations, setReservations] = useState<ReservationWithRoom[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedRooms, setSelectedRooms] = useState<Set<number>>(new Set());
+  const [legendOpen, setLegendOpen] = useState(false);
 
   const weekStart = startOfWeek(currentDate);
 
@@ -103,6 +105,23 @@ export default function HomePage() {
   }
 
   const title = viewMode === 'week' ? formatWeekTitle(weekStart) : formatMonthTitle(currentDate);
+
+  function toggleRoom(id: number) {
+    setSelectedRooms((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function clearFilter() {
+    setSelectedRooms(new Set());
+  }
+
+  const filteredReservations = selectedRooms.size === 0
+    ? reservations
+    : reservations.filter((r) => selectedRooms.has(r.room_id));
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -215,20 +234,65 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Room legend */}
-      <div className="bg-white border-b border-gray-100 px-3 sm:px-6 py-2">
-        <div className="max-w-screen-2xl mx-auto flex flex-wrap gap-x-4 gap-y-1 items-center">
-          <span className="text-xs text-gray-500 font-medium mr-1">장소:</span>
-          {rooms.map((room) => (
-            <div key={room.id} className="flex items-center gap-1">
-              <span
-                className="w-3 h-3 rounded-sm flex-shrink-0"
-                style={{ backgroundColor: room.color }}
-              />
-              <span className="text-xs text-gray-600">{room.name}</span>
-            </div>
-          ))}
+      {/* Room legend / filter */}
+      <div className="bg-white border-b border-gray-100 px-3 sm:px-6">
+        {/* Toggle header */}
+        <div className="max-w-screen-2xl mx-auto flex items-center gap-2 py-2">
+          <button
+            onClick={() => setLegendOpen((v) => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition ${
+              legendOpen
+                ? 'bg-gray-100 border-gray-300 text-gray-800'
+                : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+            </svg>
+            장소 필터
+            {selectedRooms.size > 0 && (
+              <span className="ml-0.5 px-1.5 py-0.5 bg-blue-600 text-white rounded-full text-xs leading-none">
+                {selectedRooms.size}
+              </span>
+            )}
+            <span className="text-gray-400">{legendOpen ? '▴' : '▾'}</span>
+          </button>
+          {selectedRooms.size > 0 && (
+            <button
+              onClick={clearFilter}
+              className="text-xs text-gray-400 hover:text-gray-600 underline transition"
+            >
+              전체 보기
+            </button>
+          )}
         </div>
+
+        {/* Collapsible room list */}
+        {legendOpen && (
+          <div className="max-w-screen-2xl mx-auto pb-2 flex flex-wrap gap-x-2 gap-y-1.5">
+            {rooms.map((room) => {
+              const selected = selectedRooms.has(room.id);
+              return (
+                <button
+                  key={room.id}
+                  onClick={() => toggleRoom(room.id)}
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs transition ${
+                    selected
+                      ? 'border-transparent text-white font-medium'
+                      : 'border-gray-200 text-gray-600 bg-white hover:bg-gray-50'
+                  }`}
+                  style={selected ? { backgroundColor: room.color, borderColor: room.color } : {}}
+                >
+                  <span
+                    className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+                    style={{ backgroundColor: selected ? 'rgba(255,255,255,0.7)' : room.color }}
+                  />
+                  {room.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Calendar */}
@@ -239,10 +303,10 @@ export default function HomePage() {
             style={{ height: 'calc(100vh - 170px)' }}
           >
             {viewMode === 'week' ? (
-              <WeekView weekStart={weekStart} reservations={reservations} />
+              <WeekView weekStart={weekStart} reservations={filteredReservations} />
             ) : (
               <div className="h-full overflow-y-auto calendar-scroll">
-                <MonthView currentDate={currentDate} reservations={reservations} />
+                <MonthView currentDate={currentDate} reservations={filteredReservations} />
               </div>
             )}
           </div>
