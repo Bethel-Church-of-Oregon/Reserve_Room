@@ -4,9 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import WeekView from '@/components/WeekView';
 import MonthView from '@/components/MonthView';
+import DayView from '@/components/DayView';
 import { ReservationWithRoom, Room } from '@/lib/db';
 
-type ViewMode = 'week' | 'month';
+type ViewMode = 'day' | 'week' | 'month';
 
 function startOfWeek(d: Date): Date {
   const date = new Date(d);
@@ -24,6 +25,11 @@ function formatMonthTitle(d: Date): string {
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
 }
 
+const DAYS_KO = ['일', '월', '화', '수', '목', '금', '토'];
+function formatDayTitle(d: Date): string {
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${DAYS_KO[d.getDay()]})`;
+}
+
 function formatWeekTitle(weekStart: Date): string {
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
@@ -37,6 +43,10 @@ function formatWeekTitle(weekStart: Date): string {
 export default function HomePage() {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<ViewMode>('week');
+
+  useEffect(() => {
+    if (window.innerWidth < 640) setViewMode('day');
+  }, []);
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [reservations, setReservations] = useState<ReservationWithRoom[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -59,7 +69,12 @@ export default function HomePage() {
     const ws = startOfWeek(currentDate);
     let from: string, to: string;
 
-    if (viewMode === 'week') {
+    if (viewMode === 'day') {
+      from = currentDate.toISOString().slice(0, 10);
+      const nextDay = new Date(currentDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      to = nextDay.toISOString().slice(0, 10);
+    } else if (viewMode === 'week') {
       from = ws.toISOString().slice(0, 10);
       const weekEnd = new Date(ws);
       weekEnd.setDate(ws.getDate() + 7);
@@ -91,7 +106,9 @@ export default function HomePage() {
   function navigate(dir: -1 | 1) {
     setCurrentDate((prev) => {
       const d = new Date(prev);
-      if (viewMode === 'week') {
+      if (viewMode === 'day') {
+        d.setDate(d.getDate() + dir);
+      } else if (viewMode === 'week') {
         d.setDate(d.getDate() + dir * 7);
       } else {
         d.setMonth(d.getMonth() + dir);
@@ -104,7 +121,7 @@ export default function HomePage() {
     setCurrentDate(new Date());
   }
 
-  const title = viewMode === 'week' ? formatWeekTitle(weekStart) : formatMonthTitle(currentDate);
+  const title = viewMode === 'day' ? formatDayTitle(currentDate) : viewMode === 'week' ? formatWeekTitle(weekStart) : formatMonthTitle(currentDate);
 
   function toggleRoom(id: number) {
     setSelectedRooms((prev) => {
@@ -129,31 +146,35 @@ export default function HomePage() {
       <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-20">
         <div className="max-w-screen-2xl mx-auto px-3 sm:px-6 py-3 flex flex-wrap items-center gap-2">
           {/* Logo / Title */}
-          <div className="flex items-center gap-2 mr-auto">
-            <span className="text-lg sm:text-xl font-bold text-blue-700">오레곤벧엘장로교회 장소예약시스템</span>
-
+          <div className="flex items-center gap-2 mr-auto min-w-0">
+            <span className="text-base sm:text-xl font-bold text-blue-700 truncate">
+              <span className="hidden sm:inline"></span>오레곤벧엘장로교회 장소예약시스템
+            </span>
           </div>
 
           {/* Right buttons */}
           <button
             onClick={() => router.push('/reserve')}
-            className="px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition"
+            className="px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition whitespace-nowrap"
           >
-            + 장소 예약 신청
+            <span className="hidden sm:inline">+ 장소 예약 신청</span>
+            <span className="sm:hidden">+ 예약</span>
           </button>
           <button
             onClick={() => router.push('/admin')}
-            className="px-3 py-1.5 sm:px-4 sm:py-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium rounded-lg transition"
+            className="px-3 py-1.5 sm:px-4 sm:py-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium rounded-lg transition whitespace-nowrap"
           >
-            관리자 모드
+            <span className="hidden sm:inline">관리자 모드</span>
+            <span className="sm:hidden">관리자</span>
           </button>
         </div>
       </header>
 
       {/* Notice banner */}
       <div className="bg-blue-50 border-b border-blue-100 px-3 sm:px-6 py-2">
-        <div className="max-w-screen-2xl mx-auto flex flex-wrap items-center gap-2 text-sm text-blue-800">
-          <span>본 예약시스템은 사랑방 모임, 사역팀 회의, 친교 등을 위한 것으로, 결혼식 등 큰 행사는</span>
+        <div className="max-w-screen-2xl mx-auto flex flex-wrap items-center gap-2 text-xs sm:text-sm text-blue-800">
+          <span className="hidden sm:inline">본 예약시스템은 사랑방 모임, 사역팀 회의, 친교 등을 위한 것으로, 결혼식 등 큰 행사는</span>
+          <span className="sm:hidden">본 예약시스템은 사랑방 모임, 사역팀 회의, 친교 등을 위한 것으로, 결혼식 등 큰 행사는</span>
           <a
             href="https://drive.google.com/drive/folders/1lz7kaoe8GQf2FZI1Dfb-3hDEEWpFgygj"
             target="_blank"
@@ -162,7 +183,7 @@ export default function HomePage() {
           >
             사용신청서 작성
           </a>
-          <span>을 클릭하여 제출해 주시기 바랍니다.</span>
+          <span>을 클릭하여 작성/제출해 주세요.</span>
         </div>
       </div>
 
@@ -172,8 +193,16 @@ export default function HomePage() {
           {/* View mode toggle */}
           <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
             <button
-              onClick={() => setViewMode('week')}
+              onClick={() => setViewMode('day')}
               className={`px-3 py-1.5 font-medium transition ${
+                viewMode === 'day' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              일간
+            </button>
+            <button
+              onClick={() => setViewMode('week')}
+              className={`px-3 py-1.5 font-medium transition border-l border-gray-200 ${
                 viewMode === 'week' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
               }`}
             >
@@ -302,7 +331,9 @@ export default function HomePage() {
             className="bg-white border border-gray-200 rounded-none sm:rounded-lg shadow-sm overflow-hidden"
             style={{ height: 'calc(100vh - 170px)' }}
           >
-            {viewMode === 'week' ? (
+            {viewMode === 'day' ? (
+              <DayView currentDate={currentDate} reservations={filteredReservations} />
+            ) : viewMode === 'week' ? (
               <WeekView weekStart={weekStart} reservations={filteredReservations} />
             ) : (
               <div className="h-full overflow-y-auto calendar-scroll">

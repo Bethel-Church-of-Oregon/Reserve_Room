@@ -116,7 +116,7 @@ export default function WeekView({ weekStart, reservations }: Props) {
           return (
             <div
               key={idx}
-              className={`flex-1 text-center py-2 text-sm font-medium border-l border-gray-100 ${
+              className={`flex-1 text-center py-2 text-sm font-medium ${
                 idx === 0 ? 'text-red-500' : idx === 6 ? 'text-blue-500' : 'text-gray-700'
               }`}
             >
@@ -232,3 +232,4 @@ export default function WeekView({ weekStart, reservations }: Props) {
     </div>
   );
 }
+
