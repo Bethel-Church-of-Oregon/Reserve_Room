@@ -20,8 +20,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     if (action === 'approve') {
       // 승인 전에 예약 정보 조회
-      const reservation = getReservationById(id);
-      const ok = approveReservation(id);
+      const reservation = await getReservationById(id);
+      const ok = await approveReservation(id);
       if (!ok) return NextResponse.json({ error: '승인할 수 없습니다.' }, { status: 400 });
 
       // 이메일 발송 (실패해도 승인은 유지)
@@ -40,8 +40,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       }
 
       // 거절 전에 예약 정보 조회
-      const reservation = getReservationById(id);
-      const ok = rejectReservation(id, reason);
+      const reservation = await getReservationById(id);
+      const ok = await rejectReservation(id, reason);
       if (!ok) return NextResponse.json({ error: '거절할 수 없습니다.' }, { status: 400 });
 
       // 이메일 발송 (실패해도 거절은 유지)
@@ -68,7 +68,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
   try {
     const id = parseInt(params.id);
-    const ok = deleteReservation(id);
+    const ok = await deleteReservation(id);
     if (!ok) return NextResponse.json({ error: '삭제할 수 없습니다. 승인된 예약만 삭제 가능합니다.' }, { status: 400 });
     return NextResponse.json({ success: true });
   } catch (e) {
