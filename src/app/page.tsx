@@ -148,7 +148,7 @@ export default function HomePage() {
           {/* Logo / Title */}
           <div className="flex items-center gap-2 mr-auto min-w-0">
             <span className="text-base sm:text-xl font-bold text-blue-700 truncate">
-              <span className="hidden sm:inline"></span>오레곤벧엘장로교회 장소예약시스템
+              <span className="hidden sm:inline"></span>Bethel 장소예약시스템
             </span>
           </div>
 
@@ -173,8 +173,8 @@ export default function HomePage() {
       {/* Notice banner */}
       <div className="bg-blue-50 border-b border-blue-100 px-3 sm:px-6 py-2">
         <div className="max-w-screen-2xl mx-auto flex flex-wrap items-center gap-2 text-xs sm:text-sm text-blue-800">
-          <span className="hidden sm:inline">본 예약시스템은 사랑방 모임, 사역팀 회의, 친교 등을 위한 것으로, 결혼식 등 큰 행사는</span>
-          <span className="sm:hidden">본 예약시스템은 사랑방 모임, 사역팀 회의, 친교 등을 위한 것으로, 결혼식 등 큰 행사는</span>
+          <span className="hidden sm:inline">본 시스템은 소모임(사랑방, 사역팀 등) 전용 입니다. 결혼식 등 대규모 행사는</span>
+          <span className="sm:hidden">소모임(사랑방, 사역팀 등) 전용 입니다. 결혼식 등 대규모 행사는</span>
           <a
             href="https://drive.google.com/drive/folders/1lz7kaoe8GQf2FZI1Dfb-3hDEEWpFgygj"
             target="_blank"
@@ -284,7 +284,7 @@ export default function HomePage() {
                 {selectedRooms.size}
               </span>
             )}
-            <span className="text-gray-400">{legendOpen ? '▴' : '▾'}</span>
+            <span className="text-gray-400">{legendOpen ? '접기' : '열기'}</span>
           </button>
           {selectedRooms.size > 0 && (
             <button
