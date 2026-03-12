@@ -183,7 +183,7 @@ export default function HomePage() {
           >
             사용신청서 작성
           </a>
-          <span>을 클릭하여 작성/제출해 주세요.</span>
+          <span>을 이용해 주세요.</span>
         </div>
       </div>
 
