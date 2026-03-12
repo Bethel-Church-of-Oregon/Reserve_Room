@@ -131,6 +131,22 @@ export default function HomePage() {
         </div>
       </header>
 
+      {/* Notice banner */}
+      <div className="bg-blue-50 border-b border-blue-100 px-3 sm:px-6 py-2">
+        <div className="max-w-screen-2xl mx-auto flex flex-wrap items-center gap-2 text-sm text-blue-800">
+          <span>본 예약시스템은 사랑방 모임, 사역팀 회의, 친교 등을 위한 것으로, 결혼식 등 큰 행사는</span>
+          <a
+            href="https://drive.google.com/drive/folders/1lz7kaoe8GQf2FZI1Dfb-3hDEEWpFgygj"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition whitespace-nowrap"
+          >
+            사용신청서 작성
+          </a>
+          <span>을 클릭하여 제출해 주시기 바랍니다.</span>
+        </div>
+      </div>
+
       {/* Calendar controls */}
       <div className="bg-white border-b border-gray-100 px-3 sm:px-6 py-2">
         <div className="max-w-screen-2xl mx-auto flex flex-wrap items-center gap-2">

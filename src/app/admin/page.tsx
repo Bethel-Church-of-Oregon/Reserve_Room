@@ -50,7 +50,7 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
             </svg>
           </div>
           <h1 className="text-xl font-bold text-gray-800">관리자 로그인</h1>
-          <p className="text-sm text-gray-500 mt-1">벧엘교회 예약 관리 시스템</p>
+          <p className="text-sm text-gray-500 mt-1">오레곤벧엘교회 예약관리시스템</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
@@ -194,6 +194,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const [rejectTarget, setRejectTarget] = useState<ReservationWithRoom | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ReservationWithRoom | null>(null);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [bulkLoading, setBulkLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
   function showToast(msg: string, type: 'success' | 'error' = 'success') {
@@ -256,7 +257,27 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
 
   async function handleApproveSelected() {
     const ids = Array.from(selected).filter((id) => reservations.find((r) => r.id === id)?.status === 'pending');
-    for (const id of ids) await handleApprove(id);
+    if (ids.length === 0) return;
+    setBulkLoading(true);
+    try {
+      const res = await fetch('/api/admin/reservations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve', ids }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`${data.approved}건 승인 완료`);
+        setSelected(new Set());
+        fetchReservations();
+      } else {
+        showToast(data.error ?? '오류', 'error');
+      }
+    } catch {
+      showToast('네트워크 오류', 'error');
+    } finally {
+      setBulkLoading(false);
+    }
   }
 
   async function handleReject(id: number, reason: string) {
@@ -324,7 +345,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           </button>
           <div className="flex-1">
             <h1 className="text-xl font-bold text-gray-800">관리자 모드</h1>
-            <p className="text-xs text-gray-500">벧엘교회 예약 관리</p>
+            <p className="text-xs text-gray-500">오레곤벧엘교회 예약 관리</p>
           </div>
           {pendingCount > 0 && (
             <span className="bg-red-100 text-red-700 text-xs font-bold px-2.5 py-1 rounded-full">
@@ -366,9 +387,10 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           {filter === 'pending' && selectedPendingCount > 0 && (
             <button
               onClick={handleApproveSelected}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg font-medium transition"
+              disabled={bulkLoading}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white text-sm rounded-lg font-medium transition"
             >
-              선택 승인 ({selectedPendingCount}건)
+              {bulkLoading ? '처리 중...' : `선택 승인 (${selectedPendingCount}건)`}
             </button>
           )}
           <button
@@ -446,7 +468,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                           <div className="text-xs text-gray-400">~ {formatDateTime(r.end_time)}</div>
                         </td>
                         <td className="px-4 py-3 text-gray-700">{r.person_in_charge}</td>
-                        <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{r.created_at}</td>
+                        <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{formatDateTime(r.created_at)}</td>
                         <td className="px-4 py-3">
                           <ActionButtons
                             reservation={r}
@@ -478,7 +500,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                         )}
                         <StatusBadge status={r.status} />
                       </div>
-                      <span className="text-xs text-gray-400">{r.created_at.slice(0, 10)}</span>
+                      <span className="text-xs text-gray-400">{formatDateTime(r.created_at)}</span>
                     </div>
                     <p className="font-semibold text-gray-800 mb-1">{r.title}</p>
                     <div className="flex items-center gap-1.5 mb-1">

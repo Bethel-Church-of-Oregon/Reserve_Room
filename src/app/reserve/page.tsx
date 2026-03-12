@@ -4,6 +4,8 @@ import React, { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Room } from '@/lib/db';
 
+type RecurringType = 'none' | 'daily' | 'weekly' | 'monthly';
+
 interface FormData {
   title: string;
   room_id: string;
@@ -23,8 +25,15 @@ interface FormErrors {
   end_time?: string;
   person_in_charge?: string;
   email?: string;
+  recurring_until?: string;
   conflict?: string;
   general?: string;
+}
+
+interface SuccessInfo {
+  created: number;
+  conflicts: number;
+  conflictDates: string[];
 }
 
 function generateTimeOptions(): string[] {
@@ -43,6 +52,13 @@ function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+const RECURRING_LABELS: Record<RecurringType, string> = {
+  none: '반복 없음',
+  daily: '매일',
+  weekly: '매주',
+  monthly: '매월',
+};
+
 function ReserveForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -58,9 +74,12 @@ function ReserveForm() {
     email: '',
     notes: '',
   });
+  const [recurring, setRecurring] = useState<RecurringType>('none');
+  const [recurringUntil, setRecurringUntil] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [successInfo, setSuccessInfo] = useState<SuccessInfo | null>(null);
 
   useEffect(() => {
     fetch('/api/rooms')
@@ -84,6 +103,13 @@ function ReserveForm() {
       errs.email = '이메일을 입력해주세요.';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
       errs.email = '올바른 이메일 형식이 아닙니다.';
+    }
+    if (recurring !== 'none') {
+      if (!recurringUntil) {
+        errs.recurring_until = '반복 종료일을 선택해주세요.';
+      } else if (recurringUntil <= form.date) {
+        errs.recurring_until = '반복 종료일은 시작 날짜 이후여야 합니다.';
+      }
     }
     return errs;
   }
@@ -112,6 +138,8 @@ function ReserveForm() {
           person_in_charge: form.person_in_charge.trim(),
           email: form.email.trim(),
           notes: form.notes.trim() || undefined,
+          recurring: recurring !== 'none' ? recurring : undefined,
+          recurring_until: recurring !== 'none' ? recurringUntil : undefined,
         }),
       });
 
@@ -127,6 +155,11 @@ function ReserveForm() {
         return;
       }
 
+      setSuccessInfo(
+        data.created !== undefined
+          ? data
+          : { created: 1, conflicts: 0, conflictDates: [] }
+      );
       setSuccess(true);
     } catch (err) {
       console.error(err);
@@ -146,7 +179,25 @@ function ReserveForm() {
     });
   }
 
-  if (success) {
+  function handleReset() {
+    setSuccess(false);
+    setSuccessInfo(null);
+    setForm({
+      title: '',
+      room_id: '',
+      date: todayStr(),
+      start_time: '09:00',
+      end_time: '10:00',
+      person_in_charge: '',
+      email: '',
+      notes: '',
+    });
+    setRecurring('none');
+    setRecurringUntil('');
+  }
+
+  if (success && successInfo) {
+    const isRecurring = successInfo.created > 1 || successInfo.conflicts > 0;
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
@@ -156,27 +207,38 @@ function ReserveForm() {
             </svg>
           </div>
           <h2 className="text-2xl font-bold text-gray-800 mb-3">신청 완료!</h2>
-          <p className="text-gray-600 mb-2">예약 신청이 완료되었습니다.</p>
-          <p className="text-gray-500 text-sm mb-6">
-            관리자 승인 후 예약이 확정 처리됩니다.
-            <br />
-            캘린더에서 승인 대기 상태로 표시됩니다.
-          </p>
+
+          {isRecurring ? (
+            <div className="text-left space-y-3 mb-6">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
+                <span className="text-green-700 font-medium text-sm">✓ {successInfo.created}회 예약 신청 완료</span>
+              </div>
+              {successInfo.conflicts > 0 && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <p className="text-yellow-700 font-medium text-sm mb-1">⚠ {successInfo.conflicts}회는 시간 충돌로 제외됨</p>
+                  <ul className="text-xs text-yellow-600 space-y-0.5">
+                    {successInfo.conflictDates.map((d) => (
+                      <li key={d}>• {d}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <p className="text-gray-500 text-sm">관리자 승인 후 예약이 확정 처리됩니다.</p>
+            </div>
+          ) : (
+            <div className="mb-6">
+              <p className="text-gray-600 mb-2">예약 신청이 완료되었습니다.</p>
+              <p className="text-gray-500 text-sm">
+                관리자 승인 후 예약이 확정 처리됩니다.
+                <br />
+                캘린더에서 승인 대기 상태로 표시됩니다.
+              </p>
+            </div>
+          )}
+
           <div className="flex gap-3 justify-center">
             <button
-              onClick={() => {
-                setSuccess(false);
-                setForm({
-                  title: '',
-                  room_id: '',
-                  date: todayStr(),
-                  start_time: '09:00',
-                  end_time: '10:00',
-                  person_in_charge: '',
-                  email: '',
-                  notes: '',
-                });
-              }}
+              onClick={handleReset}
               className="px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
             >
               추가 예약 신청
@@ -207,7 +269,7 @@ function ReserveForm() {
           </button>
           <div>
             <h1 className="text-xl font-bold text-gray-800">장소 예약 신청</h1>
-            <p className="text-sm text-gray-500">벧엘교회 회의실 및 장소 예약</p>
+            <p className="text-sm text-gray-500">오레곤벧엘교회 회의실 및 장소 예약</p>
           </div>
         </div>
       </header>
@@ -224,7 +286,7 @@ function ReserveForm() {
               type="text"
               value={form.title}
               onChange={(e) => handleChange('title', e.target.value)}
-              placeholder="예: 청년부 모임, 전도위원회 회의"
+              placeholder="예: 사랑방 모임, 사역팀 회의 등"
               className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 errors.title ? 'border-red-400 bg-red-50' : 'border-gray-300'
               }`}
@@ -322,6 +384,56 @@ function ReserveForm() {
             </div>
           </div>
 
+          {/* Recurring */}
+          <div className="border border-gray-200 rounded-xl p-4 space-y-3">
+            <label className="block text-sm font-medium text-gray-700">반복 설정</label>
+            <div className="flex flex-wrap gap-2">
+              {(['none', 'daily', 'weekly', 'monthly'] as RecurringType[]).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => {
+                    setRecurring(option);
+                    setErrors((prev) => { const next = { ...prev }; delete next.recurring_until; return next; });
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-sm border font-medium transition ${
+                    recurring === option
+                      ? 'bg-gray-700 text-white border-gray-700'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  {RECURRING_LABELS[option]}
+                </button>
+              ))}
+            </div>
+
+            {recurring !== 'none' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  반복 종료일 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={recurringUntil}
+                  min={form.date || todayStr()}
+                  onChange={(e) => {
+                    setRecurringUntil(e.target.value);
+                    setErrors((prev) => { const next = { ...prev }; delete next.recurring_until; return next; });
+                  }}
+                  className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    errors.recurring_until ? 'border-red-400 bg-red-50' : 'border-gray-300'
+                  }`}
+                />
+                {errors.recurring_until && <p className="mt-1 text-xs text-red-500">{errors.recurring_until}</p>}
+                <p className="mt-1.5 text-xs text-gray-400">
+                  {form.date && recurringUntil && recurringUntil > form.date
+                    ? `${form.date} 부터 ${recurringUntil} 까지 ${RECURRING_LABELS[recurring]} 반복`
+                    : `시작 날짜부터 종료일까지 ${RECURRING_LABELS[recurring]} 반복됩니다.`}
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* Person in charge */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -402,7 +514,7 @@ function ReserveForm() {
               disabled={submitting}
               className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg font-medium transition text-sm"
             >
-              {submitting ? '처리 중...' : '예약 신청'}
+              {submitting ? '처리 중...' : recurring !== 'none' ? '반복 예약 신청' : '예약 신청'}
             </button>
           </div>
         </form>

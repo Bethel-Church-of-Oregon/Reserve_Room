@@ -123,18 +123,3 @@ npm start
 
 장소 추가·수정은 `src/lib/db.ts`의 `ensureDbReady` 내 시드 로직을 수정한 뒤,
 Postgres에서 `rooms` 테이블을 비우고 앱을 재시작하면 적용됩니다.
-
-## GitHub
-
-- **저장소**: [Bethel-Church-of-Oregon/Reserve_Room](https://github.com/Bethel-Church-of-Oregon/Reserve_Room)
-
-```bash
-# 변경사항 푸시
-git add .
-git commit -m "커밋 메시지"
-git push
-```
-
-> GitHub는 비밀번호 로그인을 지원하지 않습니다.
-> Personal Access Token을 발급받아 비밀번호 대신 입력하세요.
-> `git config --global credential.helper store` 로 한 번만 입력하면 이후 자동 저장됩니다.
