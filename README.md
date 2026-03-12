@@ -19,7 +19,7 @@
 | 프레임워크 | Next.js 14 (App Router) |
 | 언어 | TypeScript |
 | 스타일 | Tailwind CSS |
-| 데이터베이스 | SQLite (`better-sqlite3`) |
+| 데이터베이스 | Vercel Postgres (Neon) |
 | 이메일 | Nodemailer + Gmail SMTP |
 
 ## 시작하기
@@ -35,12 +35,17 @@ npm install
 `.env.local` 파일을 설정합니다.
 
 ```env
+# Postgres 연결 (Vercel Marketplace에서 Neon 연동 시 자동 주입)
+POSTGRES_URL=postgres://...
+
 # 관리자 비밀번호 (기본값: bethel2024)
 ADMIN_PASSWORD=원하는비밀번호
 
 # Gmail 앱 비밀번호 (이메일 알림 기능에 필요)
 GMAIL_APP_PASSWORD=발급받은앱비밀번호
 ```
+
+> **로컬 개발:** Neon 대시보드 또는 Vercel 프로젝트 설정에서 `POSTGRES_URL`을 복사해 `.env.local`에 붙여넣으세요.
 
 #### Gmail 앱 비밀번호 발급 방법
 
@@ -68,10 +73,9 @@ npm start
 
 ## 데이터베이스
 
-- SQLite 파일은 `data/reservations.db`에 저장됩니다.
-- 앱 최초 실행 시 자동으로 생성되며, 15개 장소 기본 데이터가 입력됩니다.
-- `data/*.db`는 `.gitignore`에 등록되어 있어 git에 커밋되지 않습니다.
-  → git pull/push 시 서버의 예약 데이터가 유지됩니다.
+- **Vercel Postgres (Neon)** 사용 — Vercel 서버리스 배포에 적합.
+- Vercel 프로젝트에서 [Neon](https://vercel.com/marketplace/neon) 연동 시 `POSTGRES_URL` 자동 주입.
+- 앱 최초 실행 시 테이블 자동 생성, 15개 장소 시드 데이터 입력.
 
 ## 화면 구성
 
@@ -117,8 +121,8 @@ npm start
 | 7 | 청년부실 | 15 | 사무실 |
 | 8 | 중고등부실 | | |
 
-장소 추가·수정은 `src/lib/db.ts`의 `seedRooms` 함수에서 변경한 뒤,
-`data/reservations.db` 파일을 삭제하고 앱을 재시작하면 적용됩니다.
+장소 추가·수정은 `src/lib/db.ts`의 `ensureDbReady` 내 시드 로직을 수정한 뒤,
+Postgres에서 `rooms` 테이블을 비우고 앱을 재시작하면 적용됩니다.
 
 ## GitHub
 

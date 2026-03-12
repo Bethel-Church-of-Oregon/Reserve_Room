@@ -34,7 +34,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# SQLite database files - data persists on server, not tracked in git
+# Legacy SQLite (project now uses Vercel Postgres)
 /data/*.db
 /data/*.db-journal
 /data/*.db-shm

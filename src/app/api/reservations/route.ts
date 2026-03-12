@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getReservations, createReservation, checkConflict } from '@/lib/db';
 
-export function GET(req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const from = searchParams.get('from') ?? undefined;
     const to = searchParams.get('to') ?? undefined;
-    const reservations = getReservations(from, to);
+    const reservations = await getReservations(from, to);
     return NextResponse.json(reservations);
   } catch (e) {
     console.error(e);
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check for conflicts
-    const hasConflict = checkConflict(room_id, start_time, end_time);
+    const hasConflict = await checkConflict(room_id, start_time, end_time);
     if (hasConflict) {
       return NextResponse.json(
         { error: 'conflict', message: '해당 시간에 이미 예약이 있습니다.' },
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const reservation = createReservation({ title, room_id, start_time, end_time, person_in_charge, email, notes });
+    const reservation = await createReservation({ title, room_id, start_time, end_time, person_in_charge, email, notes });
     return NextResponse.json(reservation, { status: 201 });
   } catch (e) {
     console.error(e);
