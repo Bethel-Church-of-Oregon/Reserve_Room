@@ -40,6 +40,11 @@ function formatWeekTitle(weekStart: Date): string {
   return `${s} – ${e}`;
 }
 
+// Use local date components (avoid timezone shift from toISOString)
+function toLocalDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<ViewMode>('week');
@@ -49,18 +54,16 @@ export default function HomePage() {
   }, []);
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [reservations, setReservations] = useState<ReservationWithRoom[]>([]);
+  const [fetchedFor, setFetchedFor] = useState<{ viewMode: ViewMode; dateKey: string } | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRooms, setSelectedRooms] = useState<Set<number>>(new Set());
   const [legendOpen, setLegendOpen] = useState(false);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const weekStart = startOfWeek(currentDate);
 
   // String key for stable effect dependency (avoids Date object reference issues)
   const dateKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}`;
-
-  const refreshReservations = () => setRefreshTrigger((t) => t + 1);
 
   useEffect(() => {
     fetch('/api/rooms').then((r) => r.json()).then(setRooms).catch(console.error);
@@ -73,19 +76,19 @@ export default function HomePage() {
     let from: string, to: string;
 
     if (viewMode === 'day') {
-      from = currentDate.toISOString().slice(0, 10);
+      from = toLocalDateKey(currentDate);
       const nextDay = new Date(currentDate);
       nextDay.setDate(nextDay.getDate() + 1);
-      to = nextDay.toISOString().slice(0, 10);
+      to = toLocalDateKey(nextDay);
     } else if (viewMode === 'week') {
-      from = ws.toISOString().slice(0, 10);
+      from = toLocalDateKey(ws);
       const weekEnd = new Date(ws);
       weekEnd.setDate(ws.getDate() + 7);
-      to = weekEnd.toISOString().slice(0, 10);
+      to = toLocalDateKey(weekEnd);
     } else {
-      from = startOfMonth(currentDate).toISOString().slice(0, 10);
-      const me = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-      to = me.toISOString().slice(0, 10);
+      from = toLocalDateKey(startOfMonth(currentDate));
+      const firstOfNext = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+      to = toLocalDateKey(firstOfNext);
     }
 
     async function load() {
@@ -93,7 +96,10 @@ export default function HomePage() {
       try {
         const res = await fetch(`/api/reservations?from=${from}&to=${to}`, { cache: 'no-store' });
         const data = await res.json();
-        if (!cancelled) setReservations(Array.isArray(data) ? data : []);
+        if (!cancelled) {
+          setReservations(Array.isArray(data) ? data : []);
+          setFetchedFor({ viewMode, dateKey });
+        }
       } catch (e) {
         console.error('fetch reservations error:', e);
       } finally {
@@ -104,7 +110,7 @@ export default function HomePage() {
     load();
 
     return () => { cancelled = true; };
-  }, [viewMode, dateKey, refreshTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [viewMode, dateKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function navigate(dir: -1 | 1) {
     setCurrentDate((prev) => {
@@ -139,9 +145,11 @@ export default function HomePage() {
     setSelectedRooms(new Set());
   }
 
+  const effectiveReservations =
+    fetchedFor?.viewMode === viewMode && fetchedFor?.dateKey === dateKey ? reservations : [];
   const filteredReservations = selectedRooms.size === 0
-    ? reservations
-    : reservations.filter((r) => selectedRooms.has(r.room_id));
+    ? effectiveReservations
+    : effectiveReservations.filter((r) => selectedRooms.has(r.room_id));
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -257,7 +265,7 @@ export default function HomePage() {
                 className="w-8 h-3 rounded-sm reservation-pending"
                 style={{ backgroundColor: '#94a3b8' }}
               />
-              <span className="text-xs text-gray-500">승인 대기 / 취소 신청 대기</span>
+              <span className="text-xs text-gray-500">승인 대기</span>
             </div>
             {loading && (
               <span className="text-xs text-gray-400 animate-pulse">불러오는 중...</span>
@@ -335,12 +343,12 @@ export default function HomePage() {
             style={{ height: 'calc(100vh - 170px)' }}
           >
             {viewMode === 'day' ? (
-              <DayView currentDate={currentDate} reservations={filteredReservations} onRefresh={refreshReservations} />
+              <DayView key="day" currentDate={currentDate} reservations={filteredReservations} />
             ) : viewMode === 'week' ? (
-              <WeekView weekStart={weekStart} reservations={filteredReservations} onRefresh={refreshReservations} />
+              <WeekView key="week" weekStart={weekStart} reservations={filteredReservations} />
             ) : (
-              <div className="h-full overflow-y-auto calendar-scroll">
-                <MonthView currentDate={currentDate} reservations={filteredReservations} onRefresh={refreshReservations} />
+              <div key="month" className="h-full overflow-y-auto calendar-scroll">
+                <MonthView currentDate={currentDate} reservations={filteredReservations} />
               </div>
             )}
           </div>
