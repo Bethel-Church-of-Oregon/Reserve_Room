@@ -54,11 +54,14 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [selectedRooms, setSelectedRooms] = useState<Set<number>>(new Set());
   const [legendOpen, setLegendOpen] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const weekStart = startOfWeek(currentDate);
 
   // String key for stable effect dependency (avoids Date object reference issues)
   const dateKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}`;
+
+  const refreshReservations = () => setRefreshTrigger((t) => t + 1);
 
   useEffect(() => {
     fetch('/api/rooms').then((r) => r.json()).then(setRooms).catch(console.error);
@@ -105,7 +108,7 @@ export default function HomePage() {
     load();
 
     return () => { cancelled = true; };
-  }, [viewMode, dateKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [viewMode, dateKey, refreshTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function navigate(dir: -1 | 1) {
     setCurrentDate((prev) => {
@@ -260,7 +263,7 @@ export default function HomePage() {
                 className="w-8 h-3 rounded-sm reservation-pending"
                 style={{ backgroundColor: '#94a3b8' }}
               />
-              <span className="text-xs text-gray-500">승인 대기</span>
+              <span className="text-xs text-gray-500">승인 대기 / 취소 신청 대기</span>
             </div>
             {loading && (
               <span className="text-xs text-gray-400 animate-pulse">불러오는 중...</span>
@@ -338,12 +341,12 @@ export default function HomePage() {
             style={{ height: 'calc(100vh - 170px)' }}
           >
             {viewMode === 'day' ? (
-              <DayView key="day" currentDate={currentDate} reservations={filteredReservations} />
+              <DayView currentDate={currentDate} reservations={filteredReservations} onRefresh={refreshReservations} />
             ) : viewMode === 'week' ? (
-              <WeekView key="week" weekStart={weekStart} reservations={filteredReservations} />
+              <WeekView weekStart={weekStart} reservations={filteredReservations} onRefresh={refreshReservations} />
             ) : (
-              <div key="month" className="h-full overflow-y-auto calendar-scroll">
-                <MonthView currentDate={currentDate} reservations={filteredReservations} />
+              <div className="h-full overflow-y-auto calendar-scroll">
+                <MonthView currentDate={currentDate} reservations={filteredReservations} onRefresh={refreshReservations} />
               </div>
             )}
           </div>

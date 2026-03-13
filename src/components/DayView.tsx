@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
+import ReservationDetailPopover, { CancelRequestModal } from './ReservationDetailPopover';
 
 const HOUR_START = 6;
 const HOUR_END = 23;
@@ -15,6 +16,7 @@ const DAYS_KO = ['일요일', '월요일', '화요일', '수요일', '목요일'
 interface Props {
   currentDate: Date;
   reservations: ReservationWithRoom[];
+  onRefresh?: () => void;
 }
 
 function timeToMinutes(dateStr: string): number {
@@ -69,10 +71,40 @@ function groupOverlapping(items: ReservationWithRoom[]): Array<{ item: Reservati
   return result;
 }
 
-export default function DayView({ currentDate, reservations }: Props) {
+export default function DayView({ currentDate, reservations, onRefresh }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => HOUR_START + i);
   const grouped = groupOverlapping(reservations);
+  const [hovered, setHovered] = useState<{ reservation: ReservationWithRoom; rect: DOMRect } | null>(null);
+  const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showPopover = (reservation: ReservationWithRoom, el: HTMLElement) => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+    setHovered({ reservation, rect: el.getBoundingClientRect() });
+  };
+
+  const hidePopover = (delay = 0) => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+    if (delay > 0) {
+      hideTimeoutRef.current = setTimeout(() => setHovered(null), delay);
+    } else {
+      setHovered(null);
+    }
+  };
+
+  const cancelHide = () => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+  };
 
   const dayLabel = DAYS_KO[currentDate.getDay()];
   const isToday =
@@ -150,15 +182,16 @@ export default function DayView({ currentDate, reservations }: Props) {
               const height = Math.max(20, (endMin - startMin) * PX_PER_MIN - 2);
               const widthPct = 100 / totalCols;
               const leftPct = col * widthPct;
-              const isPending = item.status === 'pending';
+              const isPending = item.status === 'pending' || item.status === 'cancellation_requested';
 
               return (
                 <div
                   key={item.id}
-                  title={`${item.title}\n${item.room_name}\n${formatTime(item.start_time)} - ${formatTime(item.end_time)}\n담당: ${item.person_in_charge}${item.notes ? '\n' + item.notes : ''}${isPending ? '\n[승인 대기 중]' : ''}`}
                   className={`absolute rounded text-white text-xs px-1.5 py-1 overflow-hidden cursor-default ${
                     isPending ? 'reservation-pending opacity-80' : ''
                   }`}
+                  onMouseEnter={(e) => showPopover(item, e.currentTarget)}
+                  onMouseLeave={() => hidePopover(80)}
                   style={{
                     top,
                     height,
@@ -191,6 +224,27 @@ export default function DayView({ currentDate, reservations }: Props) {
           </div>
         </div>
       </div>
+
+      {hovered && (
+        <ReservationDetailPopover
+          reservation={hovered.reservation}
+          position={{ top: hovered.rect.top, left: hovered.rect.left }}
+          onMouseEnter={cancelHide}
+          onMouseLeave={() => hidePopover(80)}
+          onRequestCancel={(r) => setCancelModalReservation(r)}
+        />
+      )}
+
+      {cancelModalReservation && (
+        <CancelRequestModal
+          reservation={cancelModalReservation}
+          onConfirm={() => {
+            setCancelModalReservation(null);
+            onRefresh?.();
+          }}
+          onCancel={() => setCancelModalReservation(null)}
+        />
+      )}
     </div>
   );
 }
