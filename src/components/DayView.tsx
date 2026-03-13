@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
+import ReservationDetailPopover, { CancelRequestModal } from './ReservationDetailPopover';
 
 const HOUR_START = 6;
 const HOUR_END = 23;
@@ -19,6 +20,7 @@ function toLocalDateKey(d: Date): string {
 interface Props {
   currentDate: Date;
   reservations: ReservationWithRoom[];
+  onRefresh?: () => void;
 }
 
 function timeToMinutes(dateStr: string): number {
@@ -73,7 +75,7 @@ function groupOverlapping(items: ReservationWithRoom[]): Array<{ item: Reservati
   return result;
 }
 
-export default function DayView({ currentDate, reservations }: Props) {
+export default function DayView({ currentDate, reservations, onRefresh }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const dayKey = toLocalDateKey(currentDate);
   const dayReservations = reservations.filter((r) => r.start_time.slice(0, 10) === dayKey);
@@ -155,15 +157,16 @@ export default function DayView({ currentDate, reservations }: Props) {
               const height = Math.max(20, (endMin - startMin) * PX_PER_MIN - 2);
               const widthPct = 100 / totalCols;
               const leftPct = col * widthPct;
-              const isPending = item.status === 'pending';
+              const isPending = item.status === 'pending' || item.status === 'cancellation_requested';
 
               return (
                 <div
                   key={item.id}
-                  title={`${item.title}\n${item.room_name}\n${formatTime(item.start_time)} - ${formatTime(item.end_time)}\n담당: ${item.person_in_charge}${item.notes ? '\n' + item.notes : ''}${isPending ? '\n[승인 대기 중]' : ''}`}
                   className={`absolute rounded text-white text-xs px-1.5 py-1 overflow-hidden cursor-default ${
                     isPending ? 'reservation-pending opacity-80' : ''
                   }`}
+                  onMouseEnter={(e) => showPopover(item, e.currentTarget)}
+                  onMouseLeave={() => hidePopover(80)}
                   style={{
                     top,
                     height,
@@ -196,6 +199,27 @@ export default function DayView({ currentDate, reservations }: Props) {
           </div>
         </div>
       </div>
+
+      {hovered && (
+        <ReservationDetailPopover
+          reservation={hovered.reservation}
+          position={{ top: hovered.rect.top, left: hovered.rect.left }}
+          onMouseEnter={cancelHide}
+          onMouseLeave={() => hidePopover(80)}
+          onRequestCancel={(r) => setCancelModalReservation(r)}
+        />
+      )}
+
+      {cancelModalReservation && (
+        <CancelRequestModal
+          reservation={cancelModalReservation}
+          onConfirm={() => {
+            setCancelModalReservation(null);
+            onRefresh?.();
+          }}
+          onCancel={() => setCancelModalReservation(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
+import ReservationDetailPopover, { CancelRequestModal } from './ReservationDetailPopover';
 
 const HOUR_START = 6;   // 6am
 const HOUR_END = 23;    // 11pm
@@ -15,6 +16,7 @@ const DAYS_KO = ['일', '월', '화', '수', '목', '금', '토'];
 interface Props {
   weekStart: Date;
   reservations: ReservationWithRoom[];
+  onRefresh?: () => void;
 }
 
 function getWeekDays(weekStart: Date): Date[] {
@@ -91,10 +93,40 @@ function groupOverlapping(items: ReservationWithRoom[]): Array<{ item: Reservati
   return result;
 }
 
-export default function WeekView({ weekStart, reservations }: Props) {
+export default function WeekView({ weekStart, reservations, onRefresh }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const days = getWeekDays(weekStart);
   const today = dateKey(new Date());
+  const [hovered, setHovered] = useState<{ reservation: ReservationWithRoom; rect: DOMRect } | null>(null);
+  const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showPopover = (reservation: ReservationWithRoom, el: HTMLElement) => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+    setHovered({ reservation, rect: el.getBoundingClientRect() });
+  };
+
+  const hidePopover = (delay = 0) => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+    if (delay > 0) {
+      hideTimeoutRef.current = setTimeout(() => setHovered(null), delay);
+    } else {
+      setHovered(null);
+    }
+  };
+
+  const cancelHide = () => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+  };
 
   useEffect(() => {
     // Scroll to 8am on mount
@@ -191,12 +223,11 @@ export default function WeekView({ weekStart, reservations }: Props) {
                   const height = Math.max(20, (endMin - startMin) * PX_PER_MIN - 2);
                   const widthPct = 100 / totalCols;
                   const leftPct = col * widthPct;
-                  const isPending = item.status === 'pending';
+                  const isPending = item.status === 'pending' || item.status === 'cancellation_requested';
 
                   return (
                     <div
                       key={item.id}
-                      title={`${item.title}\n${item.room_name}\n${formatTime(item.start_time)} - ${formatTime(item.end_time)}\n담당: ${item.person_in_charge}${item.notes ? '\n' + item.notes : ''}${isPending ? '\n[승인 대기 중]' : ''}`}
                       className={`absolute rounded text-white text-xs px-1 py-0.5 overflow-hidden cursor-default ${
                         isPending ? 'reservation-pending opacity-80' : ''
                       }`}
@@ -209,6 +240,8 @@ export default function WeekView({ weekStart, reservations }: Props) {
                         border: isPending ? `2px dashed ${item.room_color}` : 'none',
                         zIndex: isPending ? 1 : 2,
                       }}
+                      onMouseEnter={(e) => showPopover(item, e.currentTarget)}
+                      onMouseLeave={() => hidePopover(80)}
                     >
                       <div className="font-semibold leading-tight truncate">{item.title}</div>
                       {height > 30 && (
@@ -229,6 +262,27 @@ export default function WeekView({ weekStart, reservations }: Props) {
           })}
         </div>
       </div>
+
+      {hovered && (
+        <ReservationDetailPopover
+          reservation={hovered.reservation}
+          position={{ top: hovered.rect.top, left: hovered.rect.left }}
+          onMouseEnter={cancelHide}
+          onMouseLeave={() => hidePopover(80)}
+          onRequestCancel={(r) => setCancelModalReservation(r)}
+        />
+      )}
+
+      {cancelModalReservation && (
+        <CancelRequestModal
+          reservation={cancelModalReservation}
+          onConfirm={() => {
+            setCancelModalReservation(null);
+            onRefresh?.();
+          }}
+          onCancel={() => setCancelModalReservation(null)}
+        />
+      )}
     </div>
   );
 }
