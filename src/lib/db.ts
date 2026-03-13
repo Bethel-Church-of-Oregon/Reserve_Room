@@ -53,6 +53,15 @@ async function ensureDbReady(): Promise<void> {
       // Column may already exist; ignore
     }
 
+    // Cancellation request columns (idempotent)
+    try {
+      await sql`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS cancellation_reason TEXT`;
+      await sql`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS cancellation_requested_at TIMESTAMPTZ`;
+      await sql`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS previous_status TEXT`;
+    } catch {
+      // Columns may already exist; ignore
+    }
+
     // Seed rooms if empty
     const countRows = (await sql`SELECT COUNT(*)::int as c FROM rooms`) as { c: number }[];
     const count = Number(countRows[0]?.c ?? 0);
@@ -97,7 +106,7 @@ export interface Room {
   color: string;
 }
 
-export type ReservationStatus = 'pending' | 'approved' | 'rejected';
+export type ReservationStatus = 'pending' | 'approved' | 'rejected' | 'cancellation_requested';
 
 export interface Reservation {
   id: number;
@@ -111,6 +120,9 @@ export interface Reservation {
   status: ReservationStatus;
   rejection_reason: string | null;
   created_at: string;
+  cancellation_reason?: string | null;
+  cancellation_requested_at?: string | null;
+  previous_status?: string | null;
 }
 
 export interface ReservationWithRoom extends Reservation {
@@ -232,7 +244,7 @@ export async function checkConflict(
     const rows = (await getSql()`
       SELECT COUNT(*)::int as c FROM reservations
       WHERE room_id = ${rid}
-        AND status != 'rejected'
+        AND status IN ('pending', 'approved')
         AND start_time < ${end_time}
         AND end_time > ${start_time}
         AND id != ${excludeId}
@@ -243,7 +255,7 @@ export async function checkConflict(
   const rows = (await getSql()`
     SELECT COUNT(*)::int as c FROM reservations
     WHERE room_id = ${rid}
-      AND status != 'rejected'
+      AND status IN ('pending', 'approved')
       AND start_time < ${end_time}
       AND end_time > ${start_time}
   `) as { c: number }[];
@@ -280,6 +292,47 @@ export async function deleteReservation(id: number): Promise<boolean> {
   const rows = (await getSql()`
     DELETE FROM reservations
     WHERE id = ${id} AND status = 'approved'
+    RETURNING id
+  `) as { id: number }[];
+  return rows.length > 0;
+}
+
+export async function requestCancellation(
+  id: number,
+  reason: string
+): Promise<boolean> {
+  await ensureDbReady();
+  const rows = (await getSql()`
+    UPDATE reservations
+    SET status = 'cancellation_requested',
+        cancellation_reason = ${reason},
+        cancellation_requested_at = now(),
+        previous_status = status
+    WHERE id = ${id} AND status IN ('pending', 'approved')
+    RETURNING id
+  `) as { id: number }[];
+  return rows.length > 0;
+}
+
+export async function approveCancellation(id: number): Promise<boolean> {
+  await ensureDbReady();
+  const rows = (await getSql()`
+    DELETE FROM reservations
+    WHERE id = ${id} AND status = 'cancellation_requested'
+    RETURNING id
+  `) as { id: number }[];
+  return rows.length > 0;
+}
+
+export async function rejectCancellation(id: number): Promise<boolean> {
+  await ensureDbReady();
+  const rows = (await getSql()`
+    UPDATE reservations
+    SET status = COALESCE(previous_status, 'approved'),
+        cancellation_reason = NULL,
+        cancellation_requested_at = NULL,
+        previous_status = NULL
+    WHERE id = ${id} AND status = 'cancellation_requested'
     RETURNING id
   `) as { id: number }[];
   return rows.length > 0;

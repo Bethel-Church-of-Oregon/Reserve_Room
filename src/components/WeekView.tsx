@@ -2,7 +2,7 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
-import ReservationDetailPopover from './ReservationDetailPopover';
+import ReservationDetailPopover, { CancelRequestModal } from './ReservationDetailPopover';
 
 const HOUR_START = 6;   // 6am
 const HOUR_END = 23;    // 11pm
@@ -16,6 +16,7 @@ const DAYS_KO = ['일', '월', '화', '수', '목', '금', '토'];
 interface Props {
   weekStart: Date;
   reservations: ReservationWithRoom[];
+  onRefresh?: () => void;
 }
 
 function getWeekDays(weekStart: Date): Date[] {
@@ -92,11 +93,12 @@ function groupOverlapping(items: ReservationWithRoom[]): Array<{ item: Reservati
   return result;
 }
 
-export default function WeekView({ weekStart, reservations }: Props) {
+export default function WeekView({ weekStart, reservations, onRefresh }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const days = getWeekDays(weekStart);
   const today = dateKey(new Date());
   const [hovered, setHovered] = useState<{ reservation: ReservationWithRoom; rect: DOMRect } | null>(null);
+  const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showPopover = (reservation: ReservationWithRoom, el: HTMLElement) => {
@@ -221,7 +223,7 @@ export default function WeekView({ weekStart, reservations }: Props) {
                   const height = Math.max(20, (endMin - startMin) * PX_PER_MIN - 2);
                   const widthPct = 100 / totalCols;
                   const leftPct = col * widthPct;
-                  const isPending = item.status === 'pending';
+                  const isPending = item.status === 'pending' || item.status === 'cancellation_requested';
 
                   return (
                     <div
@@ -267,6 +269,18 @@ export default function WeekView({ weekStart, reservations }: Props) {
           position={{ top: hovered.rect.top, left: hovered.rect.left }}
           onMouseEnter={cancelHide}
           onMouseLeave={() => hidePopover(80)}
+          onRequestCancel={(r) => setCancelModalReservation(r)}
+        />
+      )}
+
+      {cancelModalReservation && (
+        <CancelRequestModal
+          reservation={cancelModalReservation}
+          onConfirm={() => {
+            setCancelModalReservation(null);
+            onRefresh?.();
+          }}
+          onCancel={() => setCancelModalReservation(null)}
         />
       )}
     </div>

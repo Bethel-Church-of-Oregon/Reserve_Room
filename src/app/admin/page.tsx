@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ReservationWithRoom } from '@/lib/db';
 
-type FilterStatus = 'pending' | 'approved' | 'all';
+type FilterStatus = 'pending' | 'approved' | 'cancellation_requested' | 'all';
 
 function formatDateTime(dt: string): string {
   const d = new Date(dt);
@@ -144,6 +144,55 @@ function RejectModal({
   );
 }
 
+// ── Reject Cancellation Modal ─────────────────────────────────────────────────
+function RejectCancelModal({
+  reservation,
+  onConfirm,
+  onCancel,
+}: {
+  reservation: ReservationWithRoom;
+  onConfirm: (reason?: string) => void;
+  onCancel: () => void;
+}) {
+  const [reason, setReason] = useState('');
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
+        <h3 className="text-lg font-bold text-gray-800 mb-1">취소 신청 거절</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          <strong className="text-gray-700">{reservation.title}</strong> 예약의 취소 신청을 거절합니다.
+        </p>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">거절 사유 (선택, 요청자 이메일에 포함)</label>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="선택 사항입니다."
+            rows={3}
+            autoFocus
+            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
+          />
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm transition"
+          >
+            취소
+          </button>
+          <button
+            onClick={() => onConfirm(reason.trim() || undefined)}
+            className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition"
+          >
+            취소 거절
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Delete Confirmation Modal ─────────────────────────────────────────────────
 function DeleteModal({
   reservation,
@@ -193,6 +242,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const [loading, setLoading] = useState(true);
   const [rejectTarget, setRejectTarget] = useState<ReservationWithRoom | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ReservationWithRoom | null>(null);
+  const [rejectCancelTarget, setRejectCancelTarget] = useState<ReservationWithRoom | null>(null);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
@@ -221,6 +271,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const filtered = reservations.filter((r) => {
     if (filter === 'pending') return r.status === 'pending';
     if (filter === 'approved') return r.status === 'approved';
+    if (filter === 'cancellation_requested') return r.status === 'cancellation_requested';
     return true;
   });
 
@@ -305,7 +356,36 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   }
 
   const pendingCount = reservations.filter((r) => r.status === 'pending').length;
+  const cancellationRequestedCount = reservations.filter((r) => r.status === 'cancellation_requested').length;
   const selectedPendingCount = Array.from(selected).filter((id) => reservations.find((r) => r.id === id)?.status === 'pending').length;
+
+  async function handleApproveCancellation(id: number) {
+    setActionLoading(id);
+    try {
+      const res = await fetch(`/api/reservations/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve_cancellation' }),
+      });
+      if (res.ok) { showToast('취소 승인되었습니다.'); fetchReservations(); }
+      else { const d = await res.json(); showToast(d.error ?? '오류', 'error'); }
+    } catch { showToast('네트워크 오류', 'error'); }
+    finally { setActionLoading(null); }
+  }
+
+  async function handleRejectCancellation(id: number, reason?: string) {
+    setActionLoading(id);
+    try {
+      const res = await fetch(`/api/reservations/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reject_cancellation', reason: reason ?? '' }),
+      });
+      if (res.ok) { showToast('취소 거절되었습니다.'); fetchReservations(); setRejectCancelTarget(null); }
+      else { const d = await res.json(); showToast(d.error ?? '오류', 'error'); }
+    } catch { showToast('네트워크 오류', 'error'); }
+    finally { setActionLoading(null); setRejectCancelTarget(null); }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -333,6 +413,13 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           onCancel={() => setDeleteTarget(null)}
         />
       )}
+      {rejectCancelTarget && (
+        <RejectCancelModal
+          reservation={rejectCancelTarget}
+          onConfirm={(reason) => handleRejectCancellation(rejectCancelTarget.id, reason)}
+          onCancel={() => setRejectCancelTarget(null)}
+        />
+      )}
 
       {/* Header */}
       <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
@@ -352,6 +439,11 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
               대기 {pendingCount}건
             </span>
           )}
+          {cancellationRequestedCount > 0 && (
+            <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-full">
+              취소 신청 {cancellationRequestedCount}건
+            </span>
+          )}
           <button
             onClick={async () => {
               await fetch('/api/admin/auth', { method: 'DELETE' });
@@ -368,17 +460,20 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
         {/* Filter tabs + bulk actions */}
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
-            {(['pending', 'approved', 'all'] as FilterStatus[]).map((f) => (
+            {(['pending', 'approved', 'cancellation_requested', 'all'] as FilterStatus[]).map((f) => (
               <button
                 key={f}
                 onClick={() => { setFilter(f); setSelected(new Set()); }}
-                className={`px-4 py-2 font-medium transition border-l first:border-l-0 border-gray-200 ${
+                className={`px-3 py-2 font-medium transition border-l first:border-l-0 border-gray-200 ${
                   filter === f ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                {f === 'pending' ? '승인 대기' : f === 'approved' ? '승인 완료' : '전체'}
+                {f === 'pending' ? '승인 대기' : f === 'approved' ? '승인 완료' : f === 'cancellation_requested' ? '취소 신청' : '전체'}
                 {f === 'pending' && pendingCount > 0 && (
                   <span className="ml-1.5 bg-red-500 text-white text-xs rounded-full px-1.5">{pendingCount}</span>
+                )}
+                {f === 'cancellation_requested' && cancellationRequestedCount > 0 && (
+                  <span className="ml-1.5 bg-amber-500 text-white text-xs rounded-full px-1.5">{cancellationRequestedCount}</span>
                 )}
               </button>
             ))}
@@ -456,6 +551,9 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                         <td className="px-4 py-3 font-medium text-gray-800">
                           <div>{r.title}</div>
                           {r.notes && <div className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{r.notes}</div>}
+                          {r.status === 'cancellation_requested' && r.cancellation_reason && (
+                            <div className="text-xs text-amber-700 mt-0.5 truncate max-w-xs">취소 사유: {r.cancellation_reason}</div>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
@@ -476,6 +574,8 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                             onApprove={() => handleApprove(r.id)}
                             onReject={() => setRejectTarget(r)}
                             onDelete={() => setDeleteTarget(r)}
+                            onApproveCancellation={() => handleApproveCancellation(r.id)}
+                            onRejectCancellation={() => setRejectCancelTarget(r)}
                           />
                         </td>
                       </tr>
@@ -512,6 +612,9 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                     </p>
                     <p className="text-xs text-gray-500 mb-3">담당: {r.person_in_charge}</p>
                     {r.notes && <p className="text-xs text-gray-400 mb-3 italic">{r.notes}</p>}
+                    {r.status === 'cancellation_requested' && r.cancellation_reason && (
+                      <p className="text-xs text-amber-700 mb-3">취소 사유: {r.cancellation_reason}</p>
+                    )}
                     {r.status === 'rejected' && r.rejection_reason && (
                       <p className="text-xs text-red-500 mb-3">거절 사유: {r.rejection_reason}</p>
                     )}
@@ -522,6 +625,8 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                         onApprove={() => handleApprove(r.id)}
                         onReject={() => setRejectTarget(r)}
                         onDelete={() => setDeleteTarget(r)}
+                        onApproveCancellation={() => handleApproveCancellation(r.id)}
+                        onRejectCancellation={() => setRejectCancelTarget(r)}
                       />
                     </div>
                   </div>
@@ -555,6 +660,12 @@ function StatusBadge({ status }: { status: string }) {
       승인 완료
     </span>
   );
+  if (status === 'cancellation_requested') return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+      취소 신청
+    </span>
+  );
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
       <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
@@ -569,12 +680,16 @@ function ActionButtons({
   onApprove,
   onReject,
   onDelete,
+  onApproveCancellation,
+  onRejectCancellation,
 }: {
   reservation: ReservationWithRoom;
   loading: boolean;
   onApprove: () => void;
   onReject: () => void;
   onDelete: () => void;
+  onApproveCancellation: () => void;
+  onRejectCancellation: () => void;
 }) {
   if (reservation.status === 'pending') {
     return (
@@ -606,6 +721,27 @@ function ActionButtons({
       >
         {loading ? '...' : '삭제'}
       </button>
+    );
+  }
+
+  if (reservation.status === 'cancellation_requested') {
+    return (
+      <div className="flex gap-1.5">
+        <button
+          onClick={onApproveCancellation}
+          disabled={loading}
+          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs rounded-lg font-medium transition"
+        >
+          {loading ? '...' : '취소 승인'}
+        </button>
+        <button
+          onClick={onRejectCancellation}
+          disabled={loading}
+          className="px-3 py-1.5 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-xs rounded-lg font-medium transition"
+        >
+          취소 거절
+        </button>
+      </div>
     );
   }
 

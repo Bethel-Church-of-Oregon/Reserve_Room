@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
 
 function formatTime(dateStr: string): string {
@@ -15,6 +15,87 @@ interface Props {
   /** Keep popover visible while hovering over it */
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
+  /** Called when user clicks 취소 신청; parent should show modal and handle submit */
+  onRequestCancel?: (reservation: ReservationWithRoom) => void;
+}
+
+export function CancelRequestModal({
+  reservation,
+  onConfirm,
+  onCancel,
+}: {
+  reservation: ReservationWithRoom;
+  onConfirm: (reason: string) => void;
+  onCancel: () => void;
+}) {
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110] px-4">
+      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
+        <h3 className="text-lg font-bold text-gray-800 mb-1">예약 취소 신청</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          <strong className="text-gray-700">{reservation.title}</strong> 예약의 취소를 신청합니다.
+        </p>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">취소 사유 <span className="text-red-500">*</span></label>
+          <textarea
+            value={reason}
+            onChange={(e) => { setReason(e.target.value); setError(''); }}
+            placeholder="취소 사유를 입력해주세요."
+            rows={3}
+            autoFocus
+            disabled={loading}
+            className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none disabled:opacity-60 ${
+              error ? 'border-red-400 bg-red-50' : 'border-gray-300'
+            }`}
+          />
+          {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+        </div>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={loading}
+            className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm transition disabled:opacity-60"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              if (!reason.trim()) { setError('취소 사유를 입력해주세요.'); return; }
+              setLoading(true);
+              setError('');
+              try {
+                const res = await fetch(`/api/reservations/${reservation.id}/cancel`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ reason: reason.trim() }),
+                });
+                const data = await res.json();
+                if (res.ok) {
+                  onConfirm(reason.trim());
+                } else {
+                  setError(data.error ?? '오류가 발생했습니다.');
+                }
+              } catch {
+                setError('네트워크 오류가 발생했습니다.');
+              } finally {
+                setLoading(false);
+              }
+            }}
+            disabled={loading}
+            className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition"
+          >
+            {loading ? '제출 중...' : '취소 신청'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function ReservationDetailPopover({
@@ -22,8 +103,11 @@ export default function ReservationDetailPopover({
   position,
   onMouseEnter,
   onMouseLeave,
+  onRequestCancel,
 }: Props) {
   const isPending = reservation.status === 'pending';
+  const isCancelRequested = reservation.status === 'cancellation_requested';
+  const canRequestCancel = (reservation.status === 'pending' || reservation.status === 'approved') && !isCancelRequested;
 
   return (
     <div
@@ -69,17 +153,31 @@ export default function ReservationDetailPopover({
         </div>
       )}
 
-      {/* Status badge */}
-      <div className="mt-2 flex justify-end">
+      {/* Status badge + Cancel button */}
+      <div className="mt-2 flex items-center justify-between gap-2">
         <span
           className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
             isPending
               ? 'bg-amber-100 text-amber-800'
+              : isCancelRequested
+              ? 'bg-amber-100 text-amber-800'
               : 'bg-gray-100 text-gray-600'
           }`}
         >
-          {isPending ? '승인 대기 중' : '확정'}
+          {isPending ? '승인 대기 중' : isCancelRequested ? '취소 신청 대기' : '확정'}
         </span>
+        {canRequestCancel && onRequestCancel && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRequestCancel(reservation);
+            }}
+            className="text-[10px] font-medium px-1.5 py-0.5 text-red-600 hover:bg-red-50 rounded transition"
+          >
+            취소 신청
+          </button>
+        )}
       </div>
     </div>
   );

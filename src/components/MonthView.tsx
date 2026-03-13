@@ -2,13 +2,14 @@
 
 import React, { useState, useRef } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
-import ReservationDetailPopover from './ReservationDetailPopover';
+import ReservationDetailPopover, { CancelRequestModal } from './ReservationDetailPopover';
 
 const DAYS_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
 interface Props {
   currentDate: Date;
   reservations: ReservationWithRoom[];
+  onRefresh?: () => void;
 }
 
 function dateKey(d: Date) {
@@ -48,12 +49,13 @@ function getCalendarDays(year: number, month: number): Date[] {
   return days;
 }
 
-export default function MonthView({ currentDate, reservations }: Props) {
+export default function MonthView({ currentDate, reservations, onRefresh }: Props) {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const calDays = getCalendarDays(year, month);
   const today = dateKey(new Date());
   const [hovered, setHovered] = useState<{ reservation: ReservationWithRoom; rect: DOMRect } | null>(null);
+  const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showPopover = (reservation: ReservationWithRoom, el: HTMLElement) => {
@@ -147,7 +149,7 @@ export default function MonthView({ currentDate, reservations }: Props) {
 
                   <div className="space-y-0.5">
                     {shown.map((r) => {
-                      const isPending = r.status === 'pending';
+                      const isPending = r.status === 'pending' || r.status === 'cancellation_requested';
                       return (
                         <div
                           key={r.id}
@@ -183,6 +185,18 @@ export default function MonthView({ currentDate, reservations }: Props) {
           position={{ top: hovered.rect.top, left: hovered.rect.left }}
           onMouseEnter={cancelHide}
           onMouseLeave={() => hidePopover(80)}
+          onRequestCancel={(r) => setCancelModalReservation(r)}
+        />
+      )}
+
+      {cancelModalReservation && (
+        <CancelRequestModal
+          reservation={cancelModalReservation}
+          onConfirm={() => {
+            setCancelModalReservation(null);
+            onRefresh?.();
+          }}
+          onCancel={() => setCancelModalReservation(null)}
         />
       )}
     </div>
