@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
+import ReservationDetailPopover from './ReservationDetailPopover';
 
 const HOUR_START = 6;
 const HOUR_END = 23;
@@ -73,6 +74,35 @@ export default function DayView({ currentDate, reservations }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => HOUR_START + i);
   const grouped = groupOverlapping(reservations);
+  const [hovered, setHovered] = useState<{ reservation: ReservationWithRoom; rect: DOMRect } | null>(null);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showPopover = (reservation: ReservationWithRoom, el: HTMLElement) => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+    setHovered({ reservation, rect: el.getBoundingClientRect() });
+  };
+
+  const hidePopover = (delay = 0) => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+    if (delay > 0) {
+      hideTimeoutRef.current = setTimeout(() => setHovered(null), delay);
+    } else {
+      setHovered(null);
+    }
+  };
+
+  const cancelHide = () => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+  };
 
   const dayLabel = DAYS_KO[currentDate.getDay()];
   const isToday =
@@ -155,10 +185,11 @@ export default function DayView({ currentDate, reservations }: Props) {
               return (
                 <div
                   key={item.id}
-                  title={`${item.title}\n${item.room_name}\n${formatTime(item.start_time)} - ${formatTime(item.end_time)}\n담당: ${item.person_in_charge}${item.notes ? '\n' + item.notes : ''}${isPending ? '\n[승인 대기 중]' : ''}`}
                   className={`absolute rounded text-white text-xs px-1.5 py-1 overflow-hidden cursor-default ${
                     isPending ? 'reservation-pending opacity-80' : ''
                   }`}
+                  onMouseEnter={(e) => showPopover(item, e.currentTarget)}
+                  onMouseLeave={() => hidePopover(80)}
                   style={{
                     top,
                     height,
@@ -191,6 +222,15 @@ export default function DayView({ currentDate, reservations }: Props) {
           </div>
         </div>
       </div>
+
+      {hovered && (
+        <ReservationDetailPopover
+          reservation={hovered.reservation}
+          position={{ top: hovered.rect.top, left: hovered.rect.left }}
+          onMouseEnter={cancelHide}
+          onMouseLeave={() => hidePopover(80)}
+        />
+      )}
     </div>
   );
 }

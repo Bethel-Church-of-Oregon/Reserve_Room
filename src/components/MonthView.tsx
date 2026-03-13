@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
+import ReservationDetailPopover from './ReservationDetailPopover';
 
 const DAYS_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -52,6 +53,35 @@ export default function MonthView({ currentDate, reservations }: Props) {
   const month = currentDate.getMonth();
   const calDays = getCalendarDays(year, month);
   const today = dateKey(new Date());
+  const [hovered, setHovered] = useState<{ reservation: ReservationWithRoom; rect: DOMRect } | null>(null);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showPopover = (reservation: ReservationWithRoom, el: HTMLElement) => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+    setHovered({ reservation, rect: el.getBoundingClientRect() });
+  };
+
+  const hidePopover = (delay = 0) => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+    if (delay > 0) {
+      hideTimeoutRef.current = setTimeout(() => setHovered(null), delay);
+    } else {
+      setHovered(null);
+    }
+  };
+
+  const cancelHide = () => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+  };
 
   const reservationsByDay = new Map<string, ReservationWithRoom[]>();
   for (const r of reservations) {
@@ -121,14 +151,15 @@ export default function MonthView({ currentDate, reservations }: Props) {
                       return (
                         <div
                           key={r.id}
-                          title={`${r.title}\n${r.room_name}\n${formatTime(r.start_time)} - ${formatTime(r.end_time)}\n담당: ${r.person_in_charge}${isPending ? '\n[승인 대기 중]' : ''}`}
-                          className={`text-white text-xs px-1 rounded truncate leading-5 ${
+                          className={`text-white text-xs px-1 rounded truncate leading-5 cursor-default ${
                             isPending ? 'reservation-pending opacity-80' : ''
                           }`}
                           style={{
                             backgroundColor: r.room_color,
                             border: isPending ? `1px dashed ${r.room_color}` : 'none',
                           }}
+                          onMouseEnter={(e) => showPopover(r, e.currentTarget)}
+                          onMouseLeave={() => hidePopover(80)}
                         >
                           <span className="font-medium">{formatTime(r.start_time)}</span>{' '}
                           <span className="truncate">{r.title}</span>
@@ -145,6 +176,15 @@ export default function MonthView({ currentDate, reservations }: Props) {
           </div>
         ))}
       </div>
+
+      {hovered && (
+        <ReservationDetailPopover
+          reservation={hovered.reservation}
+          position={{ top: hovered.rect.top, left: hovered.rect.left }}
+          onMouseEnter={cancelHide}
+          onMouseLeave={() => hidePopover(80)}
+        />
+      )}
     </div>
   );
 }
