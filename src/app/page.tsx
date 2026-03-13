@@ -46,6 +46,7 @@ function formatMobileTitle(currentDate: Date): string {
   return `${currentDate.getFullYear()}년 ${currentDate.getMonth() + 1}월`;
 }
 
+
 function toLocalDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -75,7 +76,7 @@ export default function HomePage() {
   const fetchKey = viewMode === 'day' ? weekKey : dateKey;
 
   useEffect(() => {
-    fetch('/api/rooms').then((r) => r.json()).then(setRooms).catch(console.error);
+    fetch('/api/rooms').then((r: Response) => r.json()).then(setRooms).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -168,11 +169,7 @@ export default function HomePage() {
 
         {/* Logo + App name */}
         <div className="flex items-center gap-2 mr-4 flex-shrink-0">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M19 3h-1V1h-2v2H8V1H6v2H5C3.9 3 3 3.9 3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
-            </svg>
-          </div>
+          <img src="/logo.jpg" alt="Bethel 로고" className="w-8 h-8 object-contain" />
           <span className="text-lg font-medium text-gray-800 hidden sm:block whitespace-nowrap">
             Bethel 장소예약
           </span>
@@ -318,12 +315,12 @@ export default function HomePage() {
               <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">
                 범례
               </span>
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-2.5 px-2 py-1.5">
                   <span className="w-4 h-4 rounded-sm bg-gray-500 flex-shrink-0" />
                   <span className="text-sm text-gray-600">확정</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5 px-2 py-1.5">
                   <span
                     className="w-4 h-4 rounded-sm reservation-pending flex-shrink-0"
                     style={{ backgroundColor: '#94a3b8' }}
