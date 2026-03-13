@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
+import ReservationDetailPopover from './ReservationDetailPopover';
 
 const HOUR_START = 6;   // 6am
 const HOUR_END = 23;    // 11pm
@@ -95,6 +96,35 @@ export default function WeekView({ weekStart, reservations }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const days = getWeekDays(weekStart);
   const today = dateKey(new Date());
+  const [hovered, setHovered] = useState<{ reservation: ReservationWithRoom; rect: DOMRect } | null>(null);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showPopover = (reservation: ReservationWithRoom, el: HTMLElement) => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+    setHovered({ reservation, rect: el.getBoundingClientRect() });
+  };
+
+  const hidePopover = (delay = 0) => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+    if (delay > 0) {
+      hideTimeoutRef.current = setTimeout(() => setHovered(null), delay);
+    } else {
+      setHovered(null);
+    }
+  };
+
+  const cancelHide = () => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+  };
 
   useEffect(() => {
     // Scroll to 8am on mount
@@ -196,7 +226,6 @@ export default function WeekView({ weekStart, reservations }: Props) {
                   return (
                     <div
                       key={item.id}
-                      title={`${item.title}\n${item.room_name}\n${formatTime(item.start_time)} - ${formatTime(item.end_time)}\n담당: ${item.person_in_charge}${item.notes ? '\n' + item.notes : ''}${isPending ? '\n[승인 대기 중]' : ''}`}
                       className={`absolute rounded text-white text-xs px-1 py-0.5 overflow-hidden cursor-default ${
                         isPending ? 'reservation-pending opacity-80' : ''
                       }`}
@@ -209,6 +238,8 @@ export default function WeekView({ weekStart, reservations }: Props) {
                         border: isPending ? `2px dashed ${item.room_color}` : 'none',
                         zIndex: isPending ? 1 : 2,
                       }}
+                      onMouseEnter={(e) => showPopover(item, e.currentTarget)}
+                      onMouseLeave={() => hidePopover(80)}
                     >
                       <div className="font-semibold leading-tight truncate">{item.title}</div>
                       {height > 30 && (
@@ -229,6 +260,15 @@ export default function WeekView({ weekStart, reservations }: Props) {
           })}
         </div>
       </div>
+
+      {hovered && (
+        <ReservationDetailPopover
+          reservation={hovered.reservation}
+          position={{ top: hovered.rect.top, left: hovered.rect.left }}
+          onMouseEnter={cancelHide}
+          onMouseLeave={() => hidePopover(80)}
+        />
+      )}
     </div>
   );
 }
