@@ -13,6 +13,10 @@ const TOTAL_HEIGHT = TOTAL_HOURS * PX_PER_HOUR;
 
 const DAYS_KO = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
 
+function toLocalDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 interface Props {
   currentDate: Date;
   reservations: ReservationWithRoom[];
@@ -73,42 +77,13 @@ function groupOverlapping(items: ReservationWithRoom[]): Array<{ item: Reservati
 
 export default function DayView({ currentDate, reservations, onRefresh }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const dayKey = toLocalDateKey(currentDate);
+  const dayReservations = reservations.filter((r) => r.start_time.slice(0, 10) === dayKey);
   const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => HOUR_START + i);
-  const grouped = groupOverlapping(reservations);
-  const [hovered, setHovered] = useState<{ reservation: ReservationWithRoom; rect: DOMRect } | null>(null);
-  const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
-  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const showPopover = (reservation: ReservationWithRoom, el: HTMLElement) => {
-    if (hideTimeoutRef.current) {
-      clearTimeout(hideTimeoutRef.current);
-      hideTimeoutRef.current = null;
-    }
-    setHovered({ reservation, rect: el.getBoundingClientRect() });
-  };
-
-  const hidePopover = (delay = 0) => {
-    if (hideTimeoutRef.current) {
-      clearTimeout(hideTimeoutRef.current);
-      hideTimeoutRef.current = null;
-    }
-    if (delay > 0) {
-      hideTimeoutRef.current = setTimeout(() => setHovered(null), delay);
-    } else {
-      setHovered(null);
-    }
-  };
-
-  const cancelHide = () => {
-    if (hideTimeoutRef.current) {
-      clearTimeout(hideTimeoutRef.current);
-      hideTimeoutRef.current = null;
-    }
-  };
+  const grouped = groupOverlapping(dayReservations);
 
   const dayLabel = DAYS_KO[currentDate.getDay()];
-  const isToday =
-    currentDate.toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10);
+  const isToday = dayKey === toLocalDateKey(new Date());
   const dayNum = currentDate.getDate();
 
   useEffect(() => {
