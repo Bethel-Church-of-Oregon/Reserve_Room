@@ -49,6 +49,7 @@ export default function HomePage() {
   }, []);
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [reservations, setReservations] = useState<ReservationWithRoom[]>([]);
+  const [fetchedFor, setFetchedFor] = useState<{ viewMode: ViewMode; dateKey: string } | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRooms, setSelectedRooms] = useState<Set<number>>(new Set());
@@ -93,7 +94,10 @@ export default function HomePage() {
       try {
         const res = await fetch(`/api/reservations?from=${from}&to=${to}`, { cache: 'no-store' });
         const data = await res.json();
-        if (!cancelled) setReservations(Array.isArray(data) ? data : []);
+        if (!cancelled) {
+          setReservations(Array.isArray(data) ? data : []);
+          setFetchedFor({ viewMode, dateKey });
+        }
       } catch (e) {
         console.error('fetch reservations error:', e);
       } finally {
@@ -139,9 +143,11 @@ export default function HomePage() {
     setSelectedRooms(new Set());
   }
 
+  const effectiveReservations =
+    fetchedFor?.viewMode === viewMode && fetchedFor?.dateKey === dateKey ? reservations : [];
   const filteredReservations = selectedRooms.size === 0
-    ? reservations
-    : reservations.filter((r) => selectedRooms.has(r.room_id));
+    ? effectiveReservations
+    : effectiveReservations.filter((r) => selectedRooms.has(r.room_id));
 
   return (
     <div className="flex flex-col min-h-screen">
