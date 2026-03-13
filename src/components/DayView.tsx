@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
+import ReservationDetailPopover, { CancelRequestModal } from './ReservationDetailPopover';
 
 const HOUR_START = 6;
 const HOUR_END = 23;
@@ -10,15 +11,29 @@ const PX_PER_MIN = 1.5;
 const PX_PER_HOUR = PX_PER_MIN * 60;
 const TOTAL_HEIGHT = TOTAL_HOURS * PX_PER_HOUR;
 
-const DAYS_KO = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+const DAYS_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
 function toLocalDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function getWeekDays(d: Date): Date[] {
+  const day = d.getDay();
+  const sunday = new Date(d);
+  sunday.setDate(d.getDate() - day);
+  sunday.setHours(0, 0, 0, 0);
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(sunday);
+    date.setDate(sunday.getDate() + i);
+    return date;
+  });
+}
+
 interface Props {
   currentDate: Date;
   reservations: ReservationWithRoom[];
+  onDayClick?: (date: Date) => void;
+  onRefresh?: () => void;
 }
 
 function timeToMinutes(dateStr: string): number {
@@ -73,16 +88,47 @@ function groupOverlapping(items: ReservationWithRoom[]): Array<{ item: Reservati
   return result;
 }
 
-export default function DayView({ currentDate, reservations }: Props) {
+export default function DayView({ currentDate, reservations, onDayClick, onRefresh }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const dayKey = toLocalDateKey(currentDate);
   const dayReservations = reservations.filter((r) => r.start_time.slice(0, 10) === dayKey);
   const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => HOUR_START + i);
   const grouped = groupOverlapping(dayReservations);
 
-  const dayLabel = DAYS_KO[currentDate.getDay()];
   const isToday = dayKey === toLocalDateKey(new Date());
-  const dayNum = currentDate.getDate();
+  const weekDays = getWeekDays(currentDate);
+  const today = toLocalDateKey(new Date());
+
+  const [hovered, setHovered] = useState<{ reservation: ReservationWithRoom; rect: DOMRect } | null>(null);
+  const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showPopover = (reservation: ReservationWithRoom, el: HTMLElement) => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+    setHovered({ reservation, rect: el.getBoundingClientRect() });
+  };
+
+  const hidePopover = (delay = 0) => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+    if (delay > 0) {
+      hideTimeoutRef.current = setTimeout(() => setHovered(null), delay);
+    } else {
+      setHovered(null);
+    }
+  };
+
+  const cancelHide = () => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+  };
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -92,20 +138,49 @@ export default function DayView({ currentDate, reservations }: Props) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Day header */}
+      {/* Week strip */}
       <div className="flex border-b border-gray-200 bg-white sticky top-0 z-10">
         <div className="w-14 flex-shrink-0" />
-        <div className="flex-1 text-center py-2 border-l border-gray-100">
-          <div className="inline-flex flex-col items-center">
-            <span className="text-xs text-gray-500">{dayLabel}</span>
-            <span
-              className={`text-base font-bold w-8 h-8 flex items-center justify-center rounded-full ${
-                isToday ? 'bg-blue-600 text-white' : 'text-gray-800'
+        {weekDays.map((day, idx) => {
+          const key = toLocalDateKey(day);
+          const isSelected = key === dayKey;
+          const isTodayDay = key === today;
+          const hasDot = reservations.some((r) => r.start_time.slice(0, 10) === key);
+          return (
+            <div
+              key={idx}
+              className={`flex-1 text-center py-2 cursor-pointer hover:bg-gray-50 transition ${
+                idx === 0 ? 'text-red-500' : idx === 6 ? 'text-blue-500' : 'text-gray-700'
               }`}
+              onClick={() => onDayClick?.(day)}
             >
-              {dayNum}
-            </span>
-          </div>
+              <div className="inline-flex flex-col items-center gap-0.5">
+                <span className="text-xs text-gray-500">{DAYS_KO[day.getDay()]}</span>
+                <span
+                  className={`text-base font-bold w-8 h-8 flex items-center justify-center rounded-full ${
+                    isSelected
+                      ? 'bg-blue-600 text-white'
+                      : isTodayDay
+                      ? 'bg-blue-100 text-blue-600'
+                      : ''
+                  }`}
+                >
+                  {day.getDate()}
+                </span>
+                <span className={`w-1.5 h-1.5 rounded-full ${hasDot ? 'bg-gray-400' : 'invisible'}`} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Selected date label */}
+      <div className="flex border-b border-gray-100 bg-white sticky top-0 z-10">
+        <div className="w-14 flex-shrink-0" />
+        <div className="flex-1 text-center py-1.5 border-l border-gray-100">
+          <span className={`text-sm font-semibold ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>
+            {currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월 {currentDate.getDate()}일 ({DAYS_KO[currentDate.getDay()]})
+          </span>
         </div>
       </div>
 
@@ -155,12 +230,11 @@ export default function DayView({ currentDate, reservations }: Props) {
               const height = Math.max(20, (endMin - startMin) * PX_PER_MIN - 2);
               const widthPct = 100 / totalCols;
               const leftPct = col * widthPct;
-              const isPending = item.status === 'pending';
+              const isPending = item.status === 'pending' || item.status === 'cancellation_requested';
 
               return (
                 <div
                   key={item.id}
-                  title={`${item.title}\n${item.room_name}\n${formatTime(item.start_time)} - ${formatTime(item.end_time)}\n담당: ${item.person_in_charge}${item.notes ? '\n' + item.notes : ''}${isPending ? '\n[승인 대기 중]' : ''}`}
                   className={`absolute rounded text-white text-xs px-1.5 py-1 overflow-hidden cursor-default ${
                     isPending ? 'reservation-pending opacity-80' : ''
                   }`}
@@ -173,6 +247,8 @@ export default function DayView({ currentDate, reservations }: Props) {
                     border: isPending ? `2px dashed ${item.room_color}` : 'none',
                     zIndex: isPending ? 1 : 2,
                   }}
+                  onMouseEnter={(e) => showPopover(item, e.currentTarget)}
+                  onMouseLeave={() => hidePopover(80)}
                 >
                   <div className="font-semibold leading-tight truncate">{item.title}</div>
                   {height > 24 && (
@@ -196,6 +272,27 @@ export default function DayView({ currentDate, reservations }: Props) {
           </div>
         </div>
       </div>
+
+      {hovered && (
+        <ReservationDetailPopover
+          reservation={hovered.reservation}
+          position={{ top: hovered.rect.top, left: hovered.rect.left }}
+          onMouseEnter={cancelHide}
+          onMouseLeave={() => hidePopover(80)}
+          onRequestCancel={(r) => setCancelModalReservation(r)}
+        />
+      )}
+
+      {cancelModalReservation && (
+        <CancelRequestModal
+          reservation={cancelModalReservation}
+          onConfirm={() => {
+            setCancelModalReservation(null);
+            onRefresh?.();
+          }}
+          onCancel={() => setCancelModalReservation(null)}
+        />
+      )}
     </div>
   );
 }

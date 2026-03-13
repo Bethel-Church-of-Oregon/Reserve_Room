@@ -76,10 +76,11 @@ export default function HomePage() {
     let from: string, to: string;
 
     if (viewMode === 'day') {
-      from = toLocalDateKey(currentDate);
-      const nextDay = new Date(currentDate);
-      nextDay.setDate(nextDay.getDate() + 1);
-      to = toLocalDateKey(nextDay);
+      // Fetch the full week so the week strip dots can be populated
+      from = toLocalDateKey(ws);
+      const weekEnd = new Date(ws);
+      weekEnd.setDate(ws.getDate() + 7);
+      to = toLocalDateKey(weekEnd);
     } else if (viewMode === 'week') {
       from = toLocalDateKey(ws);
       const weekEnd = new Date(ws);
@@ -184,8 +185,8 @@ export default function HomePage() {
       {/* Notice banner */}
       <div className="bg-blue-50 border-b border-blue-100 px-3 sm:px-6 py-2">
         <div className="max-w-screen-2xl mx-auto flex flex-wrap items-center gap-2 text-xs sm:text-sm text-blue-800">
-          <span className="hidden sm:inline">본 시스템은 소모임(사랑방, 사역팀 등) 전용 입니다. 결혼식 등 대규모 행사는</span>
-          <span className="sm:hidden">소모임(사랑방, 사역팀 등) 전용 입니다. 결혼식 등 대규모 행사는</span>
+          <span className="hidden sm:inline">본 시스템은 소모임(사랑방, 사역팀 등) 전용 입니다. 결혼식 등 큰 행사는</span>
+          <span className="sm:hidden">소모임(사랑방, 사역팀 등) 전용 시스템 입니다. 결혼식 등 큰 행사는</span>
           <a
             href="https://drive.google.com/drive/folders/1lz7kaoe8GQf2FZI1Dfb-3hDEEWpFgygj"
             target="_blank"
@@ -343,7 +344,7 @@ export default function HomePage() {
             style={{ height: 'calc(100vh - 170px)' }}
           >
             {viewMode === 'day' ? (
-              <DayView key="day" currentDate={currentDate} reservations={filteredReservations} />
+              <DayView key="day" currentDate={currentDate} reservations={filteredReservations} onDayClick={setCurrentDate} />
             ) : viewMode === 'week' ? (
               <WeekView key="week" weekStart={weekStart} reservations={filteredReservations} />
             ) : (
