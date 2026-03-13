@@ -4,10 +4,10 @@ import React, { useRef, useEffect, useState } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
 import ReservationDetailPopover, { CancelRequestModal } from './ReservationDetailPopover';
 
-const HOUR_START = 6;   // 6am
-const HOUR_END = 23;    // 11pm
+const HOUR_START = 6;
+const HOUR_END = 23;
 const TOTAL_HOURS = HOUR_END - HOUR_START;
-const PX_PER_MIN = 1.5; // 1.5px per minute
+const PX_PER_MIN = 1.5;
 const PX_PER_HOUR = PX_PER_MIN * 60;
 const TOTAL_HEIGHT = TOTAL_HOURS * PX_PER_HOUR;
 
@@ -43,53 +43,35 @@ function formatTime(dateStr: string): string {
 
 function getReservationsForDay(reservations: ReservationWithRoom[], day: Date): ReservationWithRoom[] {
   const key = dateKey(day);
-  return reservations.filter((r) => {
-    const startDate = r.start_time.slice(0, 10);
-    return startDate === key;
-  });
+  return reservations.filter((r) => r.start_time.slice(0, 10) === key);
 }
 
-// Simple overlap grouping to position side-by-side
 function groupOverlapping(items: ReservationWithRoom[]): Array<{ item: ReservationWithRoom; col: number; totalCols: number }> {
   if (items.length === 0) return [];
-
   const sorted = [...items].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
   const result: Array<{ item: ReservationWithRoom; col: number; totalCols: number }> = [];
-  const cols: number[] = []; // end time (in minutes) of last item in each column
+  const cols: number[] = [];
 
   for (const item of sorted) {
     const startMin = timeToMinutes(item.start_time);
     const endMin = timeToMinutes(item.end_time);
-
     let col = cols.findIndex((endM) => endM <= startMin);
-    if (col === -1) {
-      col = cols.length;
-      cols.push(endMin);
-    } else {
-      cols[col] = endMin;
-    }
-
+    if (col === -1) { col = cols.length; cols.push(endMin); } else { cols[col] = endMin; }
     result.push({ item, col, totalCols: 0 });
   }
 
-  // Compute totalCols for overlapping groups
   for (let i = 0; i < result.length; i++) {
     const startMin = timeToMinutes(result[i].item.start_time);
     const endMin = timeToMinutes(result[i].item.end_time);
     let maxCol = result[i].col;
-
     for (let j = 0; j < result.length; j++) {
       if (i === j) continue;
       const sMin = timeToMinutes(result[j].item.start_time);
       const eMin = timeToMinutes(result[j].item.end_time);
-      if (sMin < endMin && eMin > startMin) {
-        maxCol = Math.max(maxCol, result[j].col);
-      }
+      if (sMin < endMin && eMin > startMin) maxCol = Math.max(maxCol, result[j].col);
     }
-
     result[i].totalCols = maxCol + 1;
   }
-
   return result;
 }
 
@@ -102,34 +84,19 @@ export default function WeekView({ weekStart, reservations, onRefresh }: Props) 
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showPopover = (reservation: ReservationWithRoom, el: HTMLElement) => {
-    if (hideTimeoutRef.current) {
-      clearTimeout(hideTimeoutRef.current);
-      hideTimeoutRef.current = null;
-    }
+    if (hideTimeoutRef.current) { clearTimeout(hideTimeoutRef.current); hideTimeoutRef.current = null; }
     setHovered({ reservation, rect: el.getBoundingClientRect() });
   };
-
   const hidePopover = (delay = 0) => {
-    if (hideTimeoutRef.current) {
-      clearTimeout(hideTimeoutRef.current);
-      hideTimeoutRef.current = null;
-    }
-    if (delay > 0) {
-      hideTimeoutRef.current = setTimeout(() => setHovered(null), delay);
-    } else {
-      setHovered(null);
-    }
+    if (hideTimeoutRef.current) { clearTimeout(hideTimeoutRef.current); hideTimeoutRef.current = null; }
+    if (delay > 0) hideTimeoutRef.current = setTimeout(() => setHovered(null), delay);
+    else setHovered(null);
   };
-
   const cancelHide = () => {
-    if (hideTimeoutRef.current) {
-      clearTimeout(hideTimeoutRef.current);
-      hideTimeoutRef.current = null;
-    }
+    if (hideTimeoutRef.current) { clearTimeout(hideTimeoutRef.current); hideTimeoutRef.current = null; }
   };
 
   useEffect(() => {
-    // Scroll to 8am on mount
     if (scrollRef.current) {
       scrollRef.current.scrollTop = (8 - HOUR_START) * PX_PER_HOUR - 20;
     }
@@ -138,39 +105,43 @@ export default function WeekView({ weekStart, reservations, onRefresh }: Props) 
   const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => HOUR_START + i);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Day headers */}
-      <div className="flex border-b border-gray-200 bg-white sticky top-0 z-10">
-        <div className="w-14 flex-shrink-0" />
-        {days.map((day, idx) => {
-          const key = dateKey(day);
-          const isToday = key === today;
-          return (
-            <div
-              key={idx}
-              className={`flex-1 text-center py-2 text-sm font-medium ${
-                idx === 0 ? 'text-red-500' : idx === 6 ? 'text-blue-500' : 'text-gray-700'
-              }`}
-            >
-              <div className={`inline-flex flex-col items-center ${isToday ? 'text-white' : ''}`}>
-                <span className="text-xs text-gray-500">
-                  {DAYS_KO[day.getDay()]}
-                </span>
-                <span
-                  className={`text-base font-bold w-8 h-8 flex items-center justify-center rounded-full ${
-                    isToday ? 'bg-blue-600 text-white' : ''
-                  }`}
-                >
-                  {day.getDate()}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Scrollable body */}
+    <div className="flex flex-col h-full overflow-hidden">
+      {/*
+        Both header AND body live inside ONE scroll container.
+        This ensures the scrollbar width is the same for both,
+        so column dividers stay perfectly aligned.
+      */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto calendar-scroll">
+
+        {/* Sticky day-header — stays at top while body scrolls */}
+        <div className="flex border-b border-gray-200 bg-white sticky top-0 z-10">
+          <div className="w-14 flex-shrink-0" />
+          {days.map((day, idx) => {
+            const key = dateKey(day);
+            const isToday = key === today;
+            return (
+              <div
+                key={idx}
+                className={`flex-1 text-center py-2 text-sm font-medium border-l border-gray-100 ${
+                  idx === 0 ? 'text-red-500' : idx === 6 ? 'text-blue-500' : 'text-gray-700'
+                }`}
+              >
+                <div className="inline-flex flex-col items-center">
+                  <span className="text-xs text-gray-500">{DAYS_KO[day.getDay()]}</span>
+                  <span
+                    className={`text-base font-bold w-8 h-8 flex items-center justify-center rounded-full ${
+                      isToday ? 'bg-blue-600 text-white' : ''
+                    }`}
+                  >
+                    {day.getDate()}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Time grid body */}
         <div className="flex" style={{ height: TOTAL_HEIGHT }}>
           {/* Time labels */}
           <div className="w-14 flex-shrink-0 relative">
@@ -198,7 +169,6 @@ export default function WeekView({ weekStart, reservations, onRefresh }: Props) 
                 className={`flex-1 relative border-l border-gray-100 ${isToday ? 'bg-blue-50/30' : ''}`}
                 style={{ height: TOTAL_HEIGHT }}
               >
-                {/* Hour grid lines */}
                 {hours.map((h) => (
                   <div
                     key={h}
@@ -206,7 +176,6 @@ export default function WeekView({ weekStart, reservations, onRefresh }: Props) 
                     style={{ top: (h - HOUR_START) * PX_PER_HOUR }}
                   />
                 ))}
-                {/* Half-hour lines */}
                 {hours.map((h) => (
                   <div
                     key={`half-${h}`}
@@ -215,7 +184,6 @@ export default function WeekView({ weekStart, reservations, onRefresh }: Props) 
                   />
                 ))}
 
-                {/* Reservation blocks */}
                 {grouped.map(({ item, col, totalCols }) => {
                   const startMin = timeToMinutes(item.start_time) - HOUR_START * 60;
                   const endMin = timeToMinutes(item.end_time) - HOUR_START * 60;
@@ -245,9 +213,7 @@ export default function WeekView({ weekStart, reservations, onRefresh }: Props) 
                     >
                       <div className="font-semibold leading-tight truncate">{item.title}</div>
                       {height > 30 && (
-                        <div className="truncate opacity-90" style={{ fontSize: '10px' }}>
-                          {item.room_name}
-                        </div>
+                        <div className="truncate opacity-90" style={{ fontSize: '10px' }}>{item.room_name}</div>
                       )}
                       {height > 44 && (
                         <div className="truncate opacity-80" style={{ fontSize: '10px' }}>
@@ -276,14 +242,10 @@ export default function WeekView({ weekStart, reservations, onRefresh }: Props) 
       {cancelModalReservation && (
         <CancelRequestModal
           reservation={cancelModalReservation}
-          onConfirm={() => {
-            setCancelModalReservation(null);
-            onRefresh?.();
-          }}
+          onConfirm={() => { setCancelModalReservation(null); onRefresh?.(); }}
           onCancel={() => setCancelModalReservation(null)}
         />
       )}
     </div>
   );
 }
-

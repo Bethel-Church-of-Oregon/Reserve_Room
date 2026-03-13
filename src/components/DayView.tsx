@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
+import ReservationDetailPopover, { CancelRequestModal } from './ReservationDetailPopover';
 
 const HOUR_START = 6;
 const HOUR_END = 23;
@@ -33,7 +34,6 @@ function formatTime(dateStr: string): string {
 
 function groupOverlapping(items: ReservationWithRoom[]): Array<{ item: ReservationWithRoom; col: number; totalCols: number }> {
   if (items.length === 0) return [];
-
   const sorted = [...items].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
   const result: Array<{ item: ReservationWithRoom; col: number; totalCols: number }> = [];
   const cols: number[] = [];
@@ -41,15 +41,8 @@ function groupOverlapping(items: ReservationWithRoom[]): Array<{ item: Reservati
   for (const item of sorted) {
     const startMin = timeToMinutes(item.start_time);
     const endMin = timeToMinutes(item.end_time);
-
     let col = cols.findIndex((endM) => endM <= startMin);
-    if (col === -1) {
-      col = cols.length;
-      cols.push(endMin);
-    } else {
-      cols[col] = endMin;
-    }
-
+    if (col === -1) { col = cols.length; cols.push(endMin); } else { cols[col] = endMin; }
     result.push({ item, col, totalCols: 0 });
   }
 
@@ -57,19 +50,14 @@ function groupOverlapping(items: ReservationWithRoom[]): Array<{ item: Reservati
     const startMin = timeToMinutes(result[i].item.start_time);
     const endMin = timeToMinutes(result[i].item.end_time);
     let maxCol = result[i].col;
-
     for (let j = 0; j < result.length; j++) {
       if (i === j) continue;
       const sMin = timeToMinutes(result[j].item.start_time);
       const eMin = timeToMinutes(result[j].item.end_time);
-      if (sMin < endMin && eMin > startMin) {
-        maxCol = Math.max(maxCol, result[j].col);
-      }
+      if (sMin < endMin && eMin > startMin) maxCol = Math.max(maxCol, result[j].col);
     }
-
     result[i].totalCols = maxCol + 1;
   }
-
   return result;
 }
 
@@ -84,6 +72,23 @@ export default function DayView({ currentDate, reservations }: Props) {
   const isToday = dayKey === toLocalDateKey(new Date());
   const dayNum = currentDate.getDate();
 
+  const [hovered, setHovered] = useState<{ reservation: ReservationWithRoom; rect: DOMRect } | null>(null);
+  const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showPopover = (reservation: ReservationWithRoom, el: HTMLElement) => {
+    if (hideTimeoutRef.current) { clearTimeout(hideTimeoutRef.current); hideTimeoutRef.current = null; }
+    setHovered({ reservation, rect: el.getBoundingClientRect() });
+  };
+  const hidePopover = (delay = 0) => {
+    if (hideTimeoutRef.current) { clearTimeout(hideTimeoutRef.current); hideTimeoutRef.current = null; }
+    if (delay > 0) hideTimeoutRef.current = setTimeout(() => setHovered(null), delay);
+    else setHovered(null);
+  };
+  const cancelHide = () => {
+    if (hideTimeoutRef.current) { clearTimeout(hideTimeoutRef.current); hideTimeoutRef.current = null; }
+  };
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = (8 - HOUR_START) * PX_PER_HOUR - 20;
@@ -91,26 +96,31 @@ export default function DayView({ currentDate, reservations }: Props) {
   }, []);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Day header */}
-      <div className="flex border-b border-gray-200 bg-white sticky top-0 z-10">
-        <div className="w-14 flex-shrink-0" />
-        <div className="flex-1 text-center py-2 border-l border-gray-100">
-          <div className="inline-flex flex-col items-center">
-            <span className="text-xs text-gray-500">{dayLabel}</span>
-            <span
-              className={`text-base font-bold w-8 h-8 flex items-center justify-center rounded-full ${
-                isToday ? 'bg-blue-600 text-white' : 'text-gray-800'
-              }`}
-            >
-              {dayNum}
-            </span>
+    <div className="flex flex-col h-full overflow-hidden">
+      {/*
+        Both header AND body live inside ONE scroll container so the
+        scrollbar width is the same for both — keeps columns aligned.
+      */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto calendar-scroll">
+
+        {/* Sticky day header */}
+        <div className="flex border-b border-gray-200 bg-white sticky top-0 z-10">
+          <div className="w-14 flex-shrink-0" />
+          <div className="flex-1 text-center py-2">
+            <div className="inline-flex flex-col items-center">
+              <span className="text-xs text-gray-500">{dayLabel}</span>
+              <span
+                className={`text-base font-bold w-8 h-8 flex items-center justify-center rounded-full ${
+                  isToday ? 'bg-blue-600 text-white' : 'text-gray-800'
+                }`}
+              >
+                {dayNum}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Scrollable body */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto calendar-scroll">
+        {/* Time grid body */}
         <div className="flex" style={{ height: TOTAL_HEIGHT }}>
           {/* Time labels */}
           <div className="w-14 flex-shrink-0 relative">
@@ -127,10 +137,9 @@ export default function DayView({ currentDate, reservations }: Props) {
 
           {/* Single day column */}
           <div
-            className={`flex-1 relative border-l border-gray-100 ${isToday ? 'bg-blue-50/30' : ''}`}
+            className={`flex-1 relative ${isToday ? 'bg-blue-50/30' : ''}`}
             style={{ height: TOTAL_HEIGHT }}
           >
-            {/* Hour grid lines */}
             {hours.map((h) => (
               <div
                 key={h}
@@ -138,7 +147,6 @@ export default function DayView({ currentDate, reservations }: Props) {
                 style={{ top: (h - HOUR_START) * PX_PER_HOUR }}
               />
             ))}
-            {/* Half-hour lines */}
             {hours.map((h) => (
               <div
                 key={`half-${h}`}
@@ -147,7 +155,6 @@ export default function DayView({ currentDate, reservations }: Props) {
               />
             ))}
 
-            {/* Reservation blocks */}
             {grouped.map(({ item, col, totalCols }) => {
               const startMin = timeToMinutes(item.start_time) - HOUR_START * 60;
               const endMin = timeToMinutes(item.end_time) - HOUR_START * 60;
@@ -160,7 +167,6 @@ export default function DayView({ currentDate, reservations }: Props) {
               return (
                 <div
                   key={item.id}
-                  title={`${item.title}\n${item.room_name}\n${formatTime(item.start_time)} - ${formatTime(item.end_time)}\n담당: ${item.person_in_charge}${item.notes ? '\n' + item.notes : ''}${isPending ? '\n[승인 대기 중]' : ''}`}
                   className={`absolute rounded text-white text-xs px-1.5 py-1 overflow-hidden cursor-default ${
                     isPending ? 'reservation-pending opacity-80' : ''
                   }`}
@@ -173,12 +179,12 @@ export default function DayView({ currentDate, reservations }: Props) {
                     border: isPending ? `2px dashed ${item.room_color}` : 'none',
                     zIndex: isPending ? 1 : 2,
                   }}
+                  onMouseEnter={(e) => showPopover(item, e.currentTarget)}
+                  onMouseLeave={() => hidePopover(80)}
                 >
                   <div className="font-semibold leading-tight truncate">{item.title}</div>
                   {height > 24 && (
-                    <div className="truncate opacity-90" style={{ fontSize: '10px' }}>
-                      {item.room_name}
-                    </div>
+                    <div className="truncate opacity-90" style={{ fontSize: '10px' }}>{item.room_name}</div>
                   )}
                   {height > 40 && (
                     <div className="truncate opacity-80" style={{ fontSize: '10px' }}>
@@ -186,9 +192,7 @@ export default function DayView({ currentDate, reservations }: Props) {
                     </div>
                   )}
                   {height > 56 && (
-                    <div className="truncate opacity-70" style={{ fontSize: '10px' }}>
-                      {item.person_in_charge}
-                    </div>
+                    <div className="truncate opacity-70" style={{ fontSize: '10px' }}>{item.person_in_charge}</div>
                   )}
                 </div>
               );
@@ -196,6 +200,24 @@ export default function DayView({ currentDate, reservations }: Props) {
           </div>
         </div>
       </div>
+
+      {hovered && (
+        <ReservationDetailPopover
+          reservation={hovered.reservation}
+          position={{ top: hovered.rect.top, left: hovered.rect.left }}
+          onMouseEnter={cancelHide}
+          onMouseLeave={() => hidePopover(80)}
+          onRequestCancel={(r) => setCancelModalReservation(r)}
+        />
+      )}
+
+      {cancelModalReservation && (
+        <CancelRequestModal
+          reservation={cancelModalReservation}
+          onConfirm={() => setCancelModalReservation(null)}
+          onCancel={() => setCancelModalReservation(null)}
+        />
+      )}
     </div>
   );
 }
