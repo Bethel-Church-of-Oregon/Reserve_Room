@@ -244,7 +244,7 @@ export async function checkConflict(
     const rows = (await getSql()`
       SELECT COUNT(*)::int as c FROM reservations
       WHERE room_id = ${rid}
-        AND status IN ('pending', 'approved')
+        AND status IN ('pending', 'approved', 'cancellation_requested')
         AND start_time < ${end_time}
         AND end_time > ${start_time}
         AND id != ${excludeId}
@@ -255,7 +255,7 @@ export async function checkConflict(
   const rows = (await getSql()`
     SELECT COUNT(*)::int as c FROM reservations
     WHERE room_id = ${rid}
-      AND status IN ('pending', 'approved')
+      AND status IN ('pending', 'approved', 'cancellation_requested')
       AND start_time < ${end_time}
       AND end_time > ${start_time}
   `) as { c: number }[];
