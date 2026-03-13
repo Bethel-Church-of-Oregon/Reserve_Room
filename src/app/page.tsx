@@ -40,6 +40,11 @@ function formatWeekTitle(weekStart: Date): string {
   return `${s} – ${e}`;
 }
 
+// Use local date components (avoid timezone shift from toISOString)
+function toLocalDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<ViewMode>('week');
@@ -70,19 +75,19 @@ export default function HomePage() {
     let from: string, to: string;
 
     if (viewMode === 'day') {
-      from = currentDate.toISOString().slice(0, 10);
+      from = toLocalDateKey(currentDate);
       const nextDay = new Date(currentDate);
       nextDay.setDate(nextDay.getDate() + 1);
-      to = nextDay.toISOString().slice(0, 10);
+      to = toLocalDateKey(nextDay);
     } else if (viewMode === 'week') {
-      from = ws.toISOString().slice(0, 10);
+      from = toLocalDateKey(ws);
       const weekEnd = new Date(ws);
       weekEnd.setDate(ws.getDate() + 7);
-      to = weekEnd.toISOString().slice(0, 10);
+      to = toLocalDateKey(weekEnd);
     } else {
-      from = startOfMonth(currentDate).toISOString().slice(0, 10);
-      const me = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-      to = me.toISOString().slice(0, 10);
+      from = toLocalDateKey(startOfMonth(currentDate));
+      const firstOfNext = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+      to = toLocalDateKey(firstOfNext);
     }
 
     async function load() {
