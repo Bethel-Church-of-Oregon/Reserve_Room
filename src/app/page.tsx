@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import WeekView from '@/components/WeekView';
 import MonthView from '@/components/MonthView';
@@ -59,8 +59,10 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [selectedRooms, setSelectedRooms] = useState<Set<number>>(new Set());
   const [legendOpen, setLegendOpen] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const weekStart = startOfWeek(currentDate);
+  const refreshReservations = useCallback(() => setRefreshTrigger((t) => t + 1), []);
 
   // String key for stable effect dependency (avoids Date object reference issues)
   const dateKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}`;
@@ -111,7 +113,7 @@ export default function HomePage() {
     load();
 
     return () => { cancelled = true; };
-  }, [viewMode, dateKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [viewMode, dateKey, refreshTrigger]);
 
   function navigate(dir: -1 | 1) {
     setCurrentDate((prev) => {
@@ -344,12 +346,12 @@ export default function HomePage() {
             style={{ height: 'calc(100vh - 170px)' }}
           >
             {viewMode === 'day' ? (
-              <DayView key="day" currentDate={currentDate} reservations={filteredReservations} onDayClick={setCurrentDate} />
+              <DayView key="day" currentDate={currentDate} reservations={filteredReservations} onDayClick={setCurrentDate} onRefresh={refreshReservations} />
             ) : viewMode === 'week' ? (
-              <WeekView key="week" weekStart={weekStart} reservations={filteredReservations} />
+              <WeekView key="week" weekStart={weekStart} reservations={filteredReservations} onRefresh={refreshReservations} />
             ) : (
               <div key="month" className="h-full overflow-y-auto calendar-scroll">
-                <MonthView currentDate={currentDate} reservations={filteredReservations} />
+                <MonthView currentDate={currentDate} reservations={filteredReservations} onRefresh={refreshReservations} />
               </div>
             )}
           </div>
