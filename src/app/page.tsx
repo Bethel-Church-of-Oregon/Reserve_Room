@@ -67,7 +67,7 @@ export default function HomePage() {
   const refreshReservations = useCallback(() => setRefreshTrigger((t) => t + 1), []);
 
   // String key for stable effect dependency (avoids Date object reference issues)
-  const dateKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}`;
+  const dateKey = toLocalDateKey(currentDate);
 
   useEffect(() => {
     setRoomsError(null);
