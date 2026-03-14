@@ -10,9 +10,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   try {
-    const id = parseInt(params.id);
+    const id = parseInt(params.id, 10);
+    if (isNaN(id) || id < 1) {
+      return NextResponse.json({ error: '잘못된 예약 번호입니다.' }, { status: 400 });
+    }
+
     const body = await req.json();
     const { action, reason } = body;
+    const REASON_MAX = 500;
 
     if (action === 'approve') {
       // 승인 전에 예약 정보 조회
@@ -31,18 +36,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     if (action === 'reject') {
-      if (!reason?.trim()) {
+      const reasonTrimmed = reason?.trim();
+      if (!reasonTrimmed) {
         return NextResponse.json({ error: '거절 사유를 입력해주세요.' }, { status: 400 });
+      }
+      if (reasonTrimmed.length > REASON_MAX) {
+        return NextResponse.json({ error: `거절 사유는 ${REASON_MAX}자 이하여야 합니다.` }, { status: 400 });
       }
 
       // 거절 전에 예약 정보 조회
       const reservation = await getReservationById(id);
-      const ok = await rejectReservation(id, reason);
+      const ok = await rejectReservation(id, reasonTrimmed);
       if (!ok) return NextResponse.json({ error: '거절할 수 없습니다.' }, { status: 400 });
 
       // 이메일 발송 (실패해도 거절은 유지)
       if (reservation) {
-        sendRejectionEmail(reservation, reason).catch((e) =>
+        sendRejectionEmail(reservation, reasonTrimmed).catch((e) =>
           console.error('[email] 거절 이메일 발송 실패:', e)
         );
       }
@@ -65,12 +74,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     if (action === 'reject_cancellation') {
+      const cancelReasonTrimmed = reason?.trim();
+      if (cancelReasonTrimmed && cancelReasonTrimmed.length > REASON_MAX) {
+        return NextResponse.json({ error: `거절 사유는 ${REASON_MAX}자 이하여야 합니다.` }, { status: 400 });
+      }
+
       const reservation = await getReservationById(id);
       const ok = await rejectCancellation(id);
       if (!ok) return NextResponse.json({ error: '취소 거절할 수 없습니다.' }, { status: 400 });
 
       if (reservation) {
-        sendCancellationRejectedEmail(reservation, reason?.trim() || undefined).catch((e) =>
+        sendCancellationRejectedEmail(reservation, cancelReasonTrimmed || undefined).catch((e) =>
           console.error('[email] 취소 거절 이메일 발송 실패:', e)
         );
       }
@@ -91,7 +105,11 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   }
 
   try {
-    const id = parseInt(params.id);
+    const id = parseInt(params.id, 10);
+    if (isNaN(id) || id < 1) {
+      return NextResponse.json({ error: '잘못된 예약 번호입니다.' }, { status: 400 });
+    }
+
     const ok = await deleteReservation(id);
     if (!ok) return NextResponse.json({ error: '삭제할 수 없습니다. 승인된 예약만 삭제 가능합니다.' }, { status: 400 });
     return NextResponse.json({ success: true });

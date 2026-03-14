@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getReservations, createReservation, checkConflict } from '@/lib/db';
+import { getReservations, createReservation, checkConflict, getRooms } from '@/lib/db';
 import { checkReservationLimit } from '@/lib/ratelimit';
+
+const LIMITS = { title: 100, person_in_charge: 100, notes: 500, email: 254 };
 
 export async function GET(req: NextRequest) {
   try {
@@ -79,7 +81,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '필수 항목을 모두 입력해주세요.' }, { status: 400 });
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
+    const titleStr = String(title).trim();
+    const personStr = String(person_in_charge).trim();
+    const emailStr = String(email).trim();
+    const notesStr = notes != null ? String(notes).trim() : '';
+
+    if (titleStr.length > LIMITS.title) {
+      return NextResponse.json({ error: `제목은 ${LIMITS.title}자 이하여야 합니다.` }, { status: 400 });
+    }
+    if (personStr.length > LIMITS.person_in_charge) {
+      return NextResponse.json({ error: `담당자명은 ${LIMITS.person_in_charge}자 이하여야 합니다.` }, { status: 400 });
+    }
+    if (emailStr.length > LIMITS.email) {
+      return NextResponse.json({ error: `이메일은 ${LIMITS.email}자 이하여야 합니다.` }, { status: 400 });
+    }
+    if (notesStr.length > LIMITS.notes) {
+      return NextResponse.json({ error: `노트는 ${LIMITS.notes}자 이하여야 합니다.` }, { status: 400 });
+    }
+
+    const roomIdNum = Number(room_id);
+    if (!Number.isInteger(roomIdNum) || roomIdNum < 1) {
+      return NextResponse.json({ error: '올바른 장소를 선택해 주세요.' }, { status: 400 });
+    }
+    const rooms = await getRooms();
+    if (!rooms.some((r) => r.id === roomIdNum)) {
+      return NextResponse.json({ error: '존재하지 않는 장소입니다.' }, { status: 400 });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailStr)) {
       return NextResponse.json({ error: '올바른 이메일 형식이 아닙니다.' }, { status: 400 });
     }
 
@@ -95,11 +124,11 @@ export async function POST(req: NextRequest) {
       const conflictDates: string[] = [];
 
       for (const occ of occurrences) {
-        const hasConflict = await checkConflict(room_id, occ.start_time, occ.end_time);
+        const hasConflict = await checkConflict(roomIdNum, occ.start_time, occ.end_time);
         if (hasConflict) {
           conflictDates.push(occ.start_time.slice(0, 10));
         } else {
-          await createReservation({ title, room_id, start_time: occ.start_time, end_time: occ.end_time, person_in_charge, email, notes });
+          await createReservation({ title: titleStr, room_id: roomIdNum, start_time: occ.start_time, end_time: occ.end_time, person_in_charge: personStr, email: emailStr, notes: notesStr || undefined });
           created++;
         }
       }
@@ -115,7 +144,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Single reservation
-    const hasConflict = await checkConflict(room_id, start_time, end_time);
+    const hasConflict = await checkConflict(roomIdNum, start_time, end_time);
     if (hasConflict) {
       return NextResponse.json(
         { error: 'conflict', message: '해당 시간에 이미 예약이 있습니다.' },
@@ -123,7 +152,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const reservation = await createReservation({ title, room_id, start_time, end_time, person_in_charge, email, notes });
+    const reservation = await createReservation({ title: titleStr, room_id: roomIdNum, start_time, end_time, person_in_charge: personStr, email: emailStr, notes: notesStr || undefined });
     return NextResponse.json(reservation, { status: 201 });
   } catch (e) {
     console.error(e);

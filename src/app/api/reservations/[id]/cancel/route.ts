@@ -15,8 +15,8 @@ export async function POST(
       );
     }
 
-    const id = parseInt(params.id);
-    if (isNaN(id)) {
+    const id = parseInt(params.id, 10);
+    if (isNaN(id) || id < 1) {
       return NextResponse.json({ error: '잘못된 예약 번호입니다.' }, { status: 400 });
     }
 
@@ -24,6 +24,9 @@ export async function POST(
     const reason = body?.reason?.trim();
     if (!reason) {
       return NextResponse.json({ error: '취소 사유를 입력해주세요.' }, { status: 400 });
+    }
+    if (reason.length > 500) {
+      return NextResponse.json({ error: '취소 사유는 500자 이하여야 합니다.' }, { status: 400 });
     }
 
     const ok = await requestCancellation(id, reason);
