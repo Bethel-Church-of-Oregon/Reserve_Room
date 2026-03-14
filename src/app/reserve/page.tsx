@@ -2,6 +2,7 @@
 
 import React, { Suspense, useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { format } from 'date-fns';
 import { Room } from '@/lib/db';
 
 type RecurringType = 'none' | 'daily' | 'weekly' | 'monthly';
@@ -49,7 +50,7 @@ function generateTimeOptions(): string[] {
 const TIME_OPTIONS = generateTimeOptions();
 
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  return format(new Date(), 'yyyy-MM-dd');
 }
 
 const RECURRING_LABELS: Record<RecurringType, string> = {
