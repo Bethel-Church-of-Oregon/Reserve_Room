@@ -1,13 +1,17 @@
 import nodemailer from 'nodemailer';
 import { ReservationWithRoom } from './db';
 
-const SENDER = 'bethel.oregon.dev@gmail.com';
+function getEmailSender(): string {
+  const sender = process.env.GMAIL_USER?.trim();
+  return sender || 'bethel.oregon.dev@gmail.com';
+}
 
 function getTransporter() {
+  const sender = getEmailSender();
   return nodemailer.createTransport({
     service: 'gmail',
     auth: {
-      user: SENDER,
+      user: sender,
       pass: process.env.GMAIL_APP_PASSWORD,
     },
   });
@@ -36,7 +40,7 @@ export async function sendApprovalEmail(reservation: ReservationWithRoom): Promi
   const transporter = getTransporter();
 
   await transporter.sendMail({
-    from: `"오레곤벧엘교회 장소예약시스템" <${SENDER}>`,
+    from: `"오레곤벧엘교회 장소예약시스템" <${getEmailSender()}>`,
     to: reservation.email,
     subject: `[오레곤벧엘교회] 장소 예약이 확정되었습니다 — ${reservation.title}`,
     html: `
@@ -93,7 +97,7 @@ export async function sendBulkApprovalEmail(reservations: ReservationWithRoom[])
     if (rsvs.length === 1) {
       // 1건이면 단건 이메일 형식 사용
       await transporter.sendMail({
-        from: `"오레곤벧엘교회 장소예약시스템" <${SENDER}>`,
+        from: `"오레곤벧엘교회 장소예약시스템" <${getEmailSender()}>`,
         to: email,
         subject: `[오레곤벧엘교회] 장소 예약이 확정되었습니다 — ${rsvs[0].title}`,
         html: `
@@ -137,7 +141,7 @@ export async function sendBulkApprovalEmail(reservations: ReservationWithRoom[])
       `).join('');
 
       await transporter.sendMail({
-        from: `"오레곤벧엘교회 장소예약시스템" <${SENDER}>`,
+        from: `"오레곤벧엘교회 장소예약시스템" <${getEmailSender()}>`,
         to: email,
         subject: `[오레곤벧엘교회] ${rsvs.length}건 장소 예약이 확정되었습니다`,
         html: `
@@ -175,7 +179,7 @@ export async function sendCancellationApprovedEmail(reservation: ReservationWith
   const transporter = getTransporter();
 
   await transporter.sendMail({
-    from: `"오레곤벧엘교회 장소예약시스템" <${SENDER}>`,
+    from: `"오레곤벧엘교회 장소예약시스템" <${getEmailSender()}>`,
     to: reservation.email,
     subject: `[오레곤벧엘교회] 예약 취소가 승인되었습니다 — ${reservation.title}`,
     html: `
@@ -225,7 +229,7 @@ export async function sendCancellationRejectedEmail(reservation: ReservationWith
   ` : '';
 
   await transporter.sendMail({
-    from: `"오레곤벧엘교회 장소예약시스템" <${SENDER}>`,
+    from: `"오레곤벧엘교회 장소예약시스템" <${getEmailSender()}>`,
     to: reservation.email,
     subject: `[오레곤벧엘교회] 예약 취소 요청이 거절되었습니다 — ${reservation.title}`,
     html: `
@@ -270,7 +274,7 @@ export async function sendRejectionEmail(reservation: ReservationWithRoom, reaso
   const transporter = getTransporter();
 
   await transporter.sendMail({
-    from: `"오레곤벧엘교회 장소예약시스템" <${SENDER}>`,
+    from: `"오레곤벧엘교회 장소예약시스템" <${getEmailSender()}>`,
     to: reservation.email,
     subject: `[오레곤벧엘교회] 장소 예약 신청이 거절되었습니다 — ${reservation.title}`,
     html: `

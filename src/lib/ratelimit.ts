@@ -1,4 +1,4 @@
-import { Ratelimit } from '@upstash/ratelimit';
+import { Ratelimit, type Duration } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 import { NextRequest } from 'next/server';
 
@@ -10,7 +10,7 @@ function getClientIp(req: NextRequest): string {
   );
 }
 
-function createRatelimit(tokens: number, window: string, prefix: string): InstanceType<typeof Ratelimit> | null {
+function createRatelimit(tokens: number, window: Duration, prefix: string): InstanceType<typeof Ratelimit> | null {
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) {

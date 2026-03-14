@@ -3,6 +3,7 @@ import { approveReservation, rejectReservation, deleteReservation, getReservatio
 import { sendApprovalEmail, sendRejectionEmail, sendCancellationApprovedEmail, sendCancellationRejectedEmail } from '@/lib/email';
 import { cookies } from 'next/headers';
 import { verifyAdminSession } from '@/lib/auth';
+import { LIMITS } from '@/lib/constants';
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   if (!verifyAdminSession(cookies().get('admin_auth')?.value)) {
@@ -17,7 +18,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     const body = await req.json();
     const { action, reason } = body;
-    const REASON_MAX = 500;
 
     if (action === 'approve') {
       // 승인 전에 예약 정보 조회
@@ -40,8 +40,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       if (!reasonTrimmed) {
         return NextResponse.json({ error: '거절 사유를 입력해주세요.' }, { status: 400 });
       }
-      if (reasonTrimmed.length > REASON_MAX) {
-        return NextResponse.json({ error: `거절 사유는 ${REASON_MAX}자 이하여야 합니다.` }, { status: 400 });
+      if (reasonTrimmed.length > LIMITS.reason) {
+        return NextResponse.json({ error: `거절 사유는 ${LIMITS.reason}자 이하여야 합니다.` }, { status: 400 });
       }
 
       // 거절 전에 예약 정보 조회
@@ -75,8 +75,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     if (action === 'reject_cancellation') {
       const cancelReasonTrimmed = reason?.trim();
-      if (cancelReasonTrimmed && cancelReasonTrimmed.length > REASON_MAX) {
-        return NextResponse.json({ error: `거절 사유는 ${REASON_MAX}자 이하여야 합니다.` }, { status: 400 });
+      if (cancelReasonTrimmed && cancelReasonTrimmed.length > LIMITS.reason) {
+        return NextResponse.json({ error: `거절 사유는 ${LIMITS.reason}자 이하여야 합니다.` }, { status: 400 });
       }
 
       const reservation = await getReservationById(id);

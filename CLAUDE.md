@@ -44,6 +44,7 @@ npm run build && npm start  # 프로덕션 (포트 8000)
 ```env
 POSTGRES_URL=                     # Neon 연결 문자열 (Vercel 연동 시 자동, DATABASE_URL도 가능)
 ADMIN_PASSWORD=bethel2024         # 관리자 비밀번호
+GMAIL_USER=                       # Gmail 주소 (선택, 미설정 시 bethel.oregon.dev@gmail.com)
 GMAIL_APP_PASSWORD=               # Gmail 앱 비밀번호 16자리 (공백 없이)
 UPSTASH_REDIS_REST_URL=           # Upstash Redis URL (선택, rate limiting용)
 UPSTASH_REDIS_REST_TOKEN=         # Upstash Redis Token (선택, rate limiting용)

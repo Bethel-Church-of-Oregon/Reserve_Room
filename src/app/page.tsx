@@ -232,6 +232,8 @@ export default function HomePage() {
           <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
             <button
               onClick={() => setViewMode('day')}
+              aria-label="일간 보기"
+              aria-pressed={viewMode === 'day'}
               className={`px-3 py-1.5 font-medium transition ${
                 viewMode === 'day' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
               }`}
@@ -240,6 +242,8 @@ export default function HomePage() {
             </button>
             <button
               onClick={() => setViewMode('week')}
+              aria-label="주간 보기"
+              aria-pressed={viewMode === 'week'}
               className={`px-3 py-1.5 font-medium transition border-l border-gray-200 ${
                 viewMode === 'week' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
               }`}
@@ -248,6 +252,8 @@ export default function HomePage() {
             </button>
             <button
               onClick={() => setViewMode('month')}
+              aria-label="월간 보기"
+              aria-pressed={viewMode === 'month'}
               className={`px-3 py-1.5 font-medium transition border-l border-gray-200 ${
                 viewMode === 'month' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
               }`}
@@ -267,6 +273,7 @@ export default function HomePage() {
             </button>
             <button
               onClick={goToday}
+              aria-label="오늘로 이동"
               className="px-3 py-1 text-sm border border-gray-200 rounded hover:bg-gray-50 text-gray-700 transition"
             >
               오늘
@@ -307,6 +314,8 @@ export default function HomePage() {
         <div className="max-w-screen-2xl mx-auto flex items-center gap-2 py-2">
           <button
             onClick={() => setLegendOpen((v) => !v)}
+            aria-label={legendOpen ? '장소 필터 접기' : '장소 필터 열기'}
+            aria-expanded={legendOpen}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition ${
               legendOpen
                 ? 'bg-gray-100 border-gray-300 text-gray-800'

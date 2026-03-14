@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requestCancellation } from '@/lib/db';
 import { checkCancelLimit } from '@/lib/ratelimit';
+import { LIMITS } from '@/lib/constants';
 
 export async function POST(
   req: NextRequest,
@@ -25,8 +26,8 @@ export async function POST(
     if (!reason) {
       return NextResponse.json({ error: '취소 사유를 입력해주세요.' }, { status: 400 });
     }
-    if (reason.length > 500) {
-      return NextResponse.json({ error: '취소 사유는 500자 이하여야 합니다.' }, { status: 400 });
+    if (reason.length > LIMITS.reason) {
+      return NextResponse.json({ error: `취소 사유는 ${LIMITS.reason}자 이하여야 합니다.` }, { status: 400 });
     }
 
     const ok = await requestCancellation(id, reason);

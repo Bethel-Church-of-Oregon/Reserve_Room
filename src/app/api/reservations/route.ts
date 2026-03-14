@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { addMonths, addDays, format } from 'date-fns';
 import { getReservations, createReservation, checkConflict, getRooms } from '@/lib/db';
 import { checkReservationLimit } from '@/lib/ratelimit';
-
-const LIMITS = { title: 100, person_in_charge: 100, notes: 500, email: 254 };
+import { LIMITS } from '@/lib/constants';
 
 export async function GET(req: NextRequest) {
   try {
@@ -17,17 +17,17 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// Date helpers (timezone-safe: uses local date components only)
+// Date helpers (timezone-safe: uses date-fns for correct month boundaries, e.g. Jan 31 + 1 month = Feb 28/29)
 function dateAdd(dateStr: string, days: number): string {
   const [y, m, d] = dateStr.split('-').map(Number);
-  const date = new Date(y, m - 1, d + days);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const date = addDays(new Date(y, m - 1, d), days);
+  return format(date, 'yyyy-MM-dd');
 }
 
 function monthAdd(dateStr: string, months: number): string {
   const [y, m, d] = dateStr.split('-').map(Number);
-  const date = new Date(y, m - 1 + months, d);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const date = addMonths(new Date(y, m - 1, d), months);
+  return format(date, 'yyyy-MM-dd');
 }
 
 function generateOccurrences(
