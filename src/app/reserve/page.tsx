@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Suspense, useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Room } from '@/lib/db';
 
@@ -64,6 +64,7 @@ function ReserveForm() {
   const searchParams = useSearchParams();
 
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [roomsError, setRoomsError] = useState<string | null>(null);
   const [form, setForm] = useState<FormData>({
     title: '',
     room_id: '',
@@ -81,12 +82,20 @@ function ReserveForm() {
   const [success, setSuccess] = useState(false);
   const [successInfo, setSuccessInfo] = useState<SuccessInfo | null>(null);
 
-  useEffect(() => {
+  const loadRooms = useCallback(() => {
+    setRoomsError(null);
     fetch('/api/rooms')
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error('장소 목록을 불러오지 못했습니다.');
+        return r.json();
+      })
       .then(setRooms)
-      .catch(console.error);
+      .catch((e) => {
+        console.error('rooms fetch error:', e);
+        setRoomsError(e instanceof Error ? e.message : '장소 목록을 불러오지 못했습니다.');
+      });
   }, []);
+  useEffect(() => { loadRooms(); }, [loadRooms]);
 
   function validate(): FormErrors {
     const errs: FormErrors = {};
@@ -299,6 +308,18 @@ function ReserveForm() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               장소 <span className="text-red-500">*</span>
             </label>
+            {roomsError && (
+              <div className="mb-2 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between gap-2">
+                <p className="text-sm text-amber-800">{roomsError}</p>
+                <button
+                  type="button"
+                  onClick={loadRooms}
+                  className="text-sm font-medium text-amber-700 hover:text-amber-900 underline flex-shrink-0"
+                >
+                  다시 시도
+                </button>
+              </div>
+            )}
             <div className="relative">
               <select
                 value={form.room_id}

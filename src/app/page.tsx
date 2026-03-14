@@ -56,6 +56,8 @@ export default function HomePage() {
   const [reservations, setReservations] = useState<ReservationWithRoom[]>([]);
   const [fetchedFor, setFetchedFor] = useState<{ viewMode: ViewMode; dateKey: string } | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [roomsError, setRoomsError] = useState<string | null>(null);
+  const [reservationsError, setReservationsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedRooms, setSelectedRooms] = useState<Set<number>>(new Set());
   const [legendOpen, setLegendOpen] = useState(false);
@@ -68,7 +70,17 @@ export default function HomePage() {
   const dateKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}`;
 
   useEffect(() => {
-    fetch('/api/rooms').then((r) => r.json()).then(setRooms).catch(console.error);
+    setRoomsError(null);
+    fetch('/api/rooms')
+      .then((r) => {
+        if (!r.ok) throw new Error('장소 목록을 불러오지 못했습니다.');
+        return r.json();
+      })
+      .then(setRooms)
+      .catch((e) => {
+        console.error('rooms fetch error:', e);
+        setRoomsError(e instanceof Error ? e.message : '장소 목록을 불러오지 못했습니다.');
+      });
   }, []);
 
   useEffect(() => {
@@ -95,16 +107,28 @@ export default function HomePage() {
     }
 
     async function load() {
-      if (!cancelled) setLoading(true);
+      if (!cancelled) {
+        setLoading(true);
+        setReservationsError(null);
+      }
       try {
         const res = await fetch(`/api/reservations?from=${from}&to=${to}`, { cache: 'no-store' });
         const data = await res.json();
         if (!cancelled) {
-          setReservations(Array.isArray(data) ? data : []);
-          setFetchedFor({ viewMode, dateKey });
+          if (!res.ok) {
+            setReservationsError(typeof data?.error === 'string' ? data.error : '예약 목록을 불러오지 못했습니다.');
+            setReservations([]);
+          } else {
+            setReservations(Array.isArray(data) ? data : []);
+            setFetchedFor({ viewMode, dateKey });
+          }
         }
       } catch (e) {
         console.error('fetch reservations error:', e);
+        if (!cancelled) {
+          setReservationsError('네트워크 오류가 발생했습니다. 다시 시도해 주세요.');
+          setReservations([]);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -337,6 +361,34 @@ export default function HomePage() {
           </div>
         )}
       </div>
+
+      {/* Error banners */}
+      {roomsError && (
+        <div className="bg-amber-50 border-b border-amber-200 px-3 sm:px-6 py-2">
+          <div className="max-w-screen-2xl mx-auto flex items-center justify-between gap-2">
+            <p className="text-sm text-amber-800">{roomsError}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="text-sm text-amber-700 hover:text-amber-900 font-medium underline"
+            >
+              새로고침
+            </button>
+          </div>
+        </div>
+      )}
+      {reservationsError && (
+        <div className="bg-amber-50 border-b border-amber-200 px-3 sm:px-6 py-3">
+          <div className="max-w-screen-2xl mx-auto flex items-center justify-between gap-2 flex-wrap">
+            <p className="text-sm text-amber-800">{reservationsError}</p>
+            <button
+              onClick={refreshReservations}
+              className="px-3 py-1.5 text-sm font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-lg transition"
+            >
+              다시 시도
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Calendar */}
       <main className="flex-1 overflow-hidden">
