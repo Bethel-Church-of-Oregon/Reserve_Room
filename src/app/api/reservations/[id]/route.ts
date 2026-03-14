@@ -2,19 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { approveReservation, rejectReservation, deleteReservation, getReservationById, approveCancellation, rejectCancellation } from '@/lib/db';
 import { sendApprovalEmail, sendRejectionEmail, sendCancellationApprovedEmail, sendCancellationRejectedEmail } from '@/lib/email';
 import { cookies } from 'next/headers';
-
-function isAdminAuthed(): boolean {
-  const cookieStore = cookies();
-  return cookieStore.get('admin_auth')?.value === 'true';
-}
+import { verifyAdminSession } from '@/lib/auth';
+import { LIMITS } from '@/lib/constants';
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  if (!isAdminAuthed()) {
+  if (!verifyAdminSession(cookies().get('admin_auth')?.value)) {
     return NextResponse.json({ error: '관리자 인증이 필요합니다.' }, { status: 401 });
   }
 
   try {
-    const id = parseInt(params.id);
+    const id = parseInt(params.id, 10);
+    if (isNaN(id) || id < 1) {
+      return NextResponse.json({ error: '잘못된 예약 번호입니다.' }, { status: 400 });
+    }
+
     const body = await req.json();
     const { action, reason } = body;
 
@@ -35,18 +36,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     if (action === 'reject') {
-      if (!reason?.trim()) {
+      const reasonTrimmed = reason?.trim();
+      if (!reasonTrimmed) {
         return NextResponse.json({ error: '거절 사유를 입력해주세요.' }, { status: 400 });
+      }
+      if (reasonTrimmed.length > LIMITS.reason) {
+        return NextResponse.json({ error: `거절 사유는 ${LIMITS.reason}자 이하여야 합니다.` }, { status: 400 });
       }
 
       // 거절 전에 예약 정보 조회
       const reservation = await getReservationById(id);
-      const ok = await rejectReservation(id, reason);
+      const ok = await rejectReservation(id, reasonTrimmed);
       if (!ok) return NextResponse.json({ error: '거절할 수 없습니다.' }, { status: 400 });
 
       // 이메일 발송 (실패해도 거절은 유지)
       if (reservation) {
-        sendRejectionEmail(reservation, reason).catch((e) =>
+        sendRejectionEmail(reservation, reasonTrimmed).catch((e) =>
           console.error('[email] 거절 이메일 발송 실패:', e)
         );
       }
@@ -69,12 +74,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     if (action === 'reject_cancellation') {
+      const cancelReasonTrimmed = reason?.trim();
+      if (cancelReasonTrimmed && cancelReasonTrimmed.length > LIMITS.reason) {
+        return NextResponse.json({ error: `거절 사유는 ${LIMITS.reason}자 이하여야 합니다.` }, { status: 400 });
+      }
+
       const reservation = await getReservationById(id);
       const ok = await rejectCancellation(id);
       if (!ok) return NextResponse.json({ error: '취소 거절할 수 없습니다.' }, { status: 400 });
 
       if (reservation) {
-        sendCancellationRejectedEmail(reservation, reason?.trim() || undefined).catch((e) =>
+        sendCancellationRejectedEmail(reservation, cancelReasonTrimmed || undefined).catch((e) =>
           console.error('[email] 취소 거절 이메일 발송 실패:', e)
         );
       }
@@ -90,12 +100,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  if (!isAdminAuthed()) {
+  if (!verifyAdminSession(cookies().get('admin_auth')?.value)) {
     return NextResponse.json({ error: '관리자 인증이 필요합니다.' }, { status: 401 });
   }
 
   try {
-    const id = parseInt(params.id);
+    const id = parseInt(params.id, 10);
+    if (isNaN(id) || id < 1) {
+      return NextResponse.json({ error: '잘못된 예약 번호입니다.' }, { status: 400 });
+    }
+
     const ok = await deleteReservation(id);
     if (!ok) return NextResponse.json({ error: '삭제할 수 없습니다. 승인된 예약만 삭제 가능합니다.' }, { status: 400 });
     return NextResponse.json({ success: true });

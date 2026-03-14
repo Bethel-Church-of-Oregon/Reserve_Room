@@ -1,8 +1,10 @@
 'use client';
 
-import React, { Suspense, useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { format } from 'date-fns';
 import { Room } from '@/lib/db';
+import { LIMITS } from '@/lib/constants';
 
 type RecurringType = 'none' | 'daily' | 'weekly' | 'monthly';
 
@@ -25,8 +27,10 @@ interface FormErrors {
   end_time?: string;
   person_in_charge?: string;
   email?: string;
+  notes?: string;
   recurring_until?: string;
   conflict?: string;
+  conflictDates?: string[];
   general?: string;
 }
 
@@ -49,7 +53,7 @@ function generateTimeOptions(): string[] {
 const TIME_OPTIONS = generateTimeOptions();
 
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  return format(new Date(), 'yyyy-MM-dd');
 }
 
 const RECURRING_LABELS: Record<RecurringType, string> = {
@@ -64,6 +68,7 @@ function ReserveForm() {
   const searchParams = useSearchParams();
 
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [roomsError, setRoomsError] = useState<string | null>(null);
   const [form, setForm] = useState<FormData>({
     title: '',
     room_id: '',
@@ -81,16 +86,26 @@ function ReserveForm() {
   const [success, setSuccess] = useState(false);
   const [successInfo, setSuccessInfo] = useState<SuccessInfo | null>(null);
 
-  useEffect(() => {
+  const loadRooms = useCallback(() => {
+    setRoomsError(null);
     fetch('/api/rooms')
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error('장소 목록을 불러오지 못했습니다.');
+        return r.json();
+      })
       .then(setRooms)
-      .catch(console.error);
+      .catch((e) => {
+        console.error('rooms fetch error:', e);
+        setRoomsError(e instanceof Error ? e.message : '장소 목록을 불러오지 못했습니다.');
+      });
   }, []);
+  useEffect(() => { loadRooms(); }, [loadRooms]);
 
   function validate(): FormErrors {
     const errs: FormErrors = {};
-    if (!form.title.trim()) errs.title = '제목을 입력해주세요.';
+    const title = form.title.trim();
+    if (!title) errs.title = '제목을 입력해주세요.';
+    else if (title.length > LIMITS.title) errs.title = `제목은 ${LIMITS.title}자 이하여야 합니다.`;
     if (!form.room_id) errs.room_id = '장소를 선택해주세요.';
     if (!form.date) errs.date = '날짜를 선택해주세요.';
     if (!form.start_time) errs.start_time = '시작 시간을 선택해주세요.';
@@ -98,12 +113,16 @@ function ReserveForm() {
     if (form.start_time && form.end_time && form.start_time >= form.end_time) {
       errs.end_time = '종료 시간은 시작 시간보다 늦어야 합니다.';
     }
-    if (!form.person_in_charge.trim()) errs.person_in_charge = '담당자를 입력해주세요.';
-    if (!form.email.trim()) {
+    const person = form.person_in_charge.trim();
+    if (!person) errs.person_in_charge = '담당자를 입력해주세요.';
+    else if (person.length > LIMITS.person_in_charge) errs.person_in_charge = `담당자명은 ${LIMITS.person_in_charge}자 이하여야 합니다.`;
+    const email = form.email.trim();
+    if (!email) {
       errs.email = '이메일을 입력해주세요.';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       errs.email = '올바른 이메일 형식이 아닙니다.';
-    }
+    } else if (email.length > LIMITS.email) errs.email = `이메일은 ${LIMITS.email}자 이하여야 합니다.`;
+    if (form.notes.trim().length > LIMITS.notes) errs.notes = `노트는 ${LIMITS.notes}자 이하여야 합니다.`;
     if (recurring !== 'none') {
       if (!recurringUntil) {
         errs.recurring_until = '반복 종료일을 선택해주세요.';
@@ -146,7 +165,9 @@ function ReserveForm() {
       const data = await res.json();
 
       if (res.status === 409) {
-        setErrors({ conflict: '선택하신 시간에 이미 해당 장소 예약이 있습니다. 다른 시간 또는 장소를 선택해주세요.' });
+        const msg = typeof data?.message === 'string' ? data.message : '선택하신 시간에 이미 해당 장소 예약이 있습니다. 다른 시간 또는 장소를 선택해주세요.';
+        const dates = Array.isArray(data?.conflictDates) ? data.conflictDates : undefined;
+        setErrors({ conflict: msg, conflictDates: dates });
         return;
       }
 
@@ -175,6 +196,7 @@ function ReserveForm() {
       const next = { ...prev };
       delete next[field as keyof FormErrors];
       delete next.conflict;
+      delete next.conflictDates;
       return next;
     });
   }
@@ -279,10 +301,11 @@ function ReserveForm() {
 
           {/* Title */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="reserve-title" className="block text-sm font-medium text-gray-700 mb-1">
               제목 <span className="text-red-500">*</span>
             </label>
             <input
+              id="reserve-title"
               type="text"
               value={form.title}
               onChange={(e) => handleChange('title', e.target.value)}
@@ -296,11 +319,24 @@ function ReserveForm() {
 
           {/* Room */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="reserve-room" className="block text-sm font-medium text-gray-700 mb-1">
               장소 <span className="text-red-500">*</span>
             </label>
+            {roomsError && (
+              <div className="mb-2 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between gap-2">
+                <p className="text-sm text-amber-800">{roomsError}</p>
+                <button
+                  type="button"
+                  onClick={loadRooms}
+                  className="text-sm font-medium text-amber-700 hover:text-amber-900 underline flex-shrink-0"
+                >
+                  다시 시도
+                </button>
+              </div>
+            )}
             <div className="relative">
               <select
+                id="reserve-room"
                 value={form.room_id}
                 onChange={(e) => handleChange('room_id', e.target.value)}
                 className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white ${
@@ -330,10 +366,11 @@ function ReserveForm() {
 
           {/* Date */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="reserve-date" className="block text-sm font-medium text-gray-700 mb-1">
               날짜 <span className="text-red-500">*</span>
             </label>
             <input
+              id="reserve-date"
               type="date"
               value={form.date}
               min={todayStr()}
@@ -347,13 +384,14 @@ function ReserveForm() {
 
           {/* Time range */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="reserve-start-time" className="block text-sm font-medium text-gray-700 mb-1">
               예약 시간 <span className="text-red-500">*</span>{' '}
               <span className="text-xs font-normal text-gray-400">(15분 단위)</span>
             </label>
             <div className="flex items-center gap-3">
               <div className="flex-1">
                 <select
+                  id="reserve-start-time"
                   value={form.start_time}
                   onChange={(e) => handleChange('start_time', e.target.value)}
                   className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
@@ -369,6 +407,7 @@ function ReserveForm() {
               <span className="text-gray-400 font-medium flex-shrink-0">~</span>
               <div className="flex-1">
                 <select
+                  id="reserve-end-time"
                   value={form.end_time}
                   onChange={(e) => handleChange('end_time', e.target.value)}
                   className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
@@ -409,10 +448,11 @@ function ReserveForm() {
 
             {recurring !== 'none' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="reserve-recurring-until" className="block text-sm font-medium text-gray-700 mb-1">
                   반복 종료일 <span className="text-red-500">*</span>
                 </label>
                 <input
+                  id="reserve-recurring-until"
                   type="date"
                   value={recurringUntil}
                   min={form.date || todayStr()}
@@ -436,10 +476,11 @@ function ReserveForm() {
 
           {/* Person in charge */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="reserve-person" className="block text-sm font-medium text-gray-700 mb-1">
               담당자 <span className="text-red-500">*</span>
             </label>
             <input
+              id="reserve-person"
               type="text"
               value={form.person_in_charge}
               onChange={(e) => handleChange('person_in_charge', e.target.value)}
@@ -453,10 +494,11 @@ function ReserveForm() {
 
           {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="reserve-email" className="block text-sm font-medium text-gray-700 mb-1">
               이메일 <span className="text-red-500">*</span>
             </label>
             <input
+              id="reserve-email"
               type="email"
               value={form.email}
               onChange={(e) => handleChange('email', e.target.value)}
@@ -470,16 +512,21 @@ function ReserveForm() {
 
           {/* Notes */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="reserve-notes" className="block text-sm font-medium text-gray-700 mb-1">
               기타 노트 <span className="text-xs font-normal text-gray-400">(선택)</span>
             </label>
             <textarea
+              id="reserve-notes"
               value={form.notes}
               onChange={(e) => handleChange('notes', e.target.value)}
               placeholder="특이사항이나 요청사항을 입력해주세요."
               rows={3}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              maxLength={LIMITS.notes}
+              className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${
+                errors.notes ? 'border-red-400 bg-red-50' : 'border-gray-300'
+              }`}
             />
+            {errors.notes && <p className="mt-1 text-xs text-red-500">{errors.notes}</p>}
           </div>
 
           {/* Error messages above buttons */}
@@ -491,6 +538,13 @@ function ReserveForm() {
               <div>
                 <p className="text-sm font-medium text-red-700">예약 시간 충돌</p>
                 <p className="text-sm text-red-600 mt-0.5">{errors.conflict}</p>
+                {errors.conflictDates && errors.conflictDates.length > 0 && (
+                  <ul className="text-xs text-red-600 mt-2 space-y-0.5">
+                    {errors.conflictDates.map((d) => (
+                      <li key={d}>• {d}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
           )}
