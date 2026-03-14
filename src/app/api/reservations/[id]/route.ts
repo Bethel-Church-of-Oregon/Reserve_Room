@@ -2,14 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { approveReservation, rejectReservation, deleteReservation, getReservationById, approveCancellation, rejectCancellation } from '@/lib/db';
 import { sendApprovalEmail, sendRejectionEmail, sendCancellationApprovedEmail, sendCancellationRejectedEmail } from '@/lib/email';
 import { cookies } from 'next/headers';
-
-function isAdminAuthed(): boolean {
-  const cookieStore = cookies();
-  return cookieStore.get('admin_auth')?.value === 'true';
-}
+import { verifyAdminSession } from '@/lib/auth';
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  if (!isAdminAuthed()) {
+  if (!verifyAdminSession(cookies().get('admin_auth')?.value)) {
     return NextResponse.json({ error: '관리자 인증이 필요합니다.' }, { status: 401 });
   }
 
@@ -90,7 +86,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  if (!isAdminAuthed()) {
+  if (!verifyAdminSession(cookies().get('admin_auth')?.value)) {
     return NextResponse.json({ error: '관리자 인증이 필요합니다.' }, { status: 401 });
   }
 

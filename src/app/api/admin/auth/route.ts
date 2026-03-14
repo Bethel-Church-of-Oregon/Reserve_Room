@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { createAdminSession, verifyAdminSession } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,12 +19,12 @@ export async function POST(req: NextRequest) {
     }
 
     const cookieStore = cookies();
-    cookieStore.set('admin_auth', 'true', {
+    cookieStore.set('admin_auth', createAdminSession(), {
       httpOnly: true,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 8, // 8 hours
       path: '/',
+      // No maxAge = session cookie: expires when browser is closed
     });
 
     return NextResponse.json({ success: true });
@@ -41,6 +42,6 @@ export async function DELETE() {
 
 export async function GET() {
   const cookieStore = cookies();
-  const isAuth = cookieStore.get('admin_auth')?.value === 'true';
+  const isAuth = verifyAdminSession(cookieStore.get('admin_auth')?.value);
   return NextResponse.json({ authenticated: isAuth });
 }
