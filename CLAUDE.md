@@ -45,9 +45,12 @@ npm run build && npm start  # 프로덕션 (포트 8000)
 POSTGRES_URL=                     # Neon 연결 문자열 (Vercel 연동 시 자동, DATABASE_URL도 가능)
 ADMIN_PASSWORD=bethel2024         # 관리자 비밀번호
 GMAIL_APP_PASSWORD=               # Gmail 앱 비밀번호 16자리 (공백 없이)
+UPSTASH_REDIS_REST_URL=           # Upstash Redis URL (선택, rate limiting용)
+UPSTASH_REDIS_REST_TOKEN=         # Upstash Redis Token (선택, rate limiting용)
 ```
 - Gmail 앱 비밀번호: Google 계정 → 보안 → 2단계 인증 → 앱 비밀번호
 - `GMAIL_APP_PASSWORD` 미설정 시 이메일 건너뜀, 예약 기능은 정상 동작
+- `UPSTASH_*` 미설정 시 rate limiting 비활성화 (관리자 로그인/예약/취소 제한 없음)
 
 ## 관리자 인증
 - 쿠키 기반: `admin_auth=true` (httpOnly, 8시간)

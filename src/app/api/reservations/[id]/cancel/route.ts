@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requestCancellation } from '@/lib/db';
+import { checkCancelLimit } from '@/lib/ratelimit';
 
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const { limited } = await checkCancelLimit(req);
+    if (limited) {
+      return NextResponse.json(
+        { error: '취소 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.' },
+        { status: 429 }
+      );
+    }
+
     const id = parseInt(params.id);
     if (isNaN(id)) {
       return NextResponse.json({ error: '잘못된 예약 번호입니다.' }, { status: 400 });

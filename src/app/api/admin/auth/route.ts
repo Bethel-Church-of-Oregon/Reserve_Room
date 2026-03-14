@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createAdminSession, verifyAdminSession } from '@/lib/auth';
+import { checkAdminLoginLimit } from '@/lib/ratelimit';
 
 export async function POST(req: NextRequest) {
   try {
+    const { limited } = await checkAdminLoginLimit(req);
+    if (limited) {
+      return NextResponse.json(
+        { error: '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.' },
+        { status: 429 }
+      );
+    }
+
     const adminPassword = process.env.ADMIN_PASSWORD;
     if (!adminPassword) {
       console.error('[admin] ADMIN_PASSWORD 환경변수가 설정되지 않았습니다.');

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getReservations, createReservation, checkConflict } from '@/lib/db';
+import { checkReservationLimit } from '@/lib/ratelimit';
 
 export async function GET(req: NextRequest) {
   try {
@@ -62,6 +63,14 @@ function generateOccurrences(
 
 export async function POST(req: NextRequest) {
   try {
+    const { limited } = await checkReservationLimit(req);
+    if (limited) {
+      return NextResponse.json(
+        { error: '예약 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.' },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const { title, room_id, start_time, end_time, person_in_charge, email, notes, recurring, recurring_until } = body;
 
