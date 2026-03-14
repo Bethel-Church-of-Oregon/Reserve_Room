@@ -3,9 +3,16 @@ import { cookies } from 'next/headers';
 
 export async function POST(req: NextRequest) {
   try {
-    const { password } = await req.json();
-    const adminPassword = process.env.ADMIN_PASSWORD ?? 'bethel2024';
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    if (!adminPassword) {
+      console.error('[admin] ADMIN_PASSWORD 환경변수가 설정되지 않았습니다.');
+      return NextResponse.json(
+        { error: '관리자 로그인이 설정되지 않았습니다. 서버 관리자에게 문의하세요.' },
+        { status: 503 }
+      );
+    }
 
+    const { password } = await req.json();
     if (password !== adminPassword) {
       return NextResponse.json({ error: '비밀번호가 올바르지 않습니다.' }, { status: 401 });
     }
