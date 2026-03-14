@@ -13,6 +13,15 @@ function getTransporter() {
   });
 }
 
+function escapeHtml(s: string): string {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function formatTime(isoStr: string): string {
   const d = new Date(isoStr);
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -33,16 +42,16 @@ export async function sendApprovalEmail(reservation: ReservationWithRoom): Promi
     html: `
       <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #333;">
         <h2 style="color: #2563eb;">예약 확정 안내</h2>
-        <p>안녕하세요, <strong>${reservation.person_in_charge}</strong>성도님.</p>
+        <p>안녕하세요, <strong>${escapeHtml(reservation.person_in_charge)}</strong>성도님.</p>
         <p>신청하신 장소 예약이 <strong style="color: #16a34a;">확정</strong>되었습니다.</p>
         <table style="width:100%; border-collapse:collapse; margin: 16px 0;">
           <tr style="background:#f3f4f6;">
             <td style="padding:8px 12px; font-weight:600; width:30%;">제목</td>
-            <td style="padding:8px 12px;">${reservation.title}</td>
+            <td style="padding:8px 12px;">${escapeHtml(reservation.title)}</td>
           </tr>
           <tr>
             <td style="padding:8px 12px; font-weight:600;">장소</td>
-            <td style="padding:8px 12px;">${reservation.room_name}</td>
+            <td style="padding:8px 12px;">${escapeHtml(reservation.room_name)}</td>
           </tr>
           <tr style="background:#f3f4f6;">
             <td style="padding:8px 12px; font-weight:600;">시작</td>
@@ -90,16 +99,16 @@ export async function sendBulkApprovalEmail(reservations: ReservationWithRoom[])
         html: `
           <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #333;">
             <h2 style="color: #2563eb;">예약 확정 안내</h2>
-            <p>안녕하세요, <strong>${name}</strong>성도님.</p>
+            <p>안녕하세요, <strong>${escapeHtml(name)}</strong>성도님.</p>
             <p>신청하신 장소 예약이 <strong style="color: #16a34a;">확정</strong>되었습니다.</p>
             <table style="width:100%; border-collapse:collapse; margin: 16px 0;">
               <tr style="background:#f3f4f6;">
                 <td style="padding:8px 12px; font-weight:600; width:30%;">제목</td>
-                <td style="padding:8px 12px;">${rsvs[0].title}</td>
+                <td style="padding:8px 12px;">${escapeHtml(rsvs[0].title)}</td>
               </tr>
               <tr>
                 <td style="padding:8px 12px; font-weight:600;">장소</td>
-                <td style="padding:8px 12px;">${rsvs[0].room_name}</td>
+                <td style="padding:8px 12px;">${escapeHtml(rsvs[0].room_name)}</td>
               </tr>
               <tr style="background:#f3f4f6;">
                 <td style="padding:8px 12px; font-weight:600;">시작</td>
@@ -120,8 +129,8 @@ export async function sendBulkApprovalEmail(reservations: ReservationWithRoom[])
       // 2건 이상이면 요약 이메일 발송
       const rows = rsvs.map((r: ReservationWithRoom, i: number) => `
         <tr style="background:${i % 2 === 0 ? '#f9fafb' : 'white'};">
-          <td style="padding:8px 12px; border-bottom:1px solid #e5e7eb;">${r.title}</td>
-          <td style="padding:8px 12px; border-bottom:1px solid #e5e7eb;">${r.room_name}</td>
+          <td style="padding:8px 12px; border-bottom:1px solid #e5e7eb;">${escapeHtml(r.title)}</td>
+          <td style="padding:8px 12px; border-bottom:1px solid #e5e7eb;">${escapeHtml(r.room_name)}</td>
           <td style="padding:8px 12px; border-bottom:1px solid #e5e7eb; white-space:nowrap;">${formatTime(r.start_time)}</td>
           <td style="padding:8px 12px; border-bottom:1px solid #e5e7eb; white-space:nowrap;">${formatTime(r.end_time)}</td>
         </tr>
@@ -134,7 +143,7 @@ export async function sendBulkApprovalEmail(reservations: ReservationWithRoom[])
         html: `
           <div style="font-family: sans-serif; max-width: 640px; margin: 0 auto; color: #333;">
             <h2 style="color: #2563eb;">예약 확정 안내</h2>
-            <p>안녕하세요, <strong>${name}</strong>성도님.</p>
+            <p>안녕하세요, <strong>${escapeHtml(name)}</strong>성도님.</p>
             <p>신청하신 <strong style="color: #16a34a;">${rsvs.length}건</strong>의 장소 예약이 모두 확정되었습니다.</p>
             <table style="width:100%; border-collapse:collapse; margin: 16px 0; font-size:14px;">
               <thead>
@@ -172,16 +181,16 @@ export async function sendCancellationApprovedEmail(reservation: ReservationWith
     html: `
       <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #333;">
         <h2 style="color: #16a34a;">예약 취소 승인 안내</h2>
-        <p>안녕하세요, <strong>${reservation.person_in_charge}</strong>성도님.</p>
+        <p>안녕하세요, <strong>${escapeHtml(reservation.person_in_charge)}</strong>성도님.</p>
         <p>요청하신 예약 취소가 <strong style="color: #16a34a;">승인</strong>되었습니다.</p>
         <table style="width:100%; border-collapse:collapse; margin: 16px 0;">
           <tr style="background:#f3f4f6;">
             <td style="padding:8px 12px; font-weight:600; width:30%;">제목</td>
-            <td style="padding:8px 12px;">${reservation.title}</td>
+            <td style="padding:8px 12px;">${escapeHtml(reservation.title)}</td>
           </tr>
           <tr>
             <td style="padding:8px 12px; font-weight:600;">장소</td>
-            <td style="padding:8px 12px;">${reservation.room_name}</td>
+            <td style="padding:8px 12px;">${escapeHtml(reservation.room_name)}</td>
           </tr>
           <tr style="background:#f3f4f6;">
             <td style="padding:8px 12px; font-weight:600;">시작</td>
@@ -211,7 +220,7 @@ export async function sendCancellationRejectedEmail(reservation: ReservationWith
   const reasonRow = reason ? `
     <tr style="background:#fef2f2;">
       <td style="padding:8px 12px; font-weight:600; color:#dc2626;">거절 사유</td>
-      <td style="padding:8px 12px; color:#dc2626;">${reason}</td>
+      <td style="padding:8px 12px; color:#dc2626;">${escapeHtml(reason)}</td>
     </tr>
   ` : '';
 
@@ -222,17 +231,17 @@ export async function sendCancellationRejectedEmail(reservation: ReservationWith
     html: `
       <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #333;">
         <h2 style="color: #dc2626;">예약 취소 거절 안내</h2>
-        <p>안녕하세요, <strong>${reservation.person_in_charge}</strong>성도님.</p>
+        <p>안녕하세요, <strong>${escapeHtml(reservation.person_in_charge)}</strong>성도님.</p>
         <p>요청하신 예약 취소가 <strong style="color: #dc2626;">거절</strong>되었습니다.</p>
         <p>해당 예약은 유지됩니다.</p>
         <table style="width:100%; border-collapse:collapse; margin: 16px 0;">
           <tr style="background:#f3f4f6;">
             <td style="padding:8px 12px; font-weight:600; width:30%;">제목</td>
-            <td style="padding:8px 12px;">${reservation.title}</td>
+            <td style="padding:8px 12px;">${escapeHtml(reservation.title)}</td>
           </tr>
           <tr>
             <td style="padding:8px 12px; font-weight:600;">장소</td>
-            <td style="padding:8px 12px;">${reservation.room_name}</td>
+            <td style="padding:8px 12px;">${escapeHtml(reservation.room_name)}</td>
           </tr>
           <tr style="background:#f3f4f6;">
             <td style="padding:8px 12px; font-weight:600;">시작</td>
@@ -267,16 +276,16 @@ export async function sendRejectionEmail(reservation: ReservationWithRoom, reaso
     html: `
       <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #333;">
         <h2 style="color: #dc2626;">예약 거절 안내</h2>
-        <p>안녕하세요, <strong>${reservation.person_in_charge}</strong>성도님.</p>
+        <p>안녕하세요, <strong>${escapeHtml(reservation.person_in_charge)}</strong>성도님.</p>
         <p>신청하신 장소 예약이 <strong style="color: #dc2626;">거절</strong>되었습니다.</p>
         <table style="width:100%; border-collapse:collapse; margin: 16px 0;">
           <tr style="background:#f3f4f6;">
             <td style="padding:8px 12px; font-weight:600; width:30%;">제목</td>
-            <td style="padding:8px 12px;">${reservation.title}</td>
+            <td style="padding:8px 12px;">${escapeHtml(reservation.title)}</td>
           </tr>
           <tr>
             <td style="padding:8px 12px; font-weight:600;">장소</td>
-            <td style="padding:8px 12px;">${reservation.room_name}</td>
+            <td style="padding:8px 12px;">${escapeHtml(reservation.room_name)}</td>
           </tr>
           <tr style="background:#f3f4f6;">
             <td style="padding:8px 12px; font-weight:600;">시작</td>
@@ -288,7 +297,7 @@ export async function sendRejectionEmail(reservation: ReservationWithRoom, reaso
           </tr>
           <tr style="background:#fef2f2;">
             <td style="padding:8px 12px; font-weight:600; color:#dc2626;">거절 사유</td>
-            <td style="padding:8px 12px; color:#dc2626;">${reason}</td>
+            <td style="padding:8px 12px; color:#dc2626;">${escapeHtml(reason)}</td>
           </tr>
         </table>
         <p>다른 시간이나 장소로 다시 신청하시려면 예약 시스템을 이용해 주세요.</p>
