@@ -39,10 +39,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate: each id must be a positive integer
-    const validIds = [...new Set(ids
+    const validIds = Array.from(new Set(ids
       .map((id) => (typeof id === 'number' ? id : parseInt(String(id), 10)))
       .filter((id): id is number => Number.isInteger(id) && id >= 1)
-    )];
+    ));
 
     if (validIds.length === 0) {
       return NextResponse.json({ error: '유효한 예약 번호가 없습니다.' }, { status: 400 });
