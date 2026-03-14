@@ -25,17 +25,34 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { action, ids } = await req.json();
+    let body: { action?: string; ids?: unknown };
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: '잘못된 요청 형식입니다.' }, { status: 400 });
+    }
+
+    const { action, ids } = body;
 
     if (action !== 'approve' || !Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json({ error: '잘못된 요청입니다.' }, { status: 400 });
     }
 
+    // Validate: each id must be a positive integer
+    const validIds = [...new Set(ids
+      .map((id) => (typeof id === 'number' ? id : parseInt(String(id), 10)))
+      .filter((id): id is number => Number.isInteger(id) && id >= 1)
+    )];
+
+    if (validIds.length === 0) {
+      return NextResponse.json({ error: '유효한 예약 번호가 없습니다.' }, { status: 400 });
+    }
+
     // 승인 처리 및 예약 정보 수집
     const approved = [];
-    for (const id of ids) {
-      const reservation = await getReservationById(Number(id));
-      const ok = await approveReservation(Number(id));
+    for (const id of validIds) {
+      const reservation = await getReservationById(id);
+      const ok = await approveReservation(id);
       if (ok && reservation) approved.push(reservation);
     }
 
