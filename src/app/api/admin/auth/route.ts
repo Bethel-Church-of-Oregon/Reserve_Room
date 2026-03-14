@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
     cookieStore.set('admin_auth', 'true', {
       httpOnly: true,
       sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
       maxAge: 60 * 60 * 8, // 8 hours
       path: '/',
     });
