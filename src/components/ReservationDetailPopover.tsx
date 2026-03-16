@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
+import { LIMITS } from '@/lib/constants';
 
 function formatTime(dateStr: string): string {
   const d = new Date(dateStr);
@@ -40,11 +41,13 @@ export function CancelRequestModal({
           <strong className="text-gray-700">{reservation.title}</strong> 예약의 취소를 신청합니다.
         </p>
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">취소 사유 <span className="text-red-500">*</span></label>
+          <label htmlFor="cancel-reason" className="block text-sm font-medium text-gray-700 mb-1">취소 사유 <span className="text-red-500">*</span></label>
           <textarea
+            id="cancel-reason"
             value={reason}
             onChange={(e) => { setReason(e.target.value); setError(''); }}
             placeholder="취소 사유를 입력해주세요."
+            maxLength={LIMITS.reason}
             rows={3}
             autoFocus
             disabled={loading}
@@ -67,6 +70,7 @@ export function CancelRequestModal({
             type="button"
             onClick={async () => {
               if (!reason.trim()) { setError('취소 사유를 입력해주세요.'); return; }
+              if (reason.trim().length > LIMITS.reason) { setError(`취소 사유는 ${LIMITS.reason}자 이하여야 합니다.`); return; }
               setLoading(true);
               setError('');
               try {
@@ -111,7 +115,8 @@ export default function ReservationDetailPopover({
 
   return (
     <div
-      role="tooltip"
+      role="group"
+      aria-label={`${reservation.title} 예약 상세`}
       className="fixed z-[100] w-64 rounded-lg border border-gray-200 bg-white py-2.5 px-3 shadow-lg"
       style={{
         left: typeof window !== 'undefined' ? Math.min(position.left, window.innerWidth - 272) : position.left,

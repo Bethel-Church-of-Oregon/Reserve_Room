@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import WeekView from '@/components/WeekView';
 import MonthView from '@/components/MonthView';
@@ -56,17 +56,31 @@ export default function HomePage() {
   const [reservations, setReservations] = useState<ReservationWithRoom[]>([]);
   const [fetchedFor, setFetchedFor] = useState<{ viewMode: ViewMode; dateKey: string } | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [roomsError, setRoomsError] = useState<string | null>(null);
+  const [reservationsError, setReservationsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedRooms, setSelectedRooms] = useState<Set<number>>(new Set());
   const [legendOpen, setLegendOpen] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const weekStart = startOfWeek(currentDate);
+  const refreshReservations = useCallback(() => setRefreshTrigger((t) => t + 1), []);
 
   // String key for stable effect dependency (avoids Date object reference issues)
-  const dateKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}`;
+  const dateKey = toLocalDateKey(currentDate);
 
   useEffect(() => {
-    fetch('/api/rooms').then((r) => r.json()).then(setRooms).catch(console.error);
+    setRoomsError(null);
+    fetch('/api/rooms')
+      .then((r) => {
+        if (!r.ok) throw new Error('장소 목록을 불러오지 못했습니다.');
+        return r.json();
+      })
+      .then(setRooms)
+      .catch((e) => {
+        console.error('rooms fetch error:', e);
+        setRoomsError(e instanceof Error ? e.message : '장소 목록을 불러오지 못했습니다.');
+      });
   }, []);
 
   useEffect(() => {
@@ -93,16 +107,28 @@ export default function HomePage() {
     }
 
     async function load() {
-      if (!cancelled) setLoading(true);
+      if (!cancelled) {
+        setLoading(true);
+        setReservationsError(null);
+      }
       try {
         const res = await fetch(`/api/reservations?from=${from}&to=${to}`, { cache: 'no-store' });
         const data = await res.json();
         if (!cancelled) {
-          setReservations(Array.isArray(data) ? data : []);
-          setFetchedFor({ viewMode, dateKey });
+          if (!res.ok) {
+            setReservationsError(typeof data?.error === 'string' ? data.error : '예약 목록을 불러오지 못했습니다.');
+            setReservations([]);
+          } else {
+            setReservations(Array.isArray(data) ? data : []);
+            setFetchedFor({ viewMode, dateKey });
+          }
         }
       } catch (e) {
         console.error('fetch reservations error:', e);
+        if (!cancelled) {
+          setReservationsError('네트워크 오류가 발생했습니다. 다시 시도해 주세요.');
+          setReservations([]);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -111,7 +137,7 @@ export default function HomePage() {
     load();
 
     return () => { cancelled = true; };
-  }, [viewMode, dateKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [viewMode, dateKey, refreshTrigger]);
 
   function navigate(dir: -1 | 1) {
     setCurrentDate((prev) => {
@@ -206,6 +232,8 @@ export default function HomePage() {
           <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
             <button
               onClick={() => setViewMode('day')}
+              aria-label="일간 보기"
+              aria-pressed={viewMode === 'day'}
               className={`px-3 py-1.5 font-medium transition ${
                 viewMode === 'day' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
               }`}
@@ -214,6 +242,8 @@ export default function HomePage() {
             </button>
             <button
               onClick={() => setViewMode('week')}
+              aria-label="주간 보기"
+              aria-pressed={viewMode === 'week'}
               className={`px-3 py-1.5 font-medium transition border-l border-gray-200 ${
                 viewMode === 'week' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
               }`}
@@ -222,6 +252,8 @@ export default function HomePage() {
             </button>
             <button
               onClick={() => setViewMode('month')}
+              aria-label="월간 보기"
+              aria-pressed={viewMode === 'month'}
               className={`px-3 py-1.5 font-medium transition border-l border-gray-200 ${
                 viewMode === 'month' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
               }`}
@@ -241,6 +273,7 @@ export default function HomePage() {
             </button>
             <button
               onClick={goToday}
+              aria-label="오늘로 이동"
               className="px-3 py-1 text-sm border border-gray-200 rounded hover:bg-gray-50 text-gray-700 transition"
             >
               오늘
@@ -281,6 +314,8 @@ export default function HomePage() {
         <div className="max-w-screen-2xl mx-auto flex items-center gap-2 py-2">
           <button
             onClick={() => setLegendOpen((v) => !v)}
+            aria-label={legendOpen ? '장소 필터 접기' : '장소 필터 열기'}
+            aria-expanded={legendOpen}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition ${
               legendOpen
                 ? 'bg-gray-100 border-gray-300 text-gray-800'
@@ -336,6 +371,34 @@ export default function HomePage() {
         )}
       </div>
 
+      {/* Error banners */}
+      {roomsError && (
+        <div className="bg-amber-50 border-b border-amber-200 px-3 sm:px-6 py-2">
+          <div className="max-w-screen-2xl mx-auto flex items-center justify-between gap-2">
+            <p className="text-sm text-amber-800">{roomsError}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="text-sm text-amber-700 hover:text-amber-900 font-medium underline"
+            >
+              새로고침
+            </button>
+          </div>
+        </div>
+      )}
+      {reservationsError && (
+        <div className="bg-amber-50 border-b border-amber-200 px-3 sm:px-6 py-3">
+          <div className="max-w-screen-2xl mx-auto flex items-center justify-between gap-2 flex-wrap">
+            <p className="text-sm text-amber-800">{reservationsError}</p>
+            <button
+              onClick={refreshReservations}
+              className="px-3 py-1.5 text-sm font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-lg transition"
+            >
+              다시 시도
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Calendar */}
       <main className="flex-1 overflow-hidden">
         <div className="max-w-screen-2xl mx-auto h-full px-0 sm:px-2">
@@ -344,12 +407,12 @@ export default function HomePage() {
             style={{ height: 'calc(100vh - 170px)' }}
           >
             {viewMode === 'day' ? (
-              <DayView key="day" currentDate={currentDate} reservations={filteredReservations} onDayClick={setCurrentDate} />
+              <DayView key="day" currentDate={currentDate} reservations={filteredReservations} onDayClick={setCurrentDate} onRefresh={refreshReservations} />
             ) : viewMode === 'week' ? (
-              <WeekView key="week" weekStart={weekStart} reservations={filteredReservations} />
+              <WeekView key="week" weekStart={weekStart} reservations={filteredReservations} onRefresh={refreshReservations} />
             ) : (
               <div key="month" className="h-full overflow-y-auto calendar-scroll">
-                <MonthView currentDate={currentDate} reservations={filteredReservations} />
+                <MonthView currentDate={currentDate} reservations={filteredReservations} onRefresh={refreshReservations} />
               </div>
             )}
           </div>

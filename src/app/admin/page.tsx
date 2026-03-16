@@ -55,8 +55,9 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
+            <label htmlFor="admin-password" className="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
             <input
+              id="admin-password"
               type="password"
               value={password}
               onChange={(e) => { setPassword(e.target.value); setError(''); }}
@@ -109,8 +110,9 @@ function RejectModal({
           <strong className="text-gray-700">{reservation.title}</strong> 예약을 거절합니다.
         </p>
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">거절 사유 <span className="text-red-500">*</span></label>
+          <label htmlFor="reject-reason" className="block text-sm font-medium text-gray-700 mb-1">거절 사유 <span className="text-red-500">*</span></label>
           <textarea
+            id="reject-reason"
             value={reason}
             onChange={(e) => { setReason(e.target.value); setError(''); }}
             placeholder="거절 사유를 입력해주세요."
@@ -164,8 +166,9 @@ function RejectCancelModal({
           <strong className="text-gray-700">{reservation.title}</strong> 예약의 취소 신청을 거절합니다.
         </p>
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">거절 사유 (선택, 요청자 이메일에 포함)</label>
+          <label htmlFor="reject-cancel-reason" className="block text-sm font-medium text-gray-700 mb-1">거절 사유 (선택, 요청자 이메일에 포함)</label>
           <textarea
+            id="reject-cancel-reason"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="선택 사항입니다."
