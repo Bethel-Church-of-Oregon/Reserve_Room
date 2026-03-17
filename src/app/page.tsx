@@ -66,25 +66,59 @@ export default function HomePage() {
   const weekStart = startOfWeek(currentDate);
   const refreshReservations = useCallback(() => setRefreshTrigger((t) => t + 1), []);
 
+  const calendarRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
+  const swipeLocked = useRef<'horizontal' | 'vertical' | null>(null);
+  const navigateRef = useRef(navigate);
+  useEffect(() => { navigateRef.current = navigate; });
 
-  function handleTouchStart(e: React.TouchEvent) {
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
-  }
+  useEffect(() => {
+    const el = calendarRef.current;
+    if (!el) return;
 
-  function handleTouchEnd(e: React.TouchEvent) {
-    if (touchStartX.current === null || touchStartY.current === null) return;
-    const dx = e.changedTouches[0].clientX - touchStartX.current;
-    const dy = e.changedTouches[0].clientY - touchStartY.current;
-    touchStartX.current = null;
-    touchStartY.current = null;
-    // Ignore mostly-vertical swipes (scrolling)
-    if (Math.abs(dy) > Math.abs(dx)) return;
-    if (Math.abs(dx) < 100) return;
-    navigate(dx < 0 ? 1 : -1);
-  }
+    function onTouchStart(e: TouchEvent) {
+      touchStartX.current = e.touches[0].clientX;
+      touchStartY.current = e.touches[0].clientY;
+      swipeLocked.current = null;
+    }
+
+    function onTouchMove(e: TouchEvent) {
+      if (touchStartX.current === null || touchStartY.current === null) return;
+      const dx = e.touches[0].clientX - touchStartX.current;
+      const dy = e.touches[0].clientY - touchStartY.current;
+
+      if (!swipeLocked.current) {
+        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+          swipeLocked.current = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
+        }
+      }
+
+      if (swipeLocked.current === 'horizontal') {
+        e.preventDefault();
+      }
+    }
+
+    function onTouchEnd(e: TouchEvent) {
+      if (touchStartX.current === null || touchStartY.current === null) return;
+      const dx = e.changedTouches[0].clientX - touchStartX.current;
+      touchStartX.current = null;
+      touchStartY.current = null;
+      if (swipeLocked.current !== 'horizontal') return;
+      swipeLocked.current = null;
+      if (Math.abs(dx) < 100) return;
+      navigateRef.current(dx < 0 ? 1 : -1);
+    }
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
+  }, []);
 
   // String key for stable effect dependency (avoids Date object reference issues)
   const dateKey = toLocalDateKey(currentDate);
@@ -423,10 +457,9 @@ export default function HomePage() {
       <main className="flex-1 overflow-hidden">
         <div className="max-w-screen-2xl mx-auto h-full px-0 sm:px-2">
           <div
+            ref={calendarRef}
             className="bg-white border border-gray-200 rounded-none sm:rounded-lg shadow-sm overflow-hidden"
             style={{ height: 'calc(100vh - 170px)' }}
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
           >
             {viewMode === 'day' ? (
               <DayView key="day" currentDate={currentDate} reservations={filteredReservations} onDayClick={setCurrentDate} onRefresh={refreshReservations} />
