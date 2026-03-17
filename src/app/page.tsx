@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import WeekView from '@/components/WeekView';
 import MonthView from '@/components/MonthView';
@@ -65,6 +65,26 @@ export default function HomePage() {
 
   const weekStart = startOfWeek(currentDate);
   const refreshReservations = useCallback(() => setRefreshTrigger((t) => t + 1), []);
+
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  }
+
+  function handleTouchEnd(e: React.TouchEvent) {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+    touchStartX.current = null;
+    touchStartY.current = null;
+    // Ignore mostly-vertical swipes (scrolling)
+    if (Math.abs(dy) > Math.abs(dx)) return;
+    if (Math.abs(dx) < 50) return;
+    navigate(dx < 0 ? 1 : -1);
+  }
 
   // String key for stable effect dependency (avoids Date object reference issues)
   const dateKey = toLocalDateKey(currentDate);
@@ -405,6 +425,8 @@ export default function HomePage() {
           <div
             className="bg-white border border-gray-200 rounded-none sm:rounded-lg shadow-sm overflow-hidden"
             style={{ height: 'calc(100vh - 170px)' }}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
           >
             {viewMode === 'day' ? (
               <DayView key="day" currentDate={currentDate} reservations={filteredReservations} onDayClick={setCurrentDate} onRefresh={refreshReservations} />
