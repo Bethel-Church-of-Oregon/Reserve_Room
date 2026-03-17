@@ -106,7 +106,7 @@ export default function HomePage() {
       touchStartY.current = null;
       if (swipeLocked.current !== 'horizontal') return;
       swipeLocked.current = null;
-      if (Math.abs(dx) < 100) return;
+      if (Math.abs(dx) < 70) return;
       navigateRef.current(dx < 0 ? 1 : -1);
     }
 
