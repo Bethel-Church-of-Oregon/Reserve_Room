@@ -56,6 +56,7 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
   const today = dateKey(new Date());
   const [hovered, setHovered] = useState<{ reservation: ReservationWithRoom; rect: DOMRect } | null>(null);
   const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
+  const [expandedDay, setExpandedDay] = useState<{ date: Date; reservations: ReservationWithRoom[] } | null>(null);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showPopover = (reservation: ReservationWithRoom, el: HTMLElement) => {
@@ -169,7 +170,13 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
                       );
                     })}
                     {extra > 0 && (
-                      <div className="text-xs text-gray-400 pl-1">+{extra}개 더</div>
+                      <button
+                        type="button"
+                        className="text-xs text-blue-500 hover:text-blue-700 pl-1 cursor-pointer"
+                        onClick={() => setExpandedDay({ date: day, reservations: dayReservations })}
+                      >
+                        +{extra}개 더보기
+                      </button>
                     )}
                   </div>
                 </div>
@@ -178,6 +185,83 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
           </div>
         ))}
       </div>
+
+      {/* Day detail modal */}
+      {expandedDay && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-[120] px-4"
+          onClick={() => setExpandedDay(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-sm max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h3 className="text-base font-bold text-gray-800">
+                {expandedDay.date.getFullYear()}년 {expandedDay.date.getMonth() + 1}월 {expandedDay.date.getDate()}일 ({DAYS_KO[expandedDay.date.getDay()]})
+              </h3>
+              <button
+                type="button"
+                onClick={() => setExpandedDay(null)}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                aria-label="닫기"
+              >
+                ×
+              </button>
+            </div>
+            <div className="overflow-y-auto p-4 space-y-2">
+              {expandedDay.reservations
+                .slice()
+                .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+                .map((r) => {
+                  const isPending = r.status === 'pending' || r.status === 'cancellation_requested';
+                  const isCancelRequested = r.status === 'cancellation_requested';
+                  const canRequestCancel = (r.status === 'pending' || r.status === 'approved') && !isCancelRequested;
+                  return (
+                    <div
+                      key={r.id}
+                      className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50 cursor-default"
+                    >
+                      <span
+                        className="mt-0.5 shrink-0 w-3 h-3 rounded-sm"
+                        style={{ backgroundColor: r.room_color }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm text-gray-800 truncate">{r.title}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">{r.room_name}</div>
+                        <div className="text-xs text-gray-500">{formatTime(r.start_time)} – {formatTime(r.end_time)}</div>
+                        <div className="text-xs text-gray-500">담당: {r.person_in_charge}</div>
+                      </div>
+                      <div className="shrink-0 self-center flex flex-col items-end gap-1">
+                        <span
+                          className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                            isPending
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-gray-100 text-gray-600'
+                          }`}
+                        >
+                          {isPending ? (isCancelRequested ? '취소 신청' : '승인 대기') : '확정'}
+                        </span>
+                        {canRequestCancel && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setExpandedDay(null);
+                              setCancelModalReservation(r);
+                            }}
+                            className="text-[10px] font-medium px-1.5 py-0.5 text-red-600 hover:bg-red-50 rounded transition"
+                          >
+                            취소 신청
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {hovered && (
         <ReservationDetailPopover
