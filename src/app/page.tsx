@@ -82,7 +82,7 @@ export default function HomePage() {
     touchStartY.current = null;
     // Ignore mostly-vertical swipes (scrolling)
     if (Math.abs(dy) > Math.abs(dx)) return;
-    if (Math.abs(dx) < 50) return;
+    if (Math.abs(dx) < 100) return;
     navigate(dx < 0 ? 1 : -1);
   }
 
