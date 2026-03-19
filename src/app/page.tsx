@@ -344,6 +344,12 @@ export default function HomePage() {
           <span className="text-sm font-semibold text-gray-700 ml-1">{title}</span>
 
           <div className="flex items-center gap-3 ml-auto">
+            <span
+              className={`text-xs ${loading ? 'text-gray-400 animate-pulse' : 'text-transparent select-none'}`}
+              aria-live="polite"
+            >
+              불러오는 중...
+            </span>
             <div className="flex items-center gap-1">
               <span className="w-8 h-3 rounded-sm bg-gray-500" />
               <span className="text-xs text-gray-500">확정</span>
@@ -355,9 +361,6 @@ export default function HomePage() {
               />
               <span className="text-xs text-gray-500">승인 대기</span>
             </div>
-            {loading && (
-              <span className="text-xs text-gray-400 animate-pulse">불러오는 중...</span>
-            )}
           </div>
         </div>
       </div>
