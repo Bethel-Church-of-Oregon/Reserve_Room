@@ -244,16 +244,26 @@ export async function getReservationById(
   return rows[0] ?? null;
 }
 
-export async function getAllReservationsForAdmin(): Promise<
+export async function getAllReservationsForAdmin(from?: string): Promise<
   ReservationWithRoom[]
 > {
   await ensureDbReady();
-  const rows = (await getSql()`
-    SELECT r.*, rm.name as room_name, rm.color as room_color
-    FROM reservations r
-    JOIN rooms rm ON r.room_id = rm.id
-    ORDER BY r.created_at DESC
-  `) as ReservationWithRoom[];
+  const sql = getSql();
+  const rows = (from
+    ? await sql`
+        SELECT r.*, rm.name as room_name, rm.color as room_color
+        FROM reservations r
+        JOIN rooms rm ON r.room_id = rm.id
+        WHERE r.start_time >= ${from}
+        ORDER BY r.start_time ASC
+      `
+    : await sql`
+        SELECT r.*, rm.name as room_name, rm.color as room_color
+        FROM reservations r
+        JOIN rooms rm ON r.room_id = rm.id
+        ORDER BY r.start_time ASC
+      `
+  ) as ReservationWithRoom[];
   return rows;
 }
 

@@ -393,7 +393,10 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const fetchReservations = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/reservations');
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const from = yesterday.toISOString().slice(0, 10);
+      const res = await fetch(`/api/admin/reservations?from=${from}`);
       if (res.status === 401) { onLogout(); return; }
       const data = await res.json();
       setReservations(Array.isArray(data) ? data : []);
@@ -796,7 +799,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           ) : (
             <>
               {/* Desktop table */}
-              <div className="hidden md:block overflow-x-auto">
+              <div className="hidden admin:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
@@ -967,7 +970,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
               </div>
 
               {/* Mobile cards */}
-              <div className="md:hidden divide-y divide-gray-100">
+              <div className="admin:hidden divide-y divide-gray-100">
                 {displayRows.map((row) =>
                   row.type === 'series' ? (
                     <div key={row.seriesId} className="p-4">

@@ -233,10 +233,10 @@ export default function HomePage() {
     : effectiveReservations.filter((r) => selectedRooms.has(r.room_id));
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen max-w-screen-2xl mx-auto w-full border-x border-gray-200">
       {/* Top navigation bar */}
       <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-20">
-        <div className="max-w-screen-2xl mx-auto px-3 sm:px-6 py-3 flex flex-wrap items-center gap-2">
+        <div className="px-3 sm:px-6 py-3 flex flex-wrap items-center gap-2">
           {/* Logo / Title */}
           <div className="flex items-center gap-2 mr-auto min-w-0">
             <span className="text-base sm:text-xl font-bold text-blue-700 truncate">
@@ -260,11 +260,10 @@ export default function HomePage() {
             <span className="sm:hidden">관리자</span>
           </button>
         </div>
-      </header>
 
       {/* Notice banner */}
       <div className="bg-blue-50 border-b border-blue-100 px-3 sm:px-6 py-2">
-        <div className="max-w-screen-2xl mx-auto flex flex-wrap items-center gap-2 text-xs sm:text-sm text-blue-800">
+        <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-blue-800">
           <span className="hidden sm:inline">본 시스템은 소모임(사랑방, 사역팀 등) 전용 입니다. 결혼식 등 큰 행사는</span>
           <span className="sm:hidden">소모임(사랑방, 사역팀 등) 전용 시스템 입니다. 결혼식 등 큰 행사는</span>
           <a
@@ -281,7 +280,7 @@ export default function HomePage() {
 
       {/* Calendar controls */}
       <div className="bg-white border-b border-gray-100 px-3 sm:px-6 py-2">
-        <div className="max-w-screen-2xl mx-auto flex flex-col" style={{ gap: '8px' }}>
+        <div className="flex flex-col" style={{ gap: '8px' }}>
           {/* Row 1: view mode toggle + navigation (right) */}
           <div className="flex items-center">
             <div className="flex rounded-md border border-gray-200 overflow-hidden text-sm">
@@ -322,7 +321,7 @@ export default function HomePage() {
                 className="p-1 rounded hover:bg-gray-100 text-gray-600 transition"
                 aria-label="이전"
               >
-                ‹
+                <span className="text-lg font-semibold text-gray-800">‹</span>
               </button>
               <button
                 onClick={goToday}
@@ -336,7 +335,7 @@ export default function HomePage() {
                 className="p-1 rounded hover:bg-gray-100 text-gray-600 transition"
                 aria-label="다음"
               >
-                ›
+                <span className="text-lg font-semibold text-gray-800">›</span>
               </button>
             </div>
           </div>
@@ -353,7 +352,7 @@ export default function HomePage() {
       {/* Room legend / filter */}
       <div className="bg-white border-b border-gray-100 px-3 sm:px-6">
         {/* Toggle header */}
-        <div className="max-w-screen-2xl mx-auto flex items-center gap-2 py-2">
+        <div className="flex items-center gap-2 py-2">
           <button
             onClick={() => setLegendOpen((v) => !v)}
             aria-label={legendOpen ? '장소 필터 접기' : '장소 필터 열기'}
@@ -406,7 +405,7 @@ export default function HomePage() {
 
         {/* Collapsible room list */}
         {legendOpen && (
-          <div className="max-w-screen-2xl mx-auto pb-2 flex flex-wrap gap-x-2 gap-y-1.5">
+          <div className="pb-2 flex flex-wrap gap-x-2 gap-y-1.5">
             {rooms.map((room) => {
               const selected = selectedRooms.has(room.id);
               return (
@@ -431,11 +430,12 @@ export default function HomePage() {
           </div>
         )}
       </div>
+      </header>
 
       {/* Error banners */}
       {roomsError && (
         <div className="bg-amber-50 border-b border-amber-200 px-3 sm:px-6 py-2">
-          <div className="max-w-screen-2xl mx-auto flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-2">
             <p className="text-sm text-amber-800">{roomsError}</p>
             <button
               onClick={() => window.location.reload()}
@@ -448,7 +448,7 @@ export default function HomePage() {
       )}
       {reservationsError && (
         <div className="bg-amber-50 border-b border-amber-200 px-3 sm:px-6 py-3">
-          <div className="max-w-screen-2xl mx-auto flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <p className="text-sm text-amber-800">{reservationsError}</p>
             <button
               onClick={refreshReservations}
@@ -462,10 +462,10 @@ export default function HomePage() {
 
       {/* Calendar */}
       <main className="flex-1 overflow-hidden">
-        <div className="max-w-screen-2xl mx-auto h-full px-0 sm:px-2">
+        <div className="h-full">
           <div
             ref={calendarRef}
-            className="bg-white border border-gray-200 rounded-none sm:rounded-lg shadow-sm overflow-hidden"
+            className="bg-white border-t border-gray-200 overflow-hidden"
             style={{ height: 'calc(100vh - 170px)' }}
           >
             {viewMode === 'day' ? (

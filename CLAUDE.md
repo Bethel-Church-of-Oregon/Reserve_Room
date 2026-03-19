@@ -92,7 +92,9 @@ cancellation_requested → [approveCancellation: 삭제]
 - 충돌 감지: 같은 회의실 + 같은 시간대 이중 예약 방지
   - `checkConflict()`: `status IN ('pending', 'approved', 'cancellation_requested')`인 예약과 시간 겹침 확인
   - 충돌 메시지는 예약신청/취소 버튼 바로 위에 표시
-- 반복 예약: daily/weekly/monthly, 최대 200회, 충돌 날짜 자동 제외하고 나머지만 생성
+- 반복 예약: daily/weekly/monthly, 최대 500회 (매주 약 9.6년), 충돌 날짜 자동 제외하고 나머지만 bulk INSERT
+  - 생성 시 DB 쿼리 2번으로 고정 (범위 내 충돌 SELECT 1번 + 비충돌 건 UNNEST bulk INSERT 1번)
+  - 이전 N+1 방식(최대 1000번 쿼리) 대비 Vercel 타임아웃 위험 제거
 - 일괄 승인: `POST /api/admin/reservations` 단일 호출 → `sendBulkApprovalEmail` (이메일 주소별 묶음 발송)
 - 시리즈 전체 액션: `PATCH /api/admin/series/[id]` — approve/reject/approve_cancellation/reject_cancellation
 - Rate limiting: admin-login 5회/분, reservation 10회/분, cancel 10회/분 (Upstash 미설정 시 무제한)
@@ -100,7 +102,9 @@ cancellation_requested → [approveCancellation: 삭제]
 - SendGrid/Resend 미사용 — nodemailer + Gmail SMTP만 사용
 
 ## UI 구성
-- 컨트롤 바: 1줄 — 일간/주간/월간 토글, 2줄 — ‹ 오늘 › + 날짜/주/월 제목
+- 레이아웃: 최대 너비 1536px (`max-w-screen-2xl mx-auto`), 초과 시 양쪽 공백 + `border-x border-gray-200` 구분선
+- `<header>` 안에 로고·버튼·공지 배너·캘린더 컨트롤·장소 필터 모두 포함 (sticky top-0)
+- 컨트롤 바: 1줄 — 일간/주간/월간 토글 (왼쪽) + ‹ 오늘 › (오른쪽), 2줄 — 날짜/주/월 제목 (가운데, 일간 뷰에서는 숨김)
 - 모바일(< 640px): 기본 뷰 일간, 헤더 버튼 축약 표시 (hydration 방지: SSR은 주간, useEffect에서 전환)
 - 우측 상단: 장소 예약 신청, 관리자 모드 버튼
 - 공지 배너: 큰 행사는 사용신청서(Google Drive 링크) 제출 안내
@@ -111,3 +115,4 @@ cancellation_requested → [approveCancellation: 삭제]
 - **월간 날짜 셀 클릭**: 셀 전체가 클릭 가능, 클릭 시 해당 날의 모든 예약을 시간순으로 보여주는 모달 표시 (예약 0개이면 안내 메시지). 개별 예약 블록 hover 팝오버 없음
 - 예약 신청 폼: 타이틀, 장소(드롭다운), 날짜, 시작/종료 시간(15분 단위), 반복설정, 담당자, 이메일, 노트(선택)
 - 관리자: 탭별 목록 (승인 대기 / 취소 신청 / 확정 / 전체) → 체크박스 선택 → 일괄 승인·거절·취소처리 / 시리즈 단위 일괄 액션 / 확정 예약 삭제
+- 관리자 반응형: 925px 기준 테이블 ↔ 카드 레이아웃 전환 (커스텀 Tailwind breakpoint `admin: 925px`)

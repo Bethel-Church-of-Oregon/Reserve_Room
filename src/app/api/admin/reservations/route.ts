@@ -4,13 +4,14 @@ import { sendBulkApprovalEmail } from '@/lib/email';
 import { cookies } from 'next/headers';
 import { verifyAdminSession } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   if (!verifyAdminSession(cookies().get('admin_auth')?.value)) {
     return NextResponse.json({ error: '관리자 인증이 필요합니다.' }, { status: 401 });
   }
 
   try {
-    const reservations = await getAllReservationsForAdmin();
+    const from = req.nextUrl.searchParams.get('from') ?? undefined;
+    const reservations = await getAllReservationsForAdmin(from);
     return NextResponse.json(reservations);
   } catch (e) {
     console.error(e);
