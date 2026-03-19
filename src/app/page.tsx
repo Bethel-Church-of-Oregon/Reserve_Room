@@ -174,7 +174,7 @@ export default function HomePage() {
             setReservations([]);
           } else {
             setReservations(Array.isArray(data) ? data : []);
-            setFetchedFor({ viewMode, dateKey: viewMode === 'day' ? from : dateKey });
+            setFetchedFor({ viewMode, dateKey });
           }
         }
       } catch (e) {
@@ -226,9 +226,8 @@ export default function HomePage() {
     setSelectedRooms(new Set());
   }
 
-  const fetchKey = viewMode === 'day' ? toLocalDateKey(weekStart) : dateKey;
   const effectiveReservations =
-    fetchedFor?.viewMode === viewMode && fetchedFor?.dateKey === fetchKey ? reservations : [];
+    fetchedFor?.viewMode === viewMode && fetchedFor?.dateKey === dateKey ? reservations : [];
   const filteredReservations = selectedRooms.size === 0
     ? effectiveReservations
     : effectiveReservations.filter((r) => selectedRooms.has(r.room_id));
@@ -470,7 +469,7 @@ export default function HomePage() {
             style={{ height: 'calc(100vh - 170px)' }}
           >
             {viewMode === 'day' ? (
-              <DayView key="day" currentDate={currentDate} reservations={filteredReservations} loading={loading} onDayClick={setCurrentDate} onRefresh={refreshReservations} />
+              <DayView key="day" currentDate={currentDate} reservations={filteredReservations} onDayClick={setCurrentDate} onRefresh={refreshReservations} />
             ) : viewMode === 'week' ? (
               <WeekView key="week" weekStart={weekStart} reservations={filteredReservations} onRefresh={refreshReservations} />
             ) : (
