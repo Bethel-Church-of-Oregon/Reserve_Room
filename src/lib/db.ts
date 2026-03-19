@@ -31,8 +31,26 @@ async function ensureDbReady(): Promise<void> {
     `;
 
     await sql`
+      CREATE TABLE IF NOT EXISTS reservation_series (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        room_id INTEGER NOT NULL REFERENCES rooms(id),
+        person_in_charge TEXT NOT NULL,
+        email TEXT NOT NULL DEFAULT '',
+        notes TEXT,
+        recurring TEXT NOT NULL,
+        recurring_until TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        rejection_reason TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `;
+
+    await sql`
       CREATE TABLE IF NOT EXISTS reservations (
         id                SERIAL PRIMARY KEY,
+        series_id         TEXT REFERENCES reservation_series(id),
+        series_index      INTEGER,
         title             TEXT NOT NULL,
         room_id           INTEGER NOT NULL REFERENCES rooms(id),
         start_time        TEXT NOT NULL,
@@ -51,6 +69,14 @@ async function ensureDbReady(): Promise<void> {
       await sql`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS email TEXT NOT NULL DEFAULT ''`;
     } catch {
       // Column may already exist; ignore
+    }
+
+    // Series columns (idempotent)
+    try {
+      await sql`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS series_id TEXT REFERENCES reservation_series(id)`;
+      await sql`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS series_index INTEGER`;
+    } catch {
+      // Columns may already exist; ignore
     }
 
     // Cancellation request columns (idempotent)
@@ -110,6 +136,8 @@ export type ReservationStatus = 'pending' | 'approved' | 'rejected' | 'cancellat
 
 export interface Reservation {
   id: number;
+  series_id?: string | null;
+  series_index?: number | null;
   title: string;
   room_id: number;
   start_time: string;
@@ -128,6 +156,22 @@ export interface Reservation {
 export interface ReservationWithRoom extends Reservation {
   room_name: string;
   room_color: string;
+}
+
+export type ReservationSeriesStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+
+export interface ReservationSeries {
+  id: string;
+  title: string;
+  room_id: number;
+  person_in_charge: string;
+  email: string;
+  notes: string | null;
+  recurring: string;
+  recurring_until: string;
+  status: ReservationSeriesStatus;
+  rejection_reason: string | null;
+  created_at: string;
 }
 
 // ---------- Queries ----------
@@ -214,6 +258,8 @@ export async function getAllReservationsForAdmin(): Promise<
 }
 
 export async function createReservation(data: {
+  series_id?: string | null;
+  series_index?: number | null;
   title: string;
   room_id: number;
   start_time: string;
@@ -224,10 +270,29 @@ export async function createReservation(data: {
 }): Promise<Reservation> {
   await ensureDbReady();
   const rows = (await getSql()`
-    INSERT INTO reservations (title, room_id, start_time, end_time, person_in_charge, email, notes)
-    VALUES (${data.title}, ${data.room_id}, ${data.start_time}, ${data.end_time}, ${data.person_in_charge}, ${data.email}, ${data.notes ?? null})
+    INSERT INTO reservations (series_id, series_index, title, room_id, start_time, end_time, person_in_charge, email, notes)
+    VALUES (${data.series_id ?? null}, ${data.series_index ?? null}, ${data.title}, ${data.room_id}, ${data.start_time}, ${data.end_time}, ${data.person_in_charge}, ${data.email}, ${data.notes ?? null})
     RETURNING *
   `) as Reservation[];
+  return rows[0];
+}
+
+export async function createReservationSeries(data: {
+  id: string;
+  title: string;
+  room_id: number;
+  person_in_charge: string;
+  email: string;
+  notes?: string;
+  recurring: string;
+  recurring_until: string;
+}): Promise<ReservationSeries> {
+  await ensureDbReady();
+  const rows = (await getSql()`
+    INSERT INTO reservation_series (id, title, room_id, person_in_charge, email, notes, recurring, recurring_until)
+    VALUES (${data.id}, ${data.title}, ${data.room_id}, ${data.person_in_charge}, ${data.email}, ${data.notes ?? null}, ${data.recurring}, ${data.recurring_until})
+    RETURNING *
+  `) as ReservationSeries[];
   return rows[0];
 }
 
@@ -273,6 +338,39 @@ export async function approveReservation(id: number): Promise<boolean> {
   return rows.length > 0;
 }
 
+export async function approveReservationsBySeries(seriesId: string): Promise<ReservationWithRoom[]> {
+  await ensureDbReady();
+  const rows = (await getSql()`
+    WITH updated AS (
+      UPDATE reservations
+      SET status = 'approved', rejection_reason = NULL
+      WHERE series_id = ${seriesId} AND status = 'pending'
+      RETURNING *
+    )
+    SELECT u.*, rm.name as room_name, rm.color as room_color
+    FROM updated u
+    JOIN rooms rm ON u.room_id = rm.id
+    ORDER BY u.start_time
+  `) as ReservationWithRoom[];
+  return rows;
+}
+
+export async function setReservationSeriesStatus(
+  seriesId: string,
+  status: ReservationSeriesStatus,
+  rejectionReason?: string | null
+): Promise<boolean> {
+  await ensureDbReady();
+  const rows = (await getSql()`
+    UPDATE reservation_series
+    SET status = ${status},
+        rejection_reason = ${rejectionReason ?? null}
+    WHERE id = ${seriesId}
+    RETURNING id
+  `) as { id: string }[];
+  return rows.length > 0;
+}
+
 export async function rejectReservation(
   id: number,
   reason: string
@@ -285,6 +383,24 @@ export async function rejectReservation(
     RETURNING id
   `) as { id: number }[];
   return rows.length > 0;
+}
+
+export async function rejectReservationsBySeries(seriesId: string, reason: string): Promise<ReservationWithRoom[]> {
+  await ensureDbReady();
+  const rows = (await getSql()`
+    WITH updated AS (
+      UPDATE reservations
+      SET status = 'rejected', rejection_reason = ${reason}
+      WHERE series_id = ${seriesId} AND status = 'pending'
+      RETURNING *
+    )
+    SELECT u.*, rm.name as room_name, rm.color as room_color
+    FROM updated u
+    JOIN rooms rm ON u.room_id = rm.id
+    ORDER BY u.start_time
+  `) as ReservationWithRoom[];
+  await setReservationSeriesStatus(seriesId, 'rejected', reason);
+  return rows;
 }
 
 export async function deleteReservation(id: number): Promise<boolean> {
@@ -314,6 +430,26 @@ export async function requestCancellation(
   return rows.length > 0;
 }
 
+export async function requestCancellationSeries(
+  seriesId: string,
+  fromStartTimeInclusive: string,
+  reason: string
+): Promise<number> {
+  await ensureDbReady();
+  const rows = (await getSql()`
+    UPDATE reservations
+    SET status = 'cancellation_requested',
+        cancellation_reason = ${reason},
+        cancellation_requested_at = now(),
+        previous_status = status
+    WHERE series_id = ${seriesId}
+      AND start_time >= ${fromStartTimeInclusive}
+      AND status IN ('pending', 'approved')
+    RETURNING id
+  `) as { id: number }[];
+  return rows.length;
+}
+
 export async function approveCancellation(id: number): Promise<boolean> {
   await ensureDbReady();
   const rows = (await getSql()`
@@ -336,4 +472,41 @@ export async function rejectCancellation(id: number): Promise<boolean> {
     RETURNING id
   `) as { id: number }[];
   return rows.length > 0;
+}
+
+export async function approveCancellationBySeries(seriesId: string): Promise<ReservationWithRoom[]> {
+  await ensureDbReady();
+  const rows = (await getSql()`
+    WITH deleted AS (
+      DELETE FROM reservations
+      WHERE series_id = ${seriesId} AND status = 'cancellation_requested'
+      RETURNING *
+    )
+    SELECT d.*, rm.name as room_name, rm.color as room_color
+    FROM deleted d
+    JOIN rooms rm ON d.room_id = rm.id
+    ORDER BY d.start_time
+  `) as ReservationWithRoom[];
+  await setReservationSeriesStatus(seriesId, 'cancelled');
+  return rows;
+}
+
+export async function rejectCancellationBySeries(seriesId: string, reason?: string | null): Promise<ReservationWithRoom[]> {
+  await ensureDbReady();
+  const rows = (await getSql()`
+    WITH updated AS (
+      UPDATE reservations
+      SET status = COALESCE(previous_status, 'approved'),
+          cancellation_reason = NULL,
+          cancellation_requested_at = NULL,
+          previous_status = NULL
+      WHERE series_id = ${seriesId} AND status = 'cancellation_requested'
+      RETURNING *
+    )
+    SELECT u.*, rm.name as room_name, rm.color as room_color
+    FROM updated u
+    JOIN rooms rm ON u.room_id = rm.id
+    ORDER BY u.start_time
+  `) as ReservationWithRoom[];
+  return rows;
 }

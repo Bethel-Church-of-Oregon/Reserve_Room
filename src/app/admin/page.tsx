@@ -11,6 +11,16 @@ function formatDateTime(dt: string): string {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+/** e.g. "3/10 09:00 ~ 6/15 10:00 (12건)" for series range + count */
+/** Series range in same two-line style as single instance: earliest start, then ~ latest end (N건) */
+function formatSeriesRangeLines(reservations: ReservationWithRoom[]): { firstStart: string; lastEnd: string; count: number } | null {
+  if (reservations.length === 0) return null;
+  const byStart = [...reservations].sort((a, b) => a.start_time.localeCompare(b.start_time));
+  const firstStart = formatDateTime(byStart[0].start_time);
+  const lastEnd = formatDateTime(byStart[byStart.length - 1].end_time);
+  return { firstStart, lastEnd, count: reservations.length };
+}
+
 // ── Login Screen ──────────────────────────────────────────────────────────────
 function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
   const [password, setPassword] = useState('');
@@ -146,6 +156,123 @@ function RejectModal({
   );
 }
 
+// ── Reject Series Modal ──────────────────────────────────────────────────────
+function RejectSeriesModal({
+  seriesId,
+  title,
+  roomName,
+  count,
+  onConfirm,
+  onCancel,
+}: {
+  seriesId: string;
+  title: string;
+  roomName: string;
+  count: number;
+  onConfirm: (reason: string) => void;
+  onCancel: () => void;
+}) {
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
+        <h3 className="text-lg font-bold text-gray-800 mb-1">반복 예약 전체 거절</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          <strong className="text-gray-700">{title}</strong> — {roomName} · {count}건을 모두 거절합니다.
+        </p>
+        <div className="mb-4">
+          <label htmlFor="reject-series-reason" className="block text-sm font-medium text-gray-700 mb-1">거절 사유 <span className="text-red-500">*</span></label>
+          <textarea
+            id="reject-series-reason"
+            value={reason}
+            onChange={(e) => { setReason(e.target.value); setError(''); }}
+            placeholder="거절 사유를 입력해주세요."
+            rows={3}
+            autoFocus
+            className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none ${
+              error ? 'border-red-400 bg-red-50' : 'border-gray-300'
+            }`}
+          />
+          {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm transition"
+          >
+            취소
+          </button>
+          <button
+            onClick={() => {
+              if (!reason.trim()) { setError('거절 사유를 입력해주세요.'); return; }
+              onConfirm(reason.trim());
+            }}
+            className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition"
+          >
+            거절 확정
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Reject Cancel Series Modal (optional reason) ───────────────────────────────
+function RejectCancelSeriesModal({
+  title,
+  roomName,
+  count,
+  onConfirm,
+  onCancel,
+}: {
+  title: string;
+  roomName: string;
+  count: number;
+  onConfirm: (reason?: string) => void;
+  onCancel: () => void;
+}) {
+  const [reason, setReason] = useState('');
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
+        <h3 className="text-lg font-bold text-gray-800 mb-1">시리즈 취소 신청 거절</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          <strong className="text-gray-700">{title}</strong> — {roomName} · {count}건의 취소 신청을 거절합니다.
+        </p>
+        <div className="mb-4">
+          <label htmlFor="reject-cancel-series-reason" className="block text-sm font-medium text-gray-700 mb-1">거절 사유 (선택, 요청자 이메일에 포함)</label>
+          <textarea
+            id="reject-cancel-series-reason"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="선택 사항입니다."
+            rows={3}
+            autoFocus
+            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
+          />
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm transition"
+          >
+            취소
+          </button>
+          <button
+            onClick={() => onConfirm(reason.trim() || undefined)}
+            className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition"
+          >
+            취소 거절
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Reject Cancellation Modal ─────────────────────────────────────────────────
 function RejectCancelModal({
   reservation,
@@ -244,9 +371,17 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const [filter, setFilter] = useState<FilterStatus>('pending');
   const [loading, setLoading] = useState(true);
   const [rejectTarget, setRejectTarget] = useState<ReservationWithRoom | null>(null);
+  const [rejectSeriesTarget, setRejectSeriesTarget] = useState<{ seriesId: string; title: string; roomName: string; count: number } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ReservationWithRoom | null>(null);
   const [rejectCancelTarget, setRejectCancelTarget] = useState<ReservationWithRoom | null>(null);
+  const [rejectCancelSeriesTarget, setRejectCancelSeriesTarget] = useState<{
+    seriesId: string;
+    title: string;
+    roomName: string;
+    count: number;
+  } | null>(null);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [seriesActionLoading, setSeriesActionLoading] = useState<string | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
@@ -278,6 +413,45 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
     return true;
   });
 
+  // One row per series (grouped) or per single reservation
+  type DisplayRow =
+    | { type: 'series'; seriesId: string; reservations: ReservationWithRoom[] }
+    | { type: 'single'; reservation: ReservationWithRoom };
+
+  function buildGroupedRows(): DisplayRow[] {
+    const rows: DisplayRow[] = [];
+    const seenSeries = new Set<string>();
+    for (const r of filtered) {
+      if (r.series_id) {
+        if (!seenSeries.has(r.series_id)) {
+          seenSeries.add(r.series_id);
+          const group = filtered.filter((x) => x.series_id === r.series_id);
+          // Cancellation tab: single-instance requests show as single row, not series
+          const asSingle =
+            filter === 'cancellation_requested' && group.length === 1;
+          if (asSingle) {
+            rows.push({ type: 'single', reservation: group[0] });
+          } else {
+            rows.push({ type: 'series', seriesId: r.series_id, reservations: group });
+          }
+        }
+      } else {
+        rows.push({ type: 'single', reservation: r });
+      }
+    }
+    return rows;
+  }
+
+  const pendingRows: DisplayRow[] =
+    filter === 'pending' ? buildGroupedRows() : filtered.map((r) => ({ type: 'single' as const, reservation: r }));
+  const cancellationRows: DisplayRow[] =
+    filter === 'cancellation_requested' ? buildGroupedRows() : filtered.map((r) => ({ type: 'single' as const, reservation: r }));
+
+  const displayRows: DisplayRow[] =
+    filter === 'pending' ? pendingRows : filter === 'cancellation_requested' ? cancellationRows : filtered.map((r) => ({ type: 'single' as const, reservation: r }));
+
+  const pendingSingleIds = filter === 'pending' ? filtered.filter((r) => !r.series_id).map((r) => r.id) : [];
+
   function toggleSelect(id: number) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -287,11 +461,11 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   }
 
   function toggleSelectAll() {
-    const pendingIds = filtered.filter((r) => r.status === 'pending').map((r) => r.id);
-    if (pendingIds.every((id) => selected.has(id))) {
+    const ids = filter === 'pending' ? pendingSingleIds : filtered.filter((r) => r.status === 'pending').map((r) => r.id);
+    if (ids.length > 0 && ids.every((id) => selected.has(id))) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(pendingIds));
+      setSelected(new Set(ids));
     }
   }
 
@@ -307,6 +481,29 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
       else { const d = await res.json(); showToast(d.error ?? '오류', 'error'); }
     } catch { showToast('네트워크 오류', 'error'); }
     finally { setActionLoading(null); }
+  }
+
+  async function handleApproveSeries(seriesId: string) {
+    setBulkLoading(true);
+    try {
+      const res = await fetch(`/api/admin/series/${encodeURIComponent(seriesId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve' }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`${data.approved ?? 0}건 시리즈 승인 완료`);
+        setSelected(new Set());
+        fetchReservations();
+      } else {
+        showToast(data.error ?? '오류', 'error');
+      }
+    } catch {
+      showToast('네트워크 오류', 'error');
+    } finally {
+      setBulkLoading(false);
+    }
   }
 
   async function handleApproveSelected() {
@@ -346,6 +543,30 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
       else { const d = await res.json(); showToast(d.error ?? '오류', 'error'); }
     } catch { showToast('네트워크 오류', 'error'); }
     finally { setActionLoading(null); setRejectTarget(null); }
+  }
+
+  async function handleRejectSeries(seriesId: string, reason: string) {
+    setSeriesActionLoading(seriesId);
+    try {
+      const res = await fetch(`/api/admin/series/${encodeURIComponent(seriesId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reject', reason }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`${data.rejected ?? 0}건 시리즈 거절 처리되었습니다.`);
+        fetchReservations();
+        setRejectSeriesTarget(null);
+      } else {
+        showToast(data.error ?? '오류', 'error');
+      }
+    } catch {
+      showToast('네트워크 오류', 'error');
+    } finally {
+      setSeriesActionLoading(null);
+      setRejectSeriesTarget(null);
+    }
   }
 
   async function handleDelete(id: number) {
@@ -390,6 +611,52 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
     finally { setActionLoading(null); setRejectCancelTarget(null); }
   }
 
+  async function handleApproveCancellationSeries(seriesId: string) {
+    setSeriesActionLoading(seriesId);
+    try {
+      const res = await fetch(`/api/admin/series/${encodeURIComponent(seriesId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve_cancellation' }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`${data.approved ?? 0}건 시리즈 취소 승인되었습니다.`);
+        fetchReservations();
+      } else {
+        showToast(data.error ?? '오류', 'error');
+      }
+    } catch {
+      showToast('네트워크 오류', 'error');
+    } finally {
+      setSeriesActionLoading(null);
+    }
+  }
+
+  async function handleRejectCancellationSeries(seriesId: string, reason?: string) {
+    setSeriesActionLoading(seriesId);
+    try {
+      const res = await fetch(`/api/admin/series/${encodeURIComponent(seriesId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reject_cancellation', reason: reason ?? '' }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`${data.rejected ?? 0}건 시리즈 취소 거절되었습니다.`);
+        fetchReservations();
+        setRejectCancelSeriesTarget(null);
+      } else {
+        showToast(data.error ?? '오류', 'error');
+      }
+    } catch {
+      showToast('네트워크 오류', 'error');
+    } finally {
+      setSeriesActionLoading(null);
+      setRejectCancelSeriesTarget(null);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Toast */}
@@ -409,6 +676,16 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           onCancel={() => setRejectTarget(null)}
         />
       )}
+      {rejectSeriesTarget && (
+        <RejectSeriesModal
+          seriesId={rejectSeriesTarget.seriesId}
+          title={rejectSeriesTarget.title}
+          roomName={rejectSeriesTarget.roomName}
+          count={rejectSeriesTarget.count}
+          onConfirm={(reason) => handleRejectSeries(rejectSeriesTarget.seriesId, reason)}
+          onCancel={() => setRejectSeriesTarget(null)}
+        />
+      )}
       {deleteTarget && (
         <DeleteModal
           reservation={deleteTarget}
@@ -421,6 +698,15 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           reservation={rejectCancelTarget}
           onConfirm={(reason) => handleRejectCancellation(rejectCancelTarget.id, reason)}
           onCancel={() => setRejectCancelTarget(null)}
+        />
+      )}
+      {rejectCancelSeriesTarget && (
+        <RejectCancelSeriesModal
+          title={rejectCancelSeriesTarget.title}
+          roomName={rejectCancelSeriesTarget.roomName}
+          count={rejectCancelSeriesTarget.count}
+          onConfirm={(reason) => handleRejectCancellationSeries(rejectCancelSeriesTarget.seriesId, reason)}
+          onCancel={() => setRejectCancelSeriesTarget(null)}
         />
       )}
 
@@ -516,12 +802,14 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                     <tr>
                       {filter === 'pending' && (
                         <th className="w-10 px-4 py-3">
-                          <input
-                            type="checkbox"
-                            checked={filtered.filter((r) => r.status === 'pending').every((r) => selected.has(r.id))}
-                            onChange={toggleSelectAll}
-                            className="rounded"
-                          />
+                          {pendingSingleIds.length > 0 && (
+                            <input
+                              type="checkbox"
+                              checked={pendingSingleIds.every((id) => selected.has(id))}
+                              onChange={toggleSelectAll}
+                              className="rounded"
+                            />
+                          )}
                         </th>
                       )}
                       <th className="text-left px-4 py-3 text-gray-600 font-medium">상태</th>
@@ -534,106 +822,277 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filtered.map((r) => (
-                      <tr key={r.id} className={`hover:bg-gray-50 ${selected.has(r.id) ? 'bg-blue-50' : ''}`}>
-                        {filter === 'pending' && (
+                    {displayRows.map((row) =>
+                      row.type === 'series' ? (
+                        <tr key={row.seriesId} className="hover:bg-gray-50">
+                          {filter === 'pending' && <td className="px-4 py-3" />}
                           <td className="px-4 py-3">
-                            {r.status === 'pending' && (
-                              <input
-                                type="checkbox"
-                                checked={selected.has(r.id)}
-                                onChange={() => toggleSelect(r.id)}
-                                className="rounded"
-                              />
+                            <StatusBadge status={filter === 'cancellation_requested' ? 'cancellation_requested' : 'pending'} />
+                          </td>
+                          <td className="px-4 py-3 font-medium text-gray-800">
+                            <div>{row.reservations[0].title}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">반복 예약 {row.reservations.length}건</div>
+                            {row.reservations[0].notes && (
+                              <div className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{row.reservations[0].notes}</div>
+                            )}
+                            {filter === 'cancellation_requested' && row.reservations[0].cancellation_reason && (
+                              <div className="text-xs text-amber-700 mt-0.5 truncate max-w-xs">취소 사유: {row.reservations[0].cancellation_reason}</div>
                             )}
                           </td>
-                        )}
-                        <td className="px-4 py-3">
-                          <StatusBadge status={r.status} />
-                        </td>
-                        <td className="px-4 py-3 font-medium text-gray-800">
-                          <div>{r.title}</div>
-                          {r.notes && <div className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{r.notes}</div>}
-                          {r.status === 'cancellation_requested' && r.cancellation_reason && (
-                            <div className="text-xs text-amber-700 mt-0.5 truncate max-w-xs">취소 사유: {r.cancellation_reason}</div>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: row.reservations[0].room_color }} />
+                              <span className="text-gray-700">{row.reservations[0].room_name}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                            {(() => {
+                              const lines = formatSeriesRangeLines(row.reservations);
+                              return lines ? (
+                                <>
+                                  <div>{lines.firstStart}</div>
+                                  <div className="text-xs text-gray-400">~ {lines.lastEnd} ({lines.count}건)</div>
+                                </>
+                              ) : null;
+                            })()}
+                          </td>
+                          <td className="px-4 py-3 text-gray-700">{row.reservations[0].person_in_charge}</td>
+                          <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{formatDateTime(row.reservations[0].created_at)}</td>
+                          <td className="px-4 py-3">
+                            {filter === 'pending' ? (
+                              <div className="flex gap-1.5">
+                                <button
+                                  onClick={() => handleApproveSeries(row.seriesId)}
+                                  disabled={seriesActionLoading === row.seriesId || bulkLoading}
+                                  className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs rounded-lg font-medium transition"
+                                >
+                                  {seriesActionLoading === row.seriesId ? '...' : '시리즈 승인'}
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    setRejectSeriesTarget({
+                                      seriesId: row.seriesId,
+                                      title: row.reservations[0].title,
+                                      roomName: row.reservations[0].room_name,
+                                      count: row.reservations.length,
+                                    })
+                                  }
+                                  disabled={seriesActionLoading === row.seriesId || bulkLoading}
+                                  className="px-3 py-1.5 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-xs rounded-lg font-medium transition"
+                                >
+                                  시리즈 거절
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex gap-1.5">
+                                <button
+                                  onClick={() => handleApproveCancellationSeries(row.seriesId)}
+                                  disabled={seriesActionLoading === row.seriesId || bulkLoading}
+                                  className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs rounded-lg font-medium transition"
+                                >
+                                  {seriesActionLoading === row.seriesId ? '...' : '시리즈 취소 승인'}
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    setRejectCancelSeriesTarget({
+                                      seriesId: row.seriesId,
+                                      title: row.reservations[0].title,
+                                      roomName: row.reservations[0].room_name,
+                                      count: row.reservations.length,
+                                    })
+                                  }
+                                  disabled={seriesActionLoading === row.seriesId || bulkLoading}
+                                  className="px-3 py-1.5 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-xs rounded-lg font-medium transition"
+                                >
+                                  시리즈 취소 거절
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ) : (
+                        <tr key={row.reservation.id} className={`hover:bg-gray-50 ${selected.has(row.reservation.id) ? 'bg-blue-50' : ''}`}>
+                          {filter === 'pending' && (
+                            <td className="px-4 py-3">
+                              {row.reservation.status === 'pending' && (
+                                <input
+                                  type="checkbox"
+                                  checked={selected.has(row.reservation.id)}
+                                  onChange={() => toggleSelect(row.reservation.id)}
+                                  className="rounded"
+                                />
+                              )}
+                            </td>
                           )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: r.room_color }} />
-                            <span className="text-gray-700">{r.room_name}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                          <div>{formatDateTime(r.start_time)}</div>
-                          <div className="text-xs text-gray-400">~ {formatDateTime(r.end_time)}</div>
-                        </td>
-                        <td className="px-4 py-3 text-gray-700">{r.person_in_charge}</td>
-                        <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{formatDateTime(r.created_at)}</td>
-                        <td className="px-4 py-3">
-                          <ActionButtons
-                            reservation={r}
-                            loading={actionLoading === r.id}
-                            onApprove={() => handleApprove(r.id)}
-                            onReject={() => setRejectTarget(r)}
-                            onDelete={() => setDeleteTarget(r)}
-                            onApproveCancellation={() => handleApproveCancellation(r.id)}
-                            onRejectCancellation={() => setRejectCancelTarget(r)}
-                          />
-                        </td>
-                      </tr>
-                    ))}
+                          <td className="px-4 py-3">
+                            <StatusBadge status={row.reservation.status} />
+                          </td>
+                          <td className="px-4 py-3 font-medium text-gray-800">
+                            <div>{row.reservation.title}</div>
+                            {row.reservation.notes && (
+                              <div className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{row.reservation.notes}</div>
+                            )}
+                            {row.reservation.status === 'cancellation_requested' && row.reservation.cancellation_reason && (
+                              <div className="text-xs text-amber-700 mt-0.5 truncate max-w-xs">취소 사유: {row.reservation.cancellation_reason}</div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: row.reservation.room_color }} />
+                              <span className="text-gray-700">{row.reservation.room_name}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                            <div>{formatDateTime(row.reservation.start_time)}</div>
+                            <div className="text-xs text-gray-400">~ {formatDateTime(row.reservation.end_time)}</div>
+                          </td>
+                          <td className="px-4 py-3 text-gray-700">{row.reservation.person_in_charge}</td>
+                          <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{formatDateTime(row.reservation.created_at)}</td>
+                          <td className="px-4 py-3">
+                            <ActionButtons
+                              reservation={row.reservation}
+                              loading={actionLoading === row.reservation.id}
+                              onApprove={() => handleApprove(row.reservation.id)}
+                              onReject={() => setRejectTarget(row.reservation)}
+                              onDelete={() => setDeleteTarget(row.reservation)}
+                              onApproveCancellation={() => handleApproveCancellation(row.reservation.id)}
+                              onRejectCancellation={() => setRejectCancelTarget(row.reservation)}
+                            />
+                          </td>
+                        </tr>
+                      )
+                    )}
                   </tbody>
                 </table>
               </div>
 
               {/* Mobile cards */}
               <div className="md:hidden divide-y divide-gray-100">
-                {filtered.map((r) => (
-                  <div key={r.id} className={`p-4 ${selected.has(r.id) ? 'bg-blue-50' : ''}`}>
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2">
-                        {filter === 'pending' && r.status === 'pending' && (
-                          <input
-                            type="checkbox"
-                            checked={selected.has(r.id)}
-                            onChange={() => toggleSelect(r.id)}
-                            className="rounded mt-0.5"
-                          />
-                        )}
-                        <StatusBadge status={r.status} />
+                {displayRows.map((row) =>
+                  row.type === 'series' ? (
+                    <div key={row.seriesId} className="p-4">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <StatusBadge status={filter === 'cancellation_requested' ? 'cancellation_requested' : 'pending'} />
+                        <span className="text-xs text-gray-400">{formatDateTime(row.reservations[0].created_at)}</span>
                       </div>
-                      <span className="text-xs text-gray-400">{formatDateTime(r.created_at)}</span>
+                      <p className="font-semibold text-gray-800 mb-1">{row.reservations[0].title}</p>
+                      <p className="text-xs text-gray-500 mb-1">반복 예약 {row.reservations.length}건</p>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: row.reservations[0].room_color }} />
+                        <span className="text-sm text-gray-600">{row.reservations[0].room_name}</span>
+                      </div>
+                      {(() => {
+                        const seriesLines = formatSeriesRangeLines(row.reservations);
+                        return seriesLines ? (
+                          <div className="text-xs text-gray-500 mb-1">
+                            <div>{seriesLines.firstStart}</div>
+                            <div className="text-gray-400">~ {seriesLines.lastEnd} ({seriesLines.count}건)</div>
+                          </div>
+                        ) : null;
+                      })()}
+                      <p className="text-xs text-gray-500 mb-3">담당: {row.reservations[0].person_in_charge}</p>
+                      {row.reservations[0].notes && <p className="text-xs text-gray-400 mb-3 italic">{row.reservations[0].notes}</p>}
+                      {filter === 'cancellation_requested' && row.reservations[0].cancellation_reason && (
+                        <p className="text-xs text-amber-700 mb-3">취소 사유: {row.reservations[0].cancellation_reason}</p>
+                      )}
+                      <div className="flex gap-2">
+                        {filter === 'pending' ? (
+                          <>
+                            <button
+                              onClick={() => handleApproveSeries(row.seriesId)}
+                              disabled={seriesActionLoading === row.seriesId || bulkLoading}
+                              className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs rounded-lg font-medium transition"
+                            >
+                              {seriesActionLoading === row.seriesId ? '...' : '시리즈 승인'}
+                            </button>
+                            <button
+                              onClick={() =>
+                                setRejectSeriesTarget({
+                                  seriesId: row.seriesId,
+                                  title: row.reservations[0].title,
+                                  roomName: row.reservations[0].room_name,
+                                  count: row.reservations.length,
+                                })
+                              }
+                              disabled={seriesActionLoading === row.seriesId || bulkLoading}
+                              className="px-3 py-1.5 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-xs rounded-lg font-medium transition"
+                            >
+                              시리즈 거절
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => handleApproveCancellationSeries(row.seriesId)}
+                              disabled={seriesActionLoading === row.seriesId || bulkLoading}
+                              className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs rounded-lg font-medium transition"
+                            >
+                              {seriesActionLoading === row.seriesId ? '...' : '시리즈 취소 승인'}
+                            </button>
+                            <button
+                              onClick={() =>
+                                setRejectCancelSeriesTarget({
+                                  seriesId: row.seriesId,
+                                  title: row.reservations[0].title,
+                                  roomName: row.reservations[0].room_name,
+                                  count: row.reservations.length,
+                                })
+                              }
+                              disabled={seriesActionLoading === row.seriesId || bulkLoading}
+                              className="px-3 py-1.5 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-xs rounded-lg font-medium transition"
+                            >
+                              시리즈 취소 거절
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <p className="font-semibold text-gray-800 mb-1">{r.title}</p>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: r.room_color }} />
-                      <span className="text-sm text-gray-600">{r.room_name}</span>
+                  ) : (
+                    <div key={row.reservation.id} className={`p-4 ${selected.has(row.reservation.id) ? 'bg-blue-50' : ''}`}>
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2">
+                          {filter === 'pending' && row.reservation.status === 'pending' && (
+                            <input
+                              type="checkbox"
+                              checked={selected.has(row.reservation.id)}
+                              onChange={() => toggleSelect(row.reservation.id)}
+                              className="rounded mt-0.5"
+                            />
+                          )}
+                          <StatusBadge status={row.reservation.status} />
+                        </div>
+                        <span className="text-xs text-gray-400">{formatDateTime(row.reservation.created_at)}</span>
+                      </div>
+                      <p className="font-semibold text-gray-800 mb-1">{row.reservation.title}</p>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: row.reservation.room_color }} />
+                        <span className="text-sm text-gray-600">{row.reservation.room_name}</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mb-1">
+                        {formatDateTime(row.reservation.start_time)} ~ {formatDateTime(row.reservation.end_time)}
+                      </p>
+                      <p className="text-xs text-gray-500 mb-3">담당: {row.reservation.person_in_charge}</p>
+                      {row.reservation.notes && <p className="text-xs text-gray-400 mb-3 italic">{row.reservation.notes}</p>}
+                      {row.reservation.status === 'cancellation_requested' && row.reservation.cancellation_reason && (
+                        <p className="text-xs text-amber-700 mb-3">취소 사유: {row.reservation.cancellation_reason}</p>
+                      )}
+                      {row.reservation.status === 'rejected' && row.reservation.rejection_reason && (
+                        <p className="text-xs text-red-500 mb-3">거절 사유: {row.reservation.rejection_reason}</p>
+                      )}
+                      <div className="flex gap-2">
+                        <ActionButtons
+                          reservation={row.reservation}
+                          loading={actionLoading === row.reservation.id}
+                          onApprove={() => handleApprove(row.reservation.id)}
+                          onReject={() => setRejectTarget(row.reservation)}
+                          onDelete={() => setDeleteTarget(row.reservation)}
+                          onApproveCancellation={() => handleApproveCancellation(row.reservation.id)}
+                          onRejectCancellation={() => setRejectCancelTarget(row.reservation)}
+                        />
+                      </div>
                     </div>
-                    <p className="text-xs text-gray-500 mb-1">
-                      {formatDateTime(r.start_time)} ~ {formatDateTime(r.end_time)}
-                    </p>
-                    <p className="text-xs text-gray-500 mb-3">담당: {r.person_in_charge}</p>
-                    {r.notes && <p className="text-xs text-gray-400 mb-3 italic">{r.notes}</p>}
-                    {r.status === 'cancellation_requested' && r.cancellation_reason && (
-                      <p className="text-xs text-amber-700 mb-3">취소 사유: {r.cancellation_reason}</p>
-                    )}
-                    {r.status === 'rejected' && r.rejection_reason && (
-                      <p className="text-xs text-red-500 mb-3">거절 사유: {r.rejection_reason}</p>
-                    )}
-                    <div className="flex gap-2">
-                      <ActionButtons
-                        reservation={r}
-                        loading={actionLoading === r.id}
-                        onApprove={() => handleApprove(r.id)}
-                        onReject={() => setRejectTarget(r)}
-                        onDelete={() => setDeleteTarget(r)}
-                        onApproveCancellation={() => handleApproveCancellation(r.id)}
-                        onRejectCancellation={() => setRejectCancelTarget(r)}
-                      />
-                    </div>
-                  </div>
-                ))}
+                  )
+                )}
               </div>
             </>
           )}
