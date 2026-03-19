@@ -13,6 +13,7 @@ const TOTAL_HEIGHT = TOTAL_HOURS * PX_PER_HOUR;
 
 const DAYS_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
+
 interface Props {
   weekStart: Date;
   reservations: ReservationWithRoom[];
@@ -129,7 +130,6 @@ export default function WeekView({ weekStart, reservations, onRefresh }: Props) 
   };
 
   useEffect(() => {
-    // Scroll to 8am on mount
     if (scrollRef.current) {
       scrollRef.current.scrollTop = (8 - HOUR_START) * PX_PER_HOUR - 20;
     }
@@ -152,7 +152,7 @@ export default function WeekView({ weekStart, reservations, onRefresh }: Props) 
                 idx === 0 ? 'text-red-500' : idx === 6 ? 'text-blue-500' : 'text-gray-700'
               }`}
             >
-              <div className={`inline-flex flex-col items-center ${isToday ? 'text-white' : ''}`}>
+              <div className={`inline-flex flex-col items-center gap-1 ${isToday ? 'text-white' : ''}`}>
                 <span className="text-xs text-gray-500">
                   {DAYS_KO[day.getDay()]}
                 </span>

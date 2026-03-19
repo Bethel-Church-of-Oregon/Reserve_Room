@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
-import ReservationDetailPopover, { CancelRequestModal } from './ReservationDetailPopover';
+import { CancelRequestModal } from './ReservationDetailPopover';
 
 const DAYS_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -54,37 +54,8 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
   const month = currentDate.getMonth();
   const calDays = getCalendarDays(year, month);
   const today = dateKey(new Date());
-  const [hovered, setHovered] = useState<{ reservation: ReservationWithRoom; rect: DOMRect } | null>(null);
   const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
   const [expandedDay, setExpandedDay] = useState<{ date: Date; reservations: ReservationWithRoom[] } | null>(null);
-  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const showPopover = (reservation: ReservationWithRoom, el: HTMLElement) => {
-    if (hideTimeoutRef.current) {
-      clearTimeout(hideTimeoutRef.current);
-      hideTimeoutRef.current = null;
-    }
-    setHovered({ reservation, rect: el.getBoundingClientRect() });
-  };
-
-  const hidePopover = (delay = 0) => {
-    if (hideTimeoutRef.current) {
-      clearTimeout(hideTimeoutRef.current);
-      hideTimeoutRef.current = null;
-    }
-    if (delay > 0) {
-      hideTimeoutRef.current = setTimeout(() => setHovered(null), delay);
-    } else {
-      setHovered(null);
-    }
-  };
-
-  const cancelHide = () => {
-    if (hideTimeoutRef.current) {
-      clearTimeout(hideTimeoutRef.current);
-      hideTimeoutRef.current = null;
-    }
-  };
 
   const reservationsByDay = new Map<string, ReservationWithRoom[]>();
   for (const r of reservations) {
@@ -130,9 +101,10 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
               return (
                 <div
                   key={di}
-                  className={`border-l border-gray-100 first:border-l-0 p-1 ${
+                  className={`border-l border-gray-100 first:border-l-0 p-1 cursor-pointer hover:bg-gray-50 transition-colors ${
                     isCurrentMonth ? 'bg-white' : 'bg-gray-50'
-                  } ${isToday ? 'bg-blue-50' : ''}`}
+                  } ${isToday ? 'bg-blue-50 hover:bg-blue-100' : ''}`}
+                  onClick={() => setExpandedDay({ date: day, reservations: dayReservations })}
                 >
                   <div className="flex justify-end mb-1">
                     <span
@@ -154,15 +126,13 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
                       return (
                         <div
                           key={r.id}
-                          className={`text-white text-xs px-1 rounded truncate leading-5 cursor-default ${
+                          className={`text-white text-xs px-1 rounded truncate leading-5 ${
                             isPending ? 'reservation-pending opacity-80' : ''
                           }`}
                           style={{
                             backgroundColor: r.room_color,
                             border: isPending ? `1px dashed ${r.room_color}` : 'none',
                           }}
-                          onMouseEnter={(e) => showPopover(r, e.currentTarget)}
-                          onMouseLeave={() => hidePopover(80)}
                         >
                           <span className="font-medium">{formatTime(r.start_time)}</span>{' '}
                           <span className="truncate">{r.title}</span>
@@ -170,13 +140,7 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
                       );
                     })}
                     {extra > 0 && (
-                      <button
-                        type="button"
-                        className="text-xs text-blue-500 hover:text-blue-700 pl-1 cursor-pointer"
-                        onClick={() => setExpandedDay({ date: day, reservations: dayReservations })}
-                      >
-                        +{extra}개 더보기
-                      </button>
+                      <div className="text-xs text-gray-400 pl-1">+{extra}개</div>
                     )}
                   </div>
                 </div>
@@ -210,6 +174,9 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
               </button>
             </div>
             <div className="overflow-y-auto p-4 space-y-2">
+              {expandedDay.reservations.length === 0 && (
+                <div className="flex items-center justify-center h-24 text-sm text-gray-400">해당 일자에는 예약이 없습니다.</div>
+              )}
               {expandedDay.reservations
                 .slice()
                 .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
@@ -261,16 +228,6 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
             </div>
           </div>
         </div>
-      )}
-
-      {hovered && (
-        <ReservationDetailPopover
-          reservation={hovered.reservation}
-          position={{ top: hovered.rect.top, left: hovered.rect.left }}
-          onMouseEnter={cancelHide}
-          onMouseLeave={() => hidePopover(80)}
-          onRequestCancel={(r) => setCancelModalReservation(r)}
-        />
       )}
 
       {cancelModalReservation && (

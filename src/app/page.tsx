@@ -281,87 +281,72 @@ export default function HomePage() {
 
       {/* Calendar controls */}
       <div className="bg-white border-b border-gray-100 px-3 sm:px-6 py-2">
-        <div className="max-w-screen-2xl mx-auto flex flex-wrap items-center gap-2">
-          {/* View mode toggle */}
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
-            <button
-              onClick={() => setViewMode('day')}
-              aria-label="일간 보기"
-              aria-pressed={viewMode === 'day'}
-              className={`px-3 py-1.5 font-medium transition ${
-                viewMode === 'day' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              일간
-            </button>
-            <button
-              onClick={() => setViewMode('week')}
-              aria-label="주간 보기"
-              aria-pressed={viewMode === 'week'}
-              className={`px-3 py-1.5 font-medium transition border-l border-gray-200 ${
-                viewMode === 'week' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              주간
-            </button>
-            <button
-              onClick={() => setViewMode('month')}
-              aria-label="월간 보기"
-              aria-pressed={viewMode === 'month'}
-              className={`px-3 py-1.5 font-medium transition border-l border-gray-200 ${
-                viewMode === 'month' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              월간
-            </button>
-          </div>
-
-          {/* Navigation */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => navigate(-1)}
-              className="p-1.5 rounded hover:bg-gray-100 text-gray-600 transition"
-              aria-label="이전"
-            >
-              ‹
-            </button>
-            <button
-              onClick={goToday}
-              aria-label="오늘로 이동"
-              className="px-3 py-1 text-sm border border-gray-200 rounded hover:bg-gray-50 text-gray-700 transition"
-            >
-              오늘
-            </button>
-            <button
-              onClick={() => navigate(1)}
-              className="p-1.5 rounded hover:bg-gray-100 text-gray-600 transition"
-              aria-label="다음"
-            >
-              ›
-            </button>
-          </div>
-
-          <span className="text-sm font-semibold text-gray-700 ml-1">{title}</span>
-
-          <div className="flex items-center gap-3 ml-auto">
-            <span
-              className={`text-xs ${loading ? 'text-gray-400 animate-pulse' : 'text-transparent select-none'}`}
-              aria-live="polite"
-            >
-              불러오는 중...
-            </span>
-            <div className="flex items-center gap-1">
-              <span className="w-8 h-3 rounded-sm bg-gray-500" />
-              <span className="text-xs text-gray-500">확정</span>
+        <div className="max-w-screen-2xl mx-auto flex flex-col gap-1">
+          {/* Row 1: view mode toggle + navigation (right) */}
+          <div className="flex items-center">
+            <div className="flex rounded-md border border-gray-200 overflow-hidden text-sm">
+              <button
+                onClick={() => setViewMode('day')}
+                aria-label="일간 보기"
+                aria-pressed={viewMode === 'day'}
+                className={`px-2.5 py-1 font-medium transition ${
+                  viewMode === 'day' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                일간
+              </button>
+              <button
+                onClick={() => setViewMode('week')}
+                aria-label="주간 보기"
+                aria-pressed={viewMode === 'week'}
+                className={`px-2.5 py-1 font-medium transition border-l border-gray-200 ${
+                  viewMode === 'week' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                주간
+              </button>
+              <button
+                onClick={() => setViewMode('month')}
+                aria-label="월간 보기"
+                aria-pressed={viewMode === 'month'}
+                className={`px-2.5 py-1 font-medium transition border-l border-gray-200 ${
+                  viewMode === 'month' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                월간
+              </button>
             </div>
-            <div className="flex items-center gap-1">
-              <span
-                className="w-8 h-3 rounded-sm reservation-pending"
-                style={{ backgroundColor: '#94a3b8' }}
-              />
-              <span className="text-xs text-gray-500">승인 대기</span>
+            <div className="ml-auto flex items-center gap-0.5">
+              <button
+                onClick={() => navigate(-1)}
+                className="p-1 rounded hover:bg-gray-100 text-gray-600 transition"
+                aria-label="이전"
+              >
+                ‹
+              </button>
+              <button
+                onClick={goToday}
+                aria-label="오늘로 이동"
+                className="px-2.5 py-0.5 text-sm border border-gray-200 rounded hover:bg-gray-50 text-gray-700 transition"
+              >
+                오늘
+              </button>
+              <button
+                onClick={() => navigate(1)}
+                className="p-1 rounded hover:bg-gray-100 text-gray-600 transition"
+                aria-label="다음"
+              >
+                ›
+              </button>
             </div>
           </div>
+
+          {/* Row 2: title (week/month only) */}
+          {viewMode !== 'day' && (
+            <div className="text-center">
+              <span className="text-base font-semibold text-gray-700">{title}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -398,6 +383,25 @@ export default function HomePage() {
               전체 보기
             </button>
           )}
+          <div className="flex items-center gap-3 ml-auto">
+            <span
+              className={`text-xs ${loading ? 'text-gray-400 animate-pulse' : 'text-transparent select-none'}`}
+              aria-live="polite"
+            >
+              불러오는 중...
+            </span>
+            <div className="flex items-center gap-1">
+              <span className="w-8 h-3 rounded-sm bg-gray-500" />
+              <span className="text-xs text-gray-500">확정</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span
+                className="w-8 h-3 rounded-sm reservation-pending"
+                style={{ backgroundColor: '#94a3b8' }}
+              />
+              <span className="text-xs text-gray-500">승인 대기</span>
+            </div>
+          </div>
         </div>
 
         {/* Collapsible room list */}

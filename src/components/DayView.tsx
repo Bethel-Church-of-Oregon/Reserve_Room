@@ -13,6 +13,22 @@ const TOTAL_HEIGHT = TOTAL_HOURS * PX_PER_HOUR;
 
 const DAYS_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
+function getPacificNow(): { totalMinutes: number; dateKey: string } {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(now);
+  const get = (type: string) => parts.find((p) => p.type === type)!.value;
+  const h = parseInt(get('hour'));
+  const m = parseInt(get('minute'));
+  return {
+    totalMinutes: h * 60 + m,
+    dateKey: `${get('year')}-${get('month')}-${get('day')}`,
+  };
+}
+
 function toLocalDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -101,7 +117,14 @@ export default function DayView({ currentDate, reservations, onDayClick, onRefre
 
   const [hovered, setHovered] = useState<{ reservation: ReservationWithRoom; rect: DOMRect } | null>(null);
   const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
+  const [listMode, setListMode] = useState(false);
+  const [pacificNow, setPacificNow] = useState(getPacificNow);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const id = setInterval(() => setPacificNow(getPacificNow()), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   const showPopover = (reservation: ReservationWithRoom, el: HTMLElement) => {
     if (hideTimeoutRef.current) {
@@ -177,15 +200,104 @@ export default function DayView({ currentDate, reservations, onDayClick, onRefre
       {/* Selected date label */}
       <div className="flex border-b border-gray-100 bg-white sticky top-0 z-10">
         <div className="w-14 flex-shrink-0" />
-        <div className="flex-1 text-center py-1.5 border-l border-gray-100">
+        <div className="flex-1 flex items-center justify-between px-3 py-1.5 border-l border-gray-100">
           <span className={`text-sm font-semibold ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>
             {currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월 {currentDate.getDate()}일 ({DAYS_KO[currentDate.getDay()]})
           </span>
+          <div className="flex rounded-md border border-gray-200 overflow-hidden text-xs">
+            <button
+              onClick={() => setListMode(false)}
+              aria-pressed={!listMode}
+              className={`px-2.5 py-1 font-medium transition ${!listMode ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+            >
+              캘린더
+            </button>
+            <button
+              onClick={() => setListMode(true)}
+              aria-pressed={listMode}
+              className={`px-2.5 py-1 font-medium transition border-l border-gray-200 ${listMode ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+            >
+              목록
+            </button>
+          </div>
         </div>
       </div>
 
+      {/* List view */}
+      {listMode && (
+        <div className="flex-1 overflow-y-auto calendar-scroll">
+          {dayReservations.length === 0 ? (
+            <div className="flex items-center justify-center h-32 text-sm text-gray-400">해당 일자에는 예약이 없습니다.</div>
+          ) : (
+            <ul className="divide-y divide-gray-100 px-3 py-2">
+              {[...dayReservations]
+                .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+                .map((item) => {
+                  const isPending = item.status === 'pending';
+                  const isCancelReq = item.status === 'cancellation_requested';
+                  const canRequestCancel = item.status === 'pending' || item.status === 'approved';
+                  return (
+                    <li key={item.id} className="flex gap-3 py-4">
+                      {/* Time */}
+                      <div className="w-20 flex-shrink-0 text-xs text-gray-400 font-mono pt-0.5">
+                        {formatTime(item.start_time)}<br />{formatTime(item.end_time)}
+                      </div>
+                      {/* Color bar */}
+                      <div
+                        className={`w-1 self-stretch rounded-full flex-shrink-0 ${isPending ? 'opacity-50' : ''}`}
+                        style={{ backgroundColor: item.room_color, minHeight: 40 }}
+                      />
+                      {/* Full detail */}
+                      <div className="flex-1 min-w-0">
+                        {/* Title + status */}
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <span className="text-sm font-semibold text-gray-900 leading-snug">{item.title}</span>
+                          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0 ${
+                            isPending ? 'bg-amber-100 text-amber-800'
+                            : isCancelReq ? 'bg-amber-100 text-amber-800'
+                            : 'bg-gray-100 text-gray-500'
+                          }`}>
+                            {isPending ? '승인 대기' : isCancelReq ? '취소 신청 대기' : '확정'}
+                          </span>
+                        </div>
+                        {/* Room */}
+                        <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-0.5">
+                          <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: item.room_color }} />
+                          {item.room_name}
+                        </div>
+                        {/* Person */}
+                        {item.person_in_charge && (
+                          <div className="text-xs text-gray-400 mb-0.5">
+                            <span className="text-gray-400">담당:</span> {item.person_in_charge}
+                          </div>
+                        )}
+                        {/* Notes */}
+                        {item.notes && (
+                          <div className="mt-1 text-xs text-gray-400 border-t border-gray-100 pt-1">
+                            {item.notes}
+                          </div>
+                        )}
+                        {/* Cancel button */}
+                        {canRequestCancel && (
+                          <button
+                            type="button"
+                            onClick={() => setCancelModalReservation(item)}
+                            className="mt-1.5 text-xs text-red-500 hover:text-red-700 hover:underline transition"
+                          >
+                            취소 신청
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+            </ul>
+          )}
+        </div>
+      )}
+
       {/* Scrollable body */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto calendar-scroll">
+      {!listMode && <div ref={scrollRef} className="flex-1 overflow-y-auto calendar-scroll">
         <div className="flex" style={{ height: TOTAL_HEIGHT }}>
           {/* Time labels */}
           <div className="w-14 flex-shrink-0 relative">
@@ -221,6 +333,21 @@ export default function DayView({ currentDate, reservations, onDayClick, onRefre
                 style={{ top: (h - HOUR_START) * PX_PER_HOUR + PX_PER_HOUR / 2 }}
               />
             ))}
+
+            {/* Current time line */}
+            {dayKey === pacificNow.dateKey &&
+              pacificNow.totalMinutes >= HOUR_START * 60 &&
+              pacificNow.totalMinutes <= HOUR_END * 60 && (() => {
+                const top = (pacificNow.totalMinutes - HOUR_START * 60) * PX_PER_MIN;
+                return (
+                  <div className="absolute w-full" style={{ top, zIndex: 10, pointerEvents: 'none' }}>
+                    <div className="relative flex items-center">
+                      <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 -ml-1" />
+                      <div className="flex-1 border-t-2 border-blue-500" />
+                    </div>
+                  </div>
+                );
+              })()}
 
             {/* Reservation blocks */}
             {grouped.map(({ item, col, totalCols }) => {
@@ -271,7 +398,7 @@ export default function DayView({ currentDate, reservations, onDayClick, onRefre
             })}
           </div>
         </div>
-      </div>
+      </div>}
 
       {hovered && (
         <ReservationDetailPopover
