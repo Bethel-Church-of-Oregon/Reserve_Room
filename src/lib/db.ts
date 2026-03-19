@@ -296,6 +296,44 @@ export async function createReservationSeries(data: {
   return rows[0];
 }
 
+export async function getConflictingReservationsForRange(
+  room_id: number,
+  minStart: string,
+  maxEnd: string
+): Promise<Array<{ start_time: string; end_time: string }>> {
+  await ensureDbReady();
+  const rows = (await getSql()`
+    SELECT start_time, end_time FROM reservations
+    WHERE room_id = ${room_id}
+      AND status IN ('pending', 'approved', 'cancellation_requested')
+      AND start_time < ${maxEnd}
+      AND end_time > ${minStart}
+  `) as Array<{ start_time: string; end_time: string }>;
+  return rows;
+}
+
+export async function createReservationsBulk(data: {
+  series_id: string;
+  title: string;
+  room_id: number;
+  person_in_charge: string;
+  email: string;
+  notes?: string;
+  occurrences: Array<{ start_time: string; end_time: string; series_index: number }>;
+}): Promise<Reservation[]> {
+  await ensureDbReady();
+  const startTimes = data.occurrences.map((o) => o.start_time);
+  const endTimes = data.occurrences.map((o) => o.end_time);
+  const indices = data.occurrences.map((o) => o.series_index);
+  const rows = (await getSql()`
+    INSERT INTO reservations (series_id, series_index, title, room_id, start_time, end_time, person_in_charge, email, notes)
+    SELECT ${data.series_id}, idx, ${data.title}, ${data.room_id}, st, et, ${data.person_in_charge}, ${data.email}, ${data.notes ?? null}
+    FROM unnest(${startTimes}::text[], ${endTimes}::text[], ${indices}::int[]) AS t(st, et, idx)
+    RETURNING *
+  `) as Reservation[];
+  return rows;
+}
+
 export async function checkConflict(
   room_id: number,
   start_time: string,

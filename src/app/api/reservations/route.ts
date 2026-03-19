@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { addMonths, addDays, format } from 'date-fns';
-import { getReservations, createReservation, createReservationSeries, checkConflict, getRooms } from '@/lib/db';
+import { getReservations, createReservation, createReservationSeries, checkConflict, getRooms, getConflictingReservationsForRange, createReservationsBulk } from '@/lib/db';
 import { checkReservationLimit } from '@/lib/ratelimit';
 import { LIMITS } from '@/lib/constants';
 
@@ -41,7 +41,7 @@ function generateOccurrences(
 
   const results: Array<{ start_time: string; end_time: string }> = [];
   let currentDate = startTime.slice(0, 10); // '2024-03-10'
-  const MAX_OCCURRENCES = 200;
+  const MAX_OCCURRENCES = 500;
 
   while (currentDate <= recurringUntil && results.length < MAX_OCCURRENCES) {
     results.push({
@@ -132,30 +132,41 @@ export async function POST(req: NextRequest) {
 
       const occurrences = generateOccurrences(start_time, end_time, recurring, recurring_until);
 
-      let created = 0;
+      // Fetch all existing conflicts in the full date range with a single query
+      const minStart = occurrences[0].start_time;
+      const maxEnd = occurrences[occurrences.length - 1].end_time;
+      const existingConflicts = await getConflictingReservationsForRange(roomIdNum, minStart, maxEnd);
+
+      // Check each occurrence against in-memory conflict list
       const conflictDates: string[] = [];
+      const toInsert: Array<{ start_time: string; end_time: string; series_index: number }> = [];
       let seriesIndex = 0;
 
       for (const occ of occurrences) {
-        const hasConflict = await checkConflict(roomIdNum, occ.start_time, occ.end_time);
+        const hasConflict = existingConflicts.some(
+          (c) => c.start_time < occ.end_time && c.end_time > occ.start_time
+        );
         if (hasConflict) {
           conflictDates.push(occ.start_time.slice(0, 10));
         } else {
-          await createReservation({
-            series_id: seriesId,
-            series_index: seriesIndex,
-            title: titleStr,
-            room_id: roomIdNum,
-            start_time: occ.start_time,
-            end_time: occ.end_time,
-            person_in_charge: personStr,
-            email: emailStr,
-            notes: notesStr || undefined,
-          });
-          created++;
+          toInsert.push({ start_time: occ.start_time, end_time: occ.end_time, series_index: seriesIndex });
           seriesIndex++;
         }
       }
+
+      // Bulk INSERT all non-conflicting occurrences in a single query
+      if (toInsert.length > 0) {
+        await createReservationsBulk({
+          series_id: seriesId,
+          title: titleStr,
+          room_id: roomIdNum,
+          person_in_charge: personStr,
+          email: emailStr,
+          notes: notesStr || undefined,
+          occurrences: toInsert,
+        });
+      }
+      const created = toInsert.length;
 
       if (created === 0) {
         return NextResponse.json(
