@@ -175,7 +175,7 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
             </div>
             <div className="overflow-y-auto p-4 space-y-2">
               {expandedDay.reservations.length === 0 && (
-                <div className="flex items-center justify-center h-24 text-sm text-gray-400">해당 일자에는 예약이 없습니다.</div>
+                <div className="flex items-center justify-center h-24 text-sm text-gray-400">해당 날짜에는 예약이 없습니다.</div>
               )}
               {expandedDay.reservations
                 .slice()
