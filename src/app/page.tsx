@@ -281,7 +281,7 @@ export default function HomePage() {
 
       {/* Calendar controls */}
       <div className="bg-white border-b border-gray-100 px-3 sm:px-6 py-2">
-        <div className="max-w-screen-2xl mx-auto flex flex-col gap-1">
+        <div className="max-w-screen-2xl mx-auto flex flex-col" style={{ gap: '8px' }}>
           {/* Row 1: view mode toggle + navigation (right) */}
           <div className="flex items-center">
             <div className="flex rounded-md border border-gray-200 overflow-hidden text-sm">
@@ -344,7 +344,7 @@ export default function HomePage() {
           {/* Row 2: title (week/month only) */}
           {viewMode !== 'day' && (
             <div className="text-center">
-              <span className="text-base font-semibold text-gray-700">{title}</span>
+              <span className="text-lg font-semibold text-gray-700">{title}</span>
             </div>
           )}
         </div>
@@ -358,16 +358,16 @@ export default function HomePage() {
             onClick={() => setLegendOpen((v) => !v)}
             aria-label={legendOpen ? '장소 필터 접기' : '장소 필터 열기'}
             aria-expanded={legendOpen}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition whitespace-nowrap flex-shrink-0 ${
               legendOpen
                 ? 'bg-gray-100 border-gray-300 text-gray-800'
                 : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
             }`}
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
             </svg>
-            장소 필터
+            <span className={selectedRooms.size > 0 ? 'hidden sm:inline' : ''}>장소 필터</span>
             {selectedRooms.size > 0 && (
               <span className="ml-0.5 px-1.5 py-0.5 bg-blue-600 text-white rounded-full text-xs leading-none">
                 {selectedRooms.size}
@@ -378,28 +378,28 @@ export default function HomePage() {
           {selectedRooms.size > 0 && (
             <button
               onClick={clearFilter}
-              className="text-xs text-gray-400 hover:text-gray-600 underline transition"
+              className="text-xs text-gray-400 hover:text-gray-600 underline transition whitespace-nowrap flex-shrink-0"
             >
               전체 보기
             </button>
           )}
-          <div className="flex items-center gap-3 ml-auto">
+          <div className="flex items-center gap-2 ml-auto flex-shrink-0">
             <span
-              className={`text-xs ${loading ? 'text-gray-400 animate-pulse' : 'text-transparent select-none'}`}
+              className={`text-xs whitespace-nowrap ${loading ? 'text-gray-400 animate-pulse' : 'text-transparent select-none'}`}
               aria-live="polite"
             >
               불러오는 중...
             </span>
-            <div className="flex items-center gap-1">
-              <span className="w-8 h-3 rounded-sm bg-gray-500" />
-              <span className="text-xs text-gray-500">확정</span>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <span className="w-6 h-2.5 rounded-sm bg-gray-500 flex-shrink-0" />
+              <span className="text-xs text-gray-500 whitespace-nowrap">확정</span>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 flex-shrink-0">
               <span
-                className="w-8 h-3 rounded-sm reservation-pending"
+                className="w-6 h-2.5 rounded-sm reservation-pending flex-shrink-0"
                 style={{ backgroundColor: '#94a3b8' }}
               />
-              <span className="text-xs text-gray-500">승인 대기</span>
+              <span className="text-xs text-gray-500 whitespace-nowrap">승인대기</span>
             </div>
           </div>
         </div>

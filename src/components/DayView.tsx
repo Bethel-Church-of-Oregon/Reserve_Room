@@ -201,7 +201,7 @@ export default function DayView({ currentDate, reservations, onDayClick, onRefre
       <div className="flex border-b border-gray-100 bg-white sticky top-0 z-10">
         <div className="w-14 flex-shrink-0" />
         <div className="flex-1 flex items-center justify-between px-3 py-1.5 border-l border-gray-100">
-          <span className={`text-sm font-semibold ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>
+          <span className={`text-base font-semibold ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>
             {currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월 {currentDate.getDate()}일 ({DAYS_KO[currentDate.getDay()]})
           </span>
           <div className="flex rounded-md border border-gray-200 overflow-hidden text-xs">
