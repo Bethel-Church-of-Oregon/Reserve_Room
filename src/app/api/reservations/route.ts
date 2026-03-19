@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { addMonths, addDays, format } from 'date-fns';
-import { getReservations, createReservation, checkConflict, getRooms } from '@/lib/db';
+import { getReservations, createReservation, createReservationSeries, checkConflict, getRooms } from '@/lib/db';
 import { checkReservationLimit } from '@/lib/ratelimit';
 import { LIMITS } from '@/lib/constants';
 
@@ -118,18 +118,42 @@ export async function POST(req: NextRequest) {
 
     // Recurring reservation
     if (recurring && recurring !== 'none' && recurring_until) {
+      const seriesId = crypto.randomUUID();
+      await createReservationSeries({
+        id: seriesId,
+        title: titleStr,
+        room_id: roomIdNum,
+        person_in_charge: personStr,
+        email: emailStr,
+        notes: notesStr || undefined,
+        recurring,
+        recurring_until,
+      });
+
       const occurrences = generateOccurrences(start_time, end_time, recurring, recurring_until);
 
       let created = 0;
       const conflictDates: string[] = [];
+      let seriesIndex = 0;
 
       for (const occ of occurrences) {
         const hasConflict = await checkConflict(roomIdNum, occ.start_time, occ.end_time);
         if (hasConflict) {
           conflictDates.push(occ.start_time.slice(0, 10));
         } else {
-          await createReservation({ title: titleStr, room_id: roomIdNum, start_time: occ.start_time, end_time: occ.end_time, person_in_charge: personStr, email: emailStr, notes: notesStr || undefined });
+          await createReservation({
+            series_id: seriesId,
+            series_index: seriesIndex,
+            title: titleStr,
+            room_id: roomIdNum,
+            start_time: occ.start_time,
+            end_time: occ.end_time,
+            person_in_charge: personStr,
+            email: emailStr,
+            notes: notesStr || undefined,
+          });
           created++;
+          seriesIndex++;
         }
       }
 
@@ -140,7 +164,10 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      return NextResponse.json({ created, conflicts: conflictDates.length, conflictDates }, { status: 201 });
+      return NextResponse.json(
+        { created, conflicts: conflictDates.length, conflictDates, seriesId },
+        { status: 201 }
+      );
     }
 
     // Single reservation

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
 import { LIMITS } from '@/lib/constants';
 
@@ -32,6 +32,15 @@ export function CancelRequestModal({
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [scope, setScope] = useState<'one' | 'series'>('one');
+  const hasSeries = Boolean(reservation.series_id);
+
+  // Reset to "one instance" whenever the modal is opened with a different reservation
+  useEffect(() => {
+    setScope('one');
+    setReason('');
+    setError('');
+  }, [reservation.id]);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110] px-4">
@@ -40,6 +49,37 @@ export function CancelRequestModal({
         <p className="text-sm text-gray-500 mb-4">
           <strong className="text-gray-700">{reservation.title}</strong> 예약의 취소를 신청합니다.
         </p>
+
+        {hasSeries && (
+          <div className="mb-4">
+            <div className="block text-sm font-medium text-gray-700 mb-1">취소 범위</div>
+            <div className="flex flex-col gap-2 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="cancel-scope"
+                  value="one"
+                  checked={scope === 'one'}
+                  onChange={() => setScope('one')}
+                  disabled={loading}
+                />
+                <span>이 일정만 취소</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="cancel-scope"
+                  value="series"
+                  checked={scope === 'series'}
+                  onChange={() => setScope('series')}
+                  disabled={loading}
+                />
+                <span>이 일정부터 이후 반복 일정 모두 취소</span>
+              </label>
+            </div>
+          </div>
+        )}
+
         <div className="mb-4">
           <label htmlFor="cancel-reason" className="block text-sm font-medium text-gray-700 mb-1">취소 사유 <span className="text-red-500">*</span></label>
           <textarea
@@ -77,7 +117,7 @@ export function CancelRequestModal({
                 const res = await fetch(`/api/reservations/${reservation.id}/cancel`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ reason: reason.trim() }),
+                  body: JSON.stringify({ reason: reason.trim(), scope }),
                 });
                 const data = await res.json();
                 if (res.ok) {
