@@ -261,13 +261,13 @@ function ReserveForm() {
           <div className="flex gap-3 justify-center">
             <button
               onClick={handleReset}
-              className="px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
+              className="px-3 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition whitespace-nowrap"
             >
               추가 예약 신청
             </button>
             <button
               onClick={() => router.push('/')}
-              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+              className="px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition whitespace-nowrap"
             >
               캘린더로 돌아가기
             </button>
