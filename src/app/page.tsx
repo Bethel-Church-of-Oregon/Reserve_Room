@@ -236,7 +236,7 @@ export default function HomePage() {
     : effectiveReservations.filter((r) => selectedRooms.has(r.room_id));
 
   return (
-    <div className="flex flex-col min-h-screen max-w-screen-xl mx-auto w-full border-x border-gray-200">
+    <div className="flex flex-col h-screen max-w-screen-xl mx-auto w-full border-x border-gray-200 overflow-hidden">
       {/* Top navigation bar */}
       <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-20">
         <div className="px-3 sm:px-6 py-3 flex flex-wrap items-center gap-2">
@@ -464,12 +464,11 @@ export default function HomePage() {
       )}
 
       {/* Calendar */}
-      <main className="flex-1 overflow-hidden">
+      <main className="flex-1 min-h-0">
         <div className="h-full">
           <div
             ref={calendarRef}
-            className="bg-white border-t border-gray-200 overflow-hidden"
-            style={{ height: 'calc(100vh - 170px)' }}
+            className="bg-white border-t border-gray-200 h-full overflow-hidden"
           >
             {viewMode === 'day' ? (
               <DayView key="day" currentDate={currentDate} reservations={filteredReservations} loading={isFetchPending} onDayClick={setCurrentDate} onRefresh={refreshReservations} />

@@ -86,7 +86,7 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
       </div>
 
       {/* Calendar grid */}
-      <div className="flex-1 grid" style={{ gridTemplateRows: `repeat(${weeks.length}, 1fr)` }}>
+      <div className="flex-1 overflow-y-auto grid" style={{ gridTemplateRows: `repeat(${weeks.length}, 1fr)` }}>
         {weeks.map((week, wi) => (
           <div key={wi} className="grid grid-cols-7 border-b border-gray-100 last:border-b-0" style={{ minHeight: '100px' }}>
             {week.map((day, di) => {

@@ -165,8 +165,11 @@ export default function DayView({ currentDate, reservations, loading, onDayClick
 
   return (
     <div className="flex flex-col h-full">
+      {/* Week strip + date label — sticky together */}
+      <div className="sticky top-0 z-10 bg-white">
+
       {/* Week strip */}
-      <div className="flex border-b border-gray-200 bg-white sticky top-0 z-10">
+      <div className="flex border-b border-gray-200">
         <div className="w-14 flex-shrink-0" />
         {weekDays.map((day, idx) => {
           const key = toLocalDateKey(day);
@@ -202,7 +205,7 @@ export default function DayView({ currentDate, reservations, loading, onDayClick
       </div>
 
       {/* Selected date label */}
-      <div className="flex border-b border-gray-100 bg-white sticky top-0 z-10">
+      <div className="flex border-b border-gray-100">
         <div className="w-14 flex-shrink-0" />
         <div className="flex-1 flex items-center justify-between px-3 py-1.5 border-l border-gray-100">
           <span className={`text-base font-semibold ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>
@@ -226,6 +229,8 @@ export default function DayView({ currentDate, reservations, loading, onDayClick
           </div>
         </div>
       </div>
+
+      </div>{/* end sticky wrapper */}
 
       {/* List view */}
       {listMode && (
