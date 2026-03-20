@@ -822,8 +822,8 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                           <td className="px-4 py-3">
                             <StatusBadge status={filter === 'cancellation_requested' ? 'cancellation_requested' : 'pending'} />
                           </td>
-                          <td className="px-4 py-3 font-medium text-gray-800">
-                            <div>{row.reservations[0].title}</div>
+                          <td className="px-4 py-3 font-medium text-gray-800 max-w-[200px]">
+                            <div className="truncate">{row.reservations[0].title}</div>
                             <div className="text-xs text-gray-500 mt-0.5">반복 예약 {row.reservations.length}건</div>
                             {row.reservations[0].notes && (
                               <div className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{row.reservations[0].notes}</div>
@@ -920,8 +920,8 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                           <td className="px-4 py-3">
                             <StatusBadge status={row.reservation.status} />
                           </td>
-                          <td className="px-4 py-3 font-medium text-gray-800">
-                            <div>{row.reservation.title}</div>
+                          <td className="px-4 py-3 font-medium text-gray-800 max-w-[200px]">
+                            <div className="truncate">{row.reservation.title}</div>
                             {row.reservation.notes && (
                               <div className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{row.reservation.notes}</div>
                             )}
@@ -968,7 +968,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                         <StatusBadge status={filter === 'cancellation_requested' ? 'cancellation_requested' : 'pending'} />
                         <span className="text-xs text-gray-400">{formatDateTime(row.reservations[0].created_at)}</span>
                       </div>
-                      <p className="font-semibold text-gray-800 mb-1">{row.reservations[0].title}</p>
+                      <p className="font-semibold text-gray-800 mb-1 truncate">{row.reservations[0].title}</p>
                       <p className="text-xs text-gray-500 mb-1">반복 예약 {row.reservations.length}건</p>
                       <div className="flex items-center gap-1.5 mb-1">
                         <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: row.reservations[0].room_color }} />
@@ -1056,7 +1056,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                         </div>
                         <span className="text-xs text-gray-400">{formatDateTime(row.reservation.created_at)}</span>
                       </div>
-                      <p className="font-semibold text-gray-800 mb-1">{row.reservation.title}</p>
+                      <p className="font-semibold text-gray-800 mb-1 truncate">{row.reservation.title}</p>
                       <div className="flex items-center gap-1.5 mb-1">
                         <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: row.reservation.room_color }} />
                         <span className="text-sm text-gray-600">{row.reservation.room_name}</span>

@@ -260,7 +260,7 @@ export default function DayView({ currentDate, reservations, loading, onDayClick
                       <div className="flex-1 min-w-0">
                         {/* Title + status */}
                         <div className="flex items-start justify-between gap-2 mb-1">
-                          <span className="text-sm font-semibold text-gray-900 leading-snug">{item.title}</span>
+                          <span className="text-sm font-semibold text-gray-900 leading-snug truncate min-w-0">{item.title}</span>
                           <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0 ${
                             isPending ? 'bg-amber-100 text-amber-800'
                             : isCancelReq ? 'bg-amber-100 text-amber-800'
