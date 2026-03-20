@@ -230,10 +230,10 @@ export default function ReservationDetailPopover({
         <span
           className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
             isPending
-              ? 'bg-amber-100 text-amber-800'
+              ? 'bg-yellow-100 text-yellow-700'
               : isCancelRequested
               ? 'bg-amber-100 text-amber-800'
-              : 'bg-gray-100 text-gray-600'
+              : 'bg-green-100 text-green-700'
           }`}
         >
           {isPending ? '승인 대기중' : isCancelRequested ? '취소 대기중' : '예약 확정'}

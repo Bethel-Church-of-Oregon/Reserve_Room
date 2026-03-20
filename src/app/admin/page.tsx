@@ -1106,7 +1106,7 @@ function StatusBadge({ status }: { status: string }) {
   if (status === 'pending') return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
       <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
-      승인 대기
+      승인 대기중
     </span>
   );
   if (status === 'approved') return (
@@ -1118,7 +1118,7 @@ function StatusBadge({ status }: { status: string }) {
   if (status === 'cancellation_requested') return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
       <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-      취소 신청
+      취소 대기중
     </span>
   );
   return (

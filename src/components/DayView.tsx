@@ -262,9 +262,9 @@ export default function DayView({ currentDate, reservations, loading, onDayClick
                         <div className="flex items-start justify-between gap-2 mb-1">
                           <span className="text-sm font-semibold text-gray-900 leading-snug truncate min-w-0">{item.title}</span>
                           <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0 ${
-                            isPending ? 'bg-amber-100 text-amber-800'
+                            isPending ? 'bg-yellow-100 text-yellow-700'
                             : isCancelReq ? 'bg-amber-100 text-amber-800'
-                            : 'bg-gray-100 text-gray-500'
+                            : 'bg-green-100 text-green-700'
                           }`}>
                             {isPending ? '승인 대기중' : isCancelReq ? '취소 대기중' : '예약 확정'}
                           </span>

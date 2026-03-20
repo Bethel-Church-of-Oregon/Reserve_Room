@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation';
 import WeekView from '@/components/WeekView';
 import MonthView from '@/components/MonthView';
 import DayView from '@/components/DayView';
+import ListView from '@/components/ListView';
 import { ReservationWithRoom, Room } from '@/lib/db';
 
-type ViewMode = 'day' | 'week' | 'month';
+type ViewMode = 'day' | 'week' | 'month' | 'list';
 
 function startOfWeek(d: Date): Date {
   const date = new Date(d);
@@ -120,7 +121,7 @@ export default function HomePage() {
   // String key for stable effect dependency (avoids Date object reference issues)
   const dateKey = toLocalDateKey(currentDate);
   // Day view fetches the whole week, so only refetch when the week (or view/refresh) changes
-  const fetchPeriodKey = viewMode === 'day' ? toLocalDateKey(weekStart) : dateKey;
+  const fetchPeriodKey = viewMode === 'day' ? toLocalDateKey(weekStart) : viewMode === 'list' ? 'list' : dateKey;
 
   useEffect(() => {
     setRoomsError(null);
@@ -153,6 +154,11 @@ export default function HomePage() {
       const weekEnd = new Date(ws);
       weekEnd.setDate(ws.getDate() + 7);
       to = toLocalDateKey(weekEnd);
+    } else if (viewMode === 'list') {
+      from = toLocalDateKey(new Date());
+      const farFuture = new Date();
+      farFuture.setFullYear(farFuture.getFullYear() + 1);
+      to = toLocalDateKey(farFuture);
     } else {
       from = toLocalDateKey(startOfMonth(currentDate));
       const firstOfNext = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
@@ -173,7 +179,7 @@ export default function HomePage() {
             setReservations([]);
           } else {
             setReservations(Array.isArray(data) ? data : []);
-            setFetchedFor({ viewMode, dateKey: viewMode === 'day' ? from : dateKey });
+            setFetchedFor({ viewMode, dateKey: viewMode === 'day' ? from : viewMode === 'list' ? 'list' : dateKey });
           }
         }
       } catch (e) {
@@ -193,6 +199,7 @@ export default function HomePage() {
   }, [viewMode, fetchPeriodKey, refreshTrigger]);
 
   function navigate(dir: -1 | 1) {
+    if (viewMode === 'list') return;
     setCurrentDate((prev) => {
       const d = new Date(prev);
       if (viewMode === 'day') {
@@ -225,7 +232,7 @@ export default function HomePage() {
     setSelectedRooms(new Set());
   }
 
-  const fetchKey = viewMode === 'day' ? toLocalDateKey(weekStart) : dateKey;
+  const fetchKey = viewMode === 'day' ? toLocalDateKey(weekStart) : viewMode === 'list' ? 'list' : dateKey;
   const isFetchPending = !fetchedFor || fetchedFor.viewMode !== viewMode || fetchedFor.dateKey !== fetchKey;
   const effectiveReservations = isFetchPending ? [] : reservations;
   const filteredReservations = selectedRooms.size === 0
@@ -314,34 +321,46 @@ export default function HomePage() {
               >
                 월간
               </button>
-            </div>
-            <div className="ml-auto flex items-center gap-0.5">
               <button
-                onClick={() => navigate(-1)}
-                className="p-1 rounded hover:bg-gray-100 text-gray-600 transition flex items-center"
-                aria-label="이전"
+                onClick={() => setViewMode('list')}
+                aria-label="목록 보기"
+                aria-pressed={viewMode === 'list'}
+                className={`px-2.5 py-1 font-medium transition border-l border-gray-200 ${
+                  viewMode === 'list' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
               >
-                <span className="text-lg font-semibold text-gray-800">‹</span>
-              </button>
-              <button
-                onClick={goToday}
-                aria-label="오늘로 이동"
-                className="px-2.5 py-0.5 text-sm border border-gray-200 rounded hover:bg-gray-50 text-gray-700 transition"
-              >
-                오늘
-              </button>
-              <button
-                onClick={() => navigate(1)}
-                className="p-1 rounded hover:bg-gray-100 text-gray-600 transition flex items-center"
-                aria-label="다음"
-              >
-                <span className="text-lg font-semibold text-gray-800">›</span>
+                목록
               </button>
             </div>
+            {viewMode !== 'list' && (
+              <div className="ml-auto flex items-center gap-0.5">
+                <button
+                  onClick={() => navigate(-1)}
+                  className="p-1 rounded hover:bg-gray-100 text-gray-600 transition flex items-center"
+                  aria-label="이전"
+                >
+                  <span className="text-lg font-semibold text-gray-800">‹</span>
+                </button>
+                <button
+                  onClick={goToday}
+                  aria-label="오늘로 이동"
+                  className="px-2.5 py-0.5 text-sm border border-gray-200 rounded hover:bg-gray-50 text-gray-700 transition"
+                >
+                  오늘
+                </button>
+                <button
+                  onClick={() => navigate(1)}
+                  className="p-1 rounded hover:bg-gray-100 text-gray-600 transition flex items-center"
+                  aria-label="다음"
+                >
+                  <span className="text-lg font-semibold text-gray-800">›</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Row 2: title (week/month only) */}
-          {viewMode !== 'day' && (
+          {viewMode !== 'day' && viewMode !== 'list' && (
             <div className="text-center">
               <span className="text-lg font-semibold text-gray-700">{title}</span>
             </div>
@@ -471,6 +490,8 @@ export default function HomePage() {
               <DayView key="day" currentDate={currentDate} reservations={filteredReservations} loading={isFetchPending} onDayClick={setCurrentDate} onRefresh={refreshReservations} />
             ) : viewMode === 'week' ? (
               <WeekView key="week" weekStart={weekStart} reservations={filteredReservations} onRefresh={refreshReservations} />
+            ) : viewMode === 'list' ? (
+              <ListView key="list" reservations={filteredReservations} loading={isFetchPending} onRefresh={refreshReservations} />
             ) : (
               <div key="month" className="h-full overflow-y-auto calendar-scroll">
                 <MonthView currentDate={currentDate} reservations={filteredReservations} onRefresh={refreshReservations} />

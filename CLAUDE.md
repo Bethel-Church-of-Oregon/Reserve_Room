@@ -21,10 +21,11 @@ npm run build && npm start  # 프로덕션 (포트 8000)
 - `src/lib/auth.ts` — HMAC-SHA256 관리자 세션 토큰 생성/검증
 - `src/lib/constants.ts` — 입력값 길이 제한 상수 (`LIMITS`)
 - `src/lib/ratelimit.ts` — Upstash Redis 기반 rate limiting (로그인/예약/취소)
-- `src/app/page.tsx` — 메인 캘린더 (day/week/month, 클라이언트 컴포넌트)
+- `src/app/page.tsx` — 메인 캘린더 (day/week/month/list, 클라이언트 컴포넌트)
 - `src/components/DayView.tsx` — 일간 캘린더 (오전 6시~오후 11시, 1.5px/분) + 캘린더/목록 토글 + 현재 시간 라인 (Pacific time)
 - `src/components/WeekView.tsx` — 주간 캘린더 (오전 6시~오후 11시, 1.5px/분)
 - `src/components/MonthView.tsx` — 월간 캘린더, 날짜 셀 클릭 시 해당 날 예약 모달
+- `src/components/ListView.tsx` — 목록 뷰 (오늘 이후 전체 예약, 주 단위 헤더, 날짜별 카드)
 - `src/components/ReservationDetailPopover.tsx` — 예약 상세 팝오버 + `CancelRequestModal` (취소 신청)
 - `src/app/reserve/page.tsx` — 예약 신청 폼 (Suspense로 useSearchParams 감쌈)
 - `src/app/admin/page.tsx` — 관리자 패널 (로그인 → 승인/거절/취소처리/삭제)
@@ -85,9 +86,9 @@ cancellation_requested → [approveCancellation: 삭제]
 - 시리즈 취소는 `PATCH /api/admin/series/[id]`로 일괄 처리
 
 ## 핵심 설계 결정
-- 승인 대기 예약: CSS 빗금 패턴 (`.reservation-pending`), 배지 표시 "승인 대기중"
-- 확정 예약: 회색 계열 표시, 배지 표시 "예약 확정"
-- 취소 신청 중 예약: 별도 배지(amber) 표시, 배지 표시 "취소 대기중"
+- 승인 대기 예약: CSS 빗금 패턴 (`.reservation-pending`), 배지 표시 "승인 대기중" (`bg-yellow-100 text-yellow-700`)
+- 확정 예약: 솔리드 표시, 배지 표시 "예약 확정" (`bg-green-100 text-green-700`)
+- 취소 신청 중 예약: 별도 배지 표시, 배지 표시 "취소 대기중" (`bg-amber-100 text-amber-800`)
 - 회의실별 색상 20가지 시드 데이터로 정의
 - 일간/주간 뷰: 오전 6시~오후 11시, 1.5px/분, 겹침 감지 컬럼 레이아웃
 - 충돌 감지: 같은 회의실 + 같은 시간대 이중 예약 방지
@@ -107,7 +108,8 @@ cancellation_requested → [approveCancellation: 삭제]
 - 전체 앱 컨테이너: `h-screen overflow-hidden` — 뷰포트 높이 고정, 스크롤은 각 뷰 내부에서 처리
 - `<header>` 안에 로고·버튼·공지 배너·캘린더 컨트롤·장소 필터 모두 포함 (sticky top-0)
 - 컨트롤 바: 1줄 — 일간/주간/월간 토글 (왼쪽) + ‹ 오늘 › (오른쪽), 2줄 — 날짜/주/월 제목 (가운데, 일간 뷰에서는 숨김)
-- 기본 뷰: 모든 기기에서 월간. (이전: 모바일 일간 / 데스크탑 주간 분기 처리 제거)
+- 기본 뷰: 모든 기기에서 월간.
+- **목록 뷰**: 일간/주간/월간 옆 "목록" 버튼으로 전환. 오늘 이후 전체 예약을 주 단위 헤더 + 날짜별 카드로 표시. 네비게이션(‹ 오늘 ›) 숨김. fetch 범위: 오늘~1년 후. 각 카드: 제목·상태 배지 / 시간 / 장소 (3줄 구성, 좌측 5px 방 색상 border-l). 카드 클릭 시 선택(배경 진해짐) + 취소 신청하기 버튼 표시 (장소와 같은 줄 오른쪽)
 - 우측 상단: 장소 예약 신청, 관리자 모드 버튼
 - 공지 배너: 큰 행사는 사용신청서(Google Drive 링크) 제출 안내
 - **장소 필터**: "장소 필터 ▾" 버튼 클릭 시 패널 펼침, 장소 chip 클릭으로 멀티 필터링, "전체 보기"로 초기화. 같은 줄 오른쪽에 확정/승인대기 범례 + 불러오는 중 표시
