@@ -310,7 +310,7 @@ function ReserveForm() {
               value={form.title}
               onChange={(e) => handleChange('title', e.target.value)}
               placeholder="예: 사랑방 모임, 사역팀 회의 등"
-              className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 errors.title ? 'border-red-400 bg-red-50' : 'border-gray-300'
               }`}
             />
@@ -339,7 +339,7 @@ function ReserveForm() {
                 id="reserve-room"
                 value={form.room_id}
                 onChange={(e) => handleChange('room_id', e.target.value)}
-                className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white ${
+                className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white ${
                   errors.room_id ? 'border-red-400 bg-red-50' : 'border-gray-300'
                 }`}
               >
@@ -375,7 +375,7 @@ function ReserveForm() {
               value={form.date}
               min={todayStr()}
               onChange={(e) => handleChange('date', e.target.value)}
-              className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 errors.date ? 'border-red-400 bg-red-50' : 'border-gray-300'
               }`}
             />
@@ -394,7 +394,7 @@ function ReserveForm() {
                   id="reserve-start-time"
                   value={form.start_time}
                   onChange={(e) => handleChange('start_time', e.target.value)}
-                  className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                     errors.start_time ? 'border-red-400 bg-red-50' : 'border-gray-300'
                   }`}
                 >
@@ -410,7 +410,7 @@ function ReserveForm() {
                   id="reserve-end-time"
                   value={form.end_time}
                   onChange={(e) => handleChange('end_time', e.target.value)}
-                  className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                     errors.end_time ? 'border-red-400 bg-red-50' : 'border-gray-300'
                   }`}
                 >
@@ -460,7 +460,7 @@ function ReserveForm() {
                     setRecurringUntil(e.target.value);
                     setErrors((prev) => { const next = { ...prev }; delete next.recurring_until; return next; });
                   }}
-                  className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                     errors.recurring_until ? 'border-red-400 bg-red-50' : 'border-gray-300'
                   }`}
                 />
@@ -485,7 +485,7 @@ function ReserveForm() {
               value={form.person_in_charge}
               onChange={(e) => handleChange('person_in_charge', e.target.value)}
               placeholder="이름 또는 연락처"
-              className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 errors.person_in_charge ? 'border-red-400 bg-red-50' : 'border-gray-300'
               }`}
             />
@@ -503,7 +503,7 @@ function ReserveForm() {
               value={form.email}
               onChange={(e) => handleChange('email', e.target.value)}
               placeholder="example@email.com"
-              className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 errors.email ? 'border-red-400 bg-red-50' : 'border-gray-300'
               }`}
             />
@@ -522,7 +522,7 @@ function ReserveForm() {
               placeholder="특이사항이나 요청사항을 입력해주세요."
               rows={3}
               maxLength={LIMITS.notes}
-              className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${
+              className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${
                 errors.notes ? 'border-red-400 bg-red-50' : 'border-gray-300'
               }`}
             />
