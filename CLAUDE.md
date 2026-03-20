@@ -77,16 +77,17 @@ cancellation_requested → [approveCancellation: 삭제]
 - `checkConflict()`: `status IN ('pending', 'approved', 'cancellation_requested')` 인 예약과 겹침 확인
 
 ## 취소 신청 플로우
-- 캘린더에서 예약 블록 클릭 → `ReservationDetailPopover` → "취소 신청" 버튼
+- 캘린더에서 예약 블록 클릭 → `ReservationDetailPopover` → "취소 신청하기" 버튼 (오늘 이후 예약에만 표시)
 - `CancelRequestModal`: 단건(`scope=one`) 또는 시리즈 이후 전체(`scope=series`) 선택 + 사유 입력
+- 제출 성공 시 모달을 바로 닫지 않고 완료 안내 화면 표시 ("취소 신청 완료 / 관리자 승인 후 취소가 완료될 예정입니다.") → "확인" 클릭 시 닫힘
 - `POST /api/reservations/[id]/cancel` → `requestCancellation()` or `requestCancellationSeries()`
 - 관리자 패널 "취소 신청" 탭에서 `approve_cancellation` / `reject_cancellation` 처리
 - 시리즈 취소는 `PATCH /api/admin/series/[id]`로 일괄 처리
 
 ## 핵심 설계 결정
-- 승인 대기 예약: CSS 빗금 패턴 (`.reservation-pending`)
-- 확정 예약: 회색 계열 표시
-- 취소 신청 중 예약: 별도 배지(amber) 표시
+- 승인 대기 예약: CSS 빗금 패턴 (`.reservation-pending`), 배지 표시 "승인 대기중"
+- 확정 예약: 회색 계열 표시, 배지 표시 "예약 확정"
+- 취소 신청 중 예약: 별도 배지(amber) 표시, 배지 표시 "취소 대기중"
 - 회의실별 색상 20가지 시드 데이터로 정의
 - 일간/주간 뷰: 오전 6시~오후 11시, 1.5px/분, 겹침 감지 컬럼 레이아웃
 - 충돌 감지: 같은 회의실 + 같은 시간대 이중 예약 방지
@@ -106,7 +107,7 @@ cancellation_requested → [approveCancellation: 삭제]
 - 전체 앱 컨테이너: `h-screen overflow-hidden` — 뷰포트 높이 고정, 스크롤은 각 뷰 내부에서 처리
 - `<header>` 안에 로고·버튼·공지 배너·캘린더 컨트롤·장소 필터 모두 포함 (sticky top-0)
 - 컨트롤 바: 1줄 — 일간/주간/월간 토글 (왼쪽) + ‹ 오늘 › (오른쪽), 2줄 — 날짜/주/월 제목 (가운데, 일간 뷰에서는 숨김)
-- 모바일(< 640px): 기본 뷰 일간, 헤더 버튼 축약 표시 (hydration 방지: SSR은 주간, useEffect에서 전환)
+- 기본 뷰: 모든 기기에서 월간. (이전: 모바일 일간 / 데스크탑 주간 분기 처리 제거)
 - 우측 상단: 장소 예약 신청, 관리자 모드 버튼
 - 공지 배너: 큰 행사는 사용신청서(Google Drive 링크) 제출 안내
 - **장소 필터**: "장소 필터 ▾" 버튼 클릭 시 패널 펼침, 장소 chip 클릭으로 멀티 필터링, "전체 보기"로 초기화. 같은 줄 오른쪽에 확정/승인대기 범례 + 불러오는 중 표시
@@ -120,3 +121,4 @@ cancellation_requested → [approveCancellation: 삭제]
 - 예약 신청 폼: 타이틀, 장소(드롭다운), 날짜, 시작/종료 시간(15분 단위), 반복설정, 담당자, 이메일, 노트(선택)
 - 관리자: 탭별 목록 (승인 대기 / 취소 신청 / 확정 / 전체) → 체크박스 선택 → 일괄 승인·거절·취소처리 / 시리즈 단위 일괄 액션 / 확정 예약 삭제
 - 관리자 반응형: 925px 기준 테이블 ↔ 카드 레이아웃 전환 (커스텀 Tailwind breakpoint `admin: 925px`)
+- 관리자 모바일 헤더: 대기/취소 건수 배지 없음 (탭에 이미 숫자 배지 표시됨)

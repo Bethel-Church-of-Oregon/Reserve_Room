@@ -47,11 +47,8 @@ function toLocalDateKey(d: Date): string {
 
 export default function HomePage() {
   const router = useRouter();
-  const [viewMode, setViewMode] = useState<ViewMode>('week');
+  const [viewMode, setViewMode] = useState<ViewMode>('month');
 
-  useEffect(() => {
-    if (window.innerWidth < 640) setViewMode('day');
-  }, []);
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [reservations, setReservations] = useState<ReservationWithRoom[]>([]);
   const [fetchedFor, setFetchedFor] = useState<{ viewMode: ViewMode; dateKey: string } | null>(null);
@@ -321,7 +318,7 @@ export default function HomePage() {
             <div className="ml-auto flex items-center gap-0.5">
               <button
                 onClick={() => navigate(-1)}
-                className="p-1 rounded hover:bg-gray-100 text-gray-600 transition"
+                className="p-1 rounded hover:bg-gray-100 text-gray-600 transition flex items-center"
                 aria-label="이전"
               >
                 <span className="text-lg font-semibold text-gray-800">‹</span>
@@ -335,7 +332,7 @@ export default function HomePage() {
               </button>
               <button
                 onClick={() => navigate(1)}
-                className="p-1 rounded hover:bg-gray-100 text-gray-600 transition"
+                className="p-1 rounded hover:bg-gray-100 text-gray-600 transition flex items-center"
                 aria-label="다음"
               >
                 <span className="text-lg font-semibold text-gray-800">›</span>
@@ -394,14 +391,14 @@ export default function HomePage() {
             </span>
             <div className="flex items-center gap-1 flex-shrink-0">
               <span className="w-6 h-2.5 rounded-sm bg-gray-500 flex-shrink-0" />
-              <span className="text-xs text-gray-500 whitespace-nowrap">확정</span>
+              <span className="text-xs text-gray-500 whitespace-nowrap">예약 확정</span>
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
               <span
                 className="w-6 h-2.5 rounded-sm reservation-pending flex-shrink-0"
                 style={{ backgroundColor: '#94a3b8' }}
               />
-              <span className="text-xs text-gray-500 whitespace-nowrap">승인대기</span>
+              <span className="text-xs text-gray-500 whitespace-nowrap">승인 대기중</span>
             </div>
           </div>
         </div>

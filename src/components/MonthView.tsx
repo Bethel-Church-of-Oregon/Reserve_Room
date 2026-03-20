@@ -183,7 +183,7 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
                 .map((r) => {
                   const isPending = r.status === 'pending' || r.status === 'cancellation_requested';
                   const isCancelRequested = r.status === 'cancellation_requested';
-                  const canRequestCancel = (r.status === 'pending' || r.status === 'approved') && !isCancelRequested;
+                  const canRequestCancel = (r.status === 'pending' || r.status === 'approved') && !isCancelRequested && r.end_time.slice(0, 10) >= today;
                   return (
                     <div
                       key={r.id}
@@ -194,33 +194,35 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
                         style={{ backgroundColor: r.room_color }}
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-sm text-gray-800 truncate">{r.title}</div>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="font-semibold text-sm text-gray-800 truncate">{r.title}</div>
+                          <span
+                            className={`shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                              isPending
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-gray-100 text-gray-600'
+                            }`}
+                          >
+                            {isPending ? (isCancelRequested ? '취소 대기중' : '승인 대기중') : '예약 확정'}
+                          </span>
+                        </div>
                         <div className="text-xs text-gray-500 mt-0.5">{r.room_name}</div>
                         <div className="text-xs text-gray-500">{formatTime(r.start_time)} – {formatTime(r.end_time)}</div>
-                        <div className="text-xs text-gray-500">담당: {r.person_in_charge}</div>
-                      </div>
-                      <div className="shrink-0 self-center flex flex-col items-end gap-1">
-                        <span
-                          className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                            isPending
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-gray-100 text-gray-600'
-                          }`}
-                        >
-                          {isPending ? (isCancelRequested ? '취소 신청' : '승인 대기') : '확정'}
-                        </span>
-                        {canRequestCancel && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setExpandedDay(null);
-                              setCancelModalReservation(r);
-                            }}
-                            className="text-[10px] font-medium px-1.5 py-0.5 text-red-600 hover:bg-red-50 rounded transition"
-                          >
-                            취소 신청
-                          </button>
-                        )}
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs text-gray-500">담당: {r.person_in_charge}</div>
+                          {canRequestCancel && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setExpandedDay(null);
+                                setCancelModalReservation(r);
+                              }}
+                              className="text-[10px] font-medium px-1.5 py-0.5 text-red-600 border border-red-200 rounded hover:bg-red-50 transition"
+                            >
+                              취소 신청하기
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );

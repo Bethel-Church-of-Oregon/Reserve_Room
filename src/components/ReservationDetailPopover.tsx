@@ -33,6 +33,7 @@ export function CancelRequestModal({
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [scope, setScope] = useState<'one' | 'series'>('one');
+  const [submitted, setSubmitted] = useState(false);
   const hasSeries = Boolean(reservation.series_id);
 
   // Reset to "one instance" whenever the modal is opened with a different reservation
@@ -40,7 +41,32 @@ export function CancelRequestModal({
     setScope('one');
     setReason('');
     setError('');
+    setSubmitted(false);
   }, [reservation.id]);
+
+  if (submitted) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110] px-4">
+        <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full text-center">
+          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-green-100 mx-auto mb-4">
+            <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-bold text-gray-800 mb-2">취소 신청 완료</h3>
+          <p className="text-sm text-gray-500 mb-1">취소 신청이 접수되었습니다.</p>
+          <p className="text-sm text-gray-500 mb-6">관리자 승인 후 취소가 완료될 예정입니다.</p>
+          <button
+            type="button"
+            onClick={() => onConfirm(reason.trim())}
+            className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition"
+          >
+            확인
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110] px-4">
@@ -104,7 +130,7 @@ export function CancelRequestModal({
             disabled={loading}
             className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm transition disabled:opacity-60"
           >
-            취소
+            닫기
           </button>
           <button
             type="button"
@@ -121,7 +147,7 @@ export function CancelRequestModal({
                 });
                 const data = await res.json();
                 if (res.ok) {
-                  onConfirm(reason.trim());
+                  setSubmitted(true);
                 } else {
                   setError(data.error ?? '오류가 발생했습니다.');
                 }
@@ -151,7 +177,8 @@ export default function ReservationDetailPopover({
 }: Props) {
   const isPending = reservation.status === 'pending';
   const isCancelRequested = reservation.status === 'cancellation_requested';
-  const canRequestCancel = (reservation.status === 'pending' || reservation.status === 'approved') && !isCancelRequested;
+  const today = new Date().toISOString().slice(0, 10);
+  const canRequestCancel = (reservation.status === 'pending' || reservation.status === 'approved') && !isCancelRequested && reservation.end_time.slice(0, 10) >= today;
 
   return (
     <div
@@ -209,7 +236,7 @@ export default function ReservationDetailPopover({
               : 'bg-gray-100 text-gray-600'
           }`}
         >
-          {isPending ? '승인 대기 중' : isCancelRequested ? '취소 신청 대기' : '확정'}
+          {isPending ? '승인 대기중' : isCancelRequested ? '취소 대기중' : '예약 확정'}
         </span>
         {canRequestCancel && onRequestCancel && (
           <button
@@ -220,7 +247,7 @@ export default function ReservationDetailPopover({
             }}
             className="text-[10px] font-medium px-1.5 py-0.5 text-red-600 hover:bg-red-50 rounded transition"
           >
-            취소 신청
+            취소 신청하기
           </button>
         )}
       </div>

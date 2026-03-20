@@ -259,7 +259,7 @@ function RejectCancelSeriesModal({
             onClick={onCancel}
             className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm transition"
           >
-            취소
+            닫기
           </button>
           <button
             onClick={() => onConfirm(reason.trim() || undefined)}
@@ -309,7 +309,7 @@ function RejectCancelModal({
             onClick={onCancel}
             className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm transition"
           >
-            취소
+            닫기
           </button>
           <button
             onClick={() => onConfirm(reason.trim() || undefined)}
@@ -722,20 +722,10 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           >
             ←
           </button>
-          <div className="flex-1">
-            <h1 className="text-xl font-bold text-gray-800">관리자 모드</h1>
-            <p className="text-xs text-gray-500">오레곤벧엘교회 예약 관리</p>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl font-bold text-gray-800 truncate">관리자 모드</h1>
+            <p className="text-xs text-gray-500 truncate">오레곤벧엘교회 예약 관리</p>
           </div>
-          {pendingCount > 0 && (
-            <span className="bg-red-100 text-red-700 text-xs font-bold px-2.5 py-1 rounded-full">
-              대기 {pendingCount}건
-            </span>
-          )}
-          {cancellationRequestedCount > 0 && (
-            <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-full">
-              취소 신청 {cancellationRequestedCount}건
-            </span>
-          )}
           <button
             onClick={async () => {
               await fetch('/api/admin/auth', { method: 'DELETE' });

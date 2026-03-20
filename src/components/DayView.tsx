@@ -244,7 +244,7 @@ export default function DayView({ currentDate, reservations, loading, onDayClick
                 .map((item) => {
                   const isPending = item.status === 'pending';
                   const isCancelReq = item.status === 'cancellation_requested';
-                  const canRequestCancel = item.status === 'pending' || item.status === 'approved';
+                  const canRequestCancel = (item.status === 'pending' || item.status === 'approved') && item.end_time.slice(0, 10) >= today;
                   return (
                     <li key={item.id} className="flex gap-3 py-4">
                       {/* Time */}
@@ -266,7 +266,7 @@ export default function DayView({ currentDate, reservations, loading, onDayClick
                             : isCancelReq ? 'bg-amber-100 text-amber-800'
                             : 'bg-gray-100 text-gray-500'
                           }`}>
-                            {isPending ? '승인 대기' : isCancelReq ? '취소 신청 대기' : '확정'}
+                            {isPending ? '승인 대기중' : isCancelReq ? '취소 대기중' : '예약 확정'}
                           </span>
                         </div>
                         {/* Room */}
@@ -293,7 +293,7 @@ export default function DayView({ currentDate, reservations, loading, onDayClick
                             onClick={() => setCancelModalReservation(item)}
                             className="mt-1.5 text-xs text-red-500 hover:text-red-700 hover:underline transition"
                           >
-                            취소 신청
+                            취소 신청하기
                           </button>
                         )}
                       </div>
