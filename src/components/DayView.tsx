@@ -48,6 +48,7 @@ function getWeekDays(d: Date): Date[] {
 interface Props {
   currentDate: Date;
   reservations: ReservationWithRoom[];
+  loading?: boolean;
   onDayClick?: (date: Date) => void;
   onRefresh?: () => void;
 }
@@ -104,7 +105,7 @@ function groupOverlapping(items: ReservationWithRoom[]): Array<{ item: Reservati
   return result;
 }
 
-export default function DayView({ currentDate, reservations, onDayClick, onRefresh }: Props) {
+export default function DayView({ currentDate, reservations, loading, onDayClick, onRefresh }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const dayKey = toLocalDateKey(currentDate);
   const dayReservations = reservations.filter((r) => r.start_time.slice(0, 10) === dayKey);
@@ -120,6 +121,9 @@ export default function DayView({ currentDate, reservations, onDayClick, onRefre
   const [listMode, setListMode] = useState(false);
   const [pacificNow, setPacificNow] = useState(getPacificNow);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // stableDayKey lags one render behind dayKey; used to suppress empty message during day transitions
+  const [stableDayKey, setStableDayKey] = useState(dayKey);
+  useEffect(() => { setStableDayKey(dayKey); }, [dayKey]);
 
   useEffect(() => {
     const id = setInterval(() => setPacificNow(getPacificNow()), 30_000);
@@ -226,7 +230,7 @@ export default function DayView({ currentDate, reservations, onDayClick, onRefre
       {/* List view */}
       {listMode && (
         <div className="flex-1 overflow-y-auto calendar-scroll">
-          {dayReservations.length === 0 ? (
+          {dayReservations.length === 0 && !loading && stableDayKey === dayKey ? (
             <div className="flex items-center justify-center h-32 text-sm text-gray-400">해당 일자에는 예약이 없습니다.</div>
           ) : (
             <ul className="divide-y divide-gray-100 px-3 py-2">
