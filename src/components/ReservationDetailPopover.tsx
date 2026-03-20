@@ -117,7 +117,7 @@ export function CancelRequestModal({
             rows={3}
             autoFocus
             disabled={loading}
-            className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none disabled:opacity-60 ${
+            className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-red-400 resize-none disabled:opacity-60 ${
               error ? 'border-red-400 bg-red-50' : 'border-gray-300'
             }`}
           />
