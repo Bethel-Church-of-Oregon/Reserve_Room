@@ -73,7 +73,7 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
               onChange={(e) => { setPassword(e.target.value); setError(''); }}
               placeholder="관리자 비밀번호를 입력하세요"
               autoFocus
-              className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-700 ${
+              className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-gray-700 ${
                 error ? 'border-red-400 bg-red-50' : 'border-gray-300'
               }`}
             />
@@ -128,7 +128,7 @@ function RejectModal({
             placeholder="거절 사유를 입력해주세요."
             rows={3}
             autoFocus
-            className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none ${
+            className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-red-400 resize-none ${
               error ? 'border-red-400 bg-red-50' : 'border-gray-300'
             }`}
           />
@@ -191,7 +191,7 @@ function RejectSeriesModal({
             placeholder="거절 사유를 입력해주세요."
             rows={3}
             autoFocus
-            className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none ${
+            className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-red-400 resize-none ${
               error ? 'border-red-400 bg-red-50' : 'border-gray-300'
             }`}
           />
@@ -251,7 +251,7 @@ function RejectCancelSeriesModal({
             placeholder="선택 사항입니다."
             rows={3}
             autoFocus
-            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
           />
         </div>
         <div className="flex gap-3">
@@ -301,7 +301,7 @@ function RejectCancelModal({
             placeholder="선택 사항입니다."
             rows={3}
             autoFocus
-            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
           />
         </div>
         <div className="flex gap-3">

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
 import { CancelRequestModal } from './ReservationDetailPopover';
 
@@ -56,6 +56,13 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
   const today = dateKey(new Date());
   const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
   const [expandedDay, setExpandedDay] = useState<{ date: Date; reservations: ReservationWithRoom[] } | null>(null);
+  const [maxShow, setMaxShow] = useState(3);
+  useEffect(() => {
+    const update = () => setMaxShow(window.innerHeight > window.innerWidth ? 4 : 3);
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
 
   const reservationsByDay = new Map<string, ReservationWithRoom[]>();
   for (const r of reservations) {
@@ -88,15 +95,14 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
       {/* Calendar grid */}
       <div className="flex-1 overflow-y-auto grid" style={{ gridTemplateRows: `repeat(${weeks.length}, 1fr)` }}>
         {weeks.map((week, wi) => (
-          <div key={wi} className="grid grid-cols-7 border-b border-gray-100 last:border-b-0" style={{ minHeight: '100px' }}>
+          <div key={wi} className="grid grid-cols-7 border-b border-gray-100 last:border-b-0" style={{ minHeight: '130px' }}>
             {week.map((day, di) => {
               const key = dateKey(day);
               const isCurrentMonth = day.getMonth() === month;
               const isToday = key === today;
               const dayReservations = reservationsByDay.get(key) ?? [];
-              const MAX_SHOW = 3;
-              const shown = dayReservations.slice(0, MAX_SHOW);
-              const extra = dayReservations.length - MAX_SHOW;
+              const shown = dayReservations.slice(0, maxShow);
+              const extra = dayReservations.length - maxShow;
 
               return (
                 <div
@@ -126,7 +132,7 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
                       return (
                         <div
                           key={r.id}
-                          className={`text-white text-xs px-1 rounded truncate leading-5 ${
+                          className={`text-white text-xs px-1 rounded truncate h-3 sm:h-auto sm:leading-5 ${
                             isPending ? 'reservation-pending opacity-80' : ''
                           }`}
                           style={{
@@ -134,8 +140,8 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
                             border: isPending ? `1px dashed ${r.room_color}` : 'none',
                           }}
                         >
-                          <span className="font-medium">{formatTime(r.start_time)}</span>{' '}
-                          <span className="truncate">{r.title}</span>
+                          <span className="hidden sm:inline font-medium">{formatTime(r.start_time)}</span>
+                          <span className="hidden sm:inline truncate"> {r.title}</span>
                         </div>
                       );
                     })}
@@ -157,7 +163,7 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
           onClick={() => setExpandedDay(null)}
         >
           <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-sm max-h-[80vh] flex flex-col"
+            className="bg-white rounded-2xl shadow-xl w-full max-w-sm max-h-[88vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
