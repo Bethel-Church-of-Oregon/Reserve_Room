@@ -274,27 +274,28 @@ export default function DayView({ currentDate, reservations, loading, onDayClick
                           <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: item.room_color }} />
                           {item.room_name}
                         </div>
-                        {/* Person */}
-                        {item.person_in_charge && (
-                          <div className="text-xs text-gray-400 mb-0.5">
-                            <span className="text-gray-400">담당:</span> {item.person_in_charge}
-                          </div>
-                        )}
+                        {/* Person + Cancel button */}
+                        <div className="flex items-center justify-between gap-2 mb-0.5">
+                          {item.person_in_charge ? (
+                            <div className="text-xs text-gray-400">
+                              <span className="text-gray-400">담당:</span> {item.person_in_charge}
+                            </div>
+                          ) : <div />}
+                          {canRequestCancel && (
+                            <button
+                              type="button"
+                              onClick={() => setCancelModalReservation(item)}
+                              className="text-[10px] text-red-500 hover:text-red-700 border border-red-300 hover:border-red-400 rounded px-1.5 py-0.5 transition flex-shrink-0"
+                            >
+                              취소 신청하기
+                            </button>
+                          )}
+                        </div>
                         {/* Notes */}
                         {item.notes && (
                           <div className="mt-1 text-xs text-gray-400 border-t border-gray-100 pt-1">
                             {item.notes}
                           </div>
-                        )}
-                        {/* Cancel button */}
-                        {canRequestCancel && (
-                          <button
-                            type="button"
-                            onClick={() => setCancelModalReservation(item)}
-                            className="mt-1.5 text-xs text-red-500 hover:text-red-700 hover:underline transition"
-                          >
-                            취소 신청하기
-                          </button>
                         )}
                       </div>
                     </li>
