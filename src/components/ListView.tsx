@@ -101,8 +101,8 @@ export default function ListView({ reservations, loading, onRefresh }: Props) {
       >
         {weeks.map((week) => (
           <div key={week.weekKey}>
-            {/* Week header */}
-            <div className="bg-gray-50 border-y border-gray-200 px-4 py-1.5">
+            {/* Week header — sticky at top */}
+            <div className="sticky top-0 z-20 bg-gray-50 border-y border-gray-200 px-4 py-1.5">
               <span className="text-xs font-semibold text-gray-500">{formatWeekLabel(week.weekKey)}</span>
             </div>
 
@@ -113,9 +113,9 @@ export default function ListView({ reservations, loading, onRefresh }: Props) {
               const items = byDate.get(dateKey)!;
 
               return (
-                <div key={dateKey} className="flex border-b border-gray-100 px-4 py-3 gap-4">
-                  {/* Date column */}
-                  <div className="flex flex-col items-center w-10 flex-shrink-0 pt-0.5">
+                <div key={dateKey} className="flex border-b border-gray-100 gap-3">
+                  {/* Date column — sticky below week header (top-7 ≈ 28px = week header height) */}
+                  <div className="sticky top-7 self-start flex flex-col items-center w-12 flex-shrink-0 pt-3 pb-3 pl-4">
                     <span className={`text-2xl font-bold leading-none ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>
                       {date.getDate()}
                     </span>
@@ -125,7 +125,7 @@ export default function ListView({ reservations, loading, onRefresh }: Props) {
                   </div>
 
                   {/* Reservation cards */}
-                  <div className="flex-1 flex flex-col gap-2 min-w-0">
+                  <div className="flex-1 flex flex-col gap-2 min-w-0 py-3 pr-4 pl-1">
                     {items.map((item) => {
                       const isPending = item.status === 'pending';
                       const isCancelReq = item.status === 'cancellation_requested';
@@ -139,38 +139,42 @@ export default function ListView({ reservations, loading, onRefresh }: Props) {
                           key={item.id}
                           data-card="true"
                           onClick={() => setSelectedId(isSelected ? null : item.id)}
-                          className={`rounded-lg px-3 py-2 border-l-[5px] cursor-pointer transition-colors ${
+                          className={`flex gap-2 py-2 cursor-pointer rounded-lg px-2 transition-colors ${
                             isSelected ? 'bg-gray-200' : 'bg-gray-50 hover:bg-gray-100'
                           }`}
-                          style={{ borderLeftColor: item.room_color }}
                         >
-                          <div className="flex items-start justify-between gap-2 min-w-0">
-                            <span className="font-semibold text-gray-800 text-sm truncate">{item.title}</span>
-                            {isPending ? (
-                              <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700 whitespace-nowrap">
-                                승인 대기중
+                          {/* Color bar */}
+                          <div
+                            className={`w-1 self-stretch rounded-full flex-shrink-0 ${isPending ? 'opacity-50' : ''}`}
+                            style={{ backgroundColor: item.room_color, minHeight: 36 }}
+                          />
+                          {/* Detail */}
+                          <div className="flex-1 min-w-0">
+                            {/* Title + status */}
+                            <div className="flex items-start justify-between gap-2 mb-0.5">
+                              <span className="text-sm font-semibold text-gray-900 leading-snug truncate min-w-0">{item.title}</span>
+                              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0 ${
+                                isPending ? 'bg-yellow-100 text-yellow-700'
+                                : isCancelReq ? 'bg-amber-100 text-amber-800'
+                                : 'bg-green-100 text-green-700'
+                              }`}>
+                                {isPending ? '승인 대기중' : isCancelReq ? '취소 대기중' : '예약 확정'}
                               </span>
-                            ) : isCancelReq ? (
-                              <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 whitespace-nowrap">
-                                취소 대기중
-                              </span>
-                            ) : (
-                              <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 whitespace-nowrap">
-                                예약 확정
-                              </span>
-                            )}
-                          </div>
-                          <div className="mt-1 text-xs text-gray-500 flex flex-col gap-y-0.5">
-                            <span>{formatTime(item.start_time)} – {formatTime(item.end_time)}</span>
+                            </div>
+                            {/* Time */}
+                            <div className="text-xs text-gray-400 mb-0.5">
+                              {formatTime(item.start_time)} – {formatTime(item.end_time)}
+                            </div>
+                            {/* Room + cancel */}
                             <div className="flex items-center justify-between gap-2">
-                              <span>{item.room_name}</span>
+                              <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                                <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: item.room_color }} />
+                                <span className="truncate">{item.room_name}</span>
+                              </div>
                               {isSelected && canRequestCancel && (
                                 <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setCancelModalReservation(item);
-                                  }}
-                                  className="text-xs px-2 py-0.5 border border-red-300 text-red-600 rounded hover:bg-red-50 transition whitespace-nowrap"
+                                  onClick={(e) => { e.stopPropagation(); setCancelModalReservation(item); }}
+                                  className="text-[10px] text-red-500 hover:text-red-700 border border-red-300 hover:border-red-400 rounded px-1.5 py-0.5 bg-red-50 transition flex-shrink-0 whitespace-nowrap"
                                 >
                                   취소 신청하기
                                 </button>

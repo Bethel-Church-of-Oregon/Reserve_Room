@@ -22,7 +22,7 @@ npm run build && npm start  # 프로덕션 (포트 8000)
 - `src/lib/constants.ts` — 입력값 길이 제한 상수 (`LIMITS`)
 - `src/lib/ratelimit.ts` — Upstash Redis 기반 rate limiting (로그인/예약/취소)
 - `src/app/page.tsx` — 메인 캘린더 (day/week/month/list, 클라이언트 컴포넌트)
-- `src/components/DayView.tsx` — 일간 캘린더 (오전 6시~오후 11시, 1.5px/분) + 캘린더/목록 토글 + 현재 시간 라인 (Pacific time)
+- `src/components/DayView.tsx` — 일간 캘린더 (오전 6시~오후 11시, 1.5px/분) + 현재 시간 라인 (Pacific time)
 - `src/components/WeekView.tsx` — 주간 캘린더 (오전 6시~오후 11시, 1.5px/분)
 - `src/components/MonthView.tsx` — 월간 캘린더, 날짜 셀 클릭 시 해당 날 예약 모달
 - `src/components/ListView.tsx` — 목록 뷰 (오늘 이후 전체 예약, 주 단위 헤더, 날짜별 카드)
@@ -114,8 +114,7 @@ cancellation_requested → [approveCancellation: 삭제]
 - 공지 배너: 큰 행사는 사용신청서(Google Drive 링크) 제출 안내
 - **장소 필터**: "장소 필터 ▾" 버튼 클릭 시 패널 펼침, 장소 chip 클릭으로 멀티 필터링, "전체 보기"로 초기화. 같은 줄 오른쪽에 확정/승인대기 범례 + 불러오는 중 표시
 - **예약 상세 팝오버**: 일간/주간 캘린더 뷰에서 예약 블록 hover → 제목·장소·시간·담당자·노트·상태 표시 + 취소 신청 버튼
-- **일간 목록 보기**: 날짜 헤더 오른쪽의 캘린더/목록 토글 버튼으로 전환. 목록 뷰에서는 팝오버 없이 모든 상세 정보(장소·담당자·노트·상태·취소 신청 버튼) 인라인 표시
-  - 날짜 전환 시 빈 메시지 flash 방지: `stableDayKey` state로 dayKey 변경 직후 한 사이클 동안 빈 메시지 억제
+- **일간 뷰 날짜 레이블**: 주간 스트립 아래 선택된 날짜를 가운데 정렬로 표시
 - **현재 시간 라인**: 일간 뷰에서 오늘 날짜일 때만 파란 가로선 표시. `Intl.DateTimeFormat` + `America/Los_Angeles` 타임존으로 DST 자동 처리. 30초마다 갱신
 - **일간 뷰 고정 헤더**: 주간 스트립 + 날짜 레이블을 단일 `sticky top-0` 래퍼로 묶어 스크롤 시 항상 표시
 - **월간 날짜 셀 클릭**: 셀 전체가 클릭 가능, 클릭 시 해당 날의 모든 예약을 시간순으로 보여주는 모달 표시 (예약 0개이면 안내 메시지, `max-h-[88vh]`). 개별 예약 블록 hover 팝오버 없음
