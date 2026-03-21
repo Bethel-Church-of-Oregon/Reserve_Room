@@ -487,7 +487,7 @@ export default function HomePage() {
             className="bg-white border-t border-gray-200 h-full overflow-hidden"
           >
             {viewMode === 'day' ? (
-              <DayView key="day" currentDate={currentDate} reservations={filteredReservations} loading={isFetchPending} onDayClick={setCurrentDate} onRefresh={refreshReservations} />
+              <DayView key="day" currentDate={currentDate} reservations={filteredReservations} onDayClick={setCurrentDate} onRefresh={refreshReservations} />
             ) : viewMode === 'week' ? (
               <WeekView key="week" weekStart={weekStart} reservations={filteredReservations} onRefresh={refreshReservations} />
             ) : viewMode === 'list' ? (
