@@ -56,7 +56,7 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
   const today = dateKey(new Date());
   const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
   const [expandedDay, setExpandedDay] = useState<{ date: Date; reservations: ReservationWithRoom[] } | null>(null);
-  const [selectedModalId, setSelectedModalId] = useState<string | null>(null);
+  const [selectedModalId, setSelectedModalId] = useState<number | null>(null);
   const [maxShow, setMaxShow] = useState(3);
   useEffect(() => {
     const update = () => setMaxShow(window.innerHeight > window.innerWidth ? 4 : 3);
