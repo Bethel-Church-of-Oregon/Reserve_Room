@@ -56,6 +56,7 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
   const today = dateKey(new Date());
   const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
   const [expandedDay, setExpandedDay] = useState<{ date: Date; reservations: ReservationWithRoom[] } | null>(null);
+  const [selectedModalId, setSelectedModalId] = useState<string | null>(null);
   const [maxShow, setMaxShow] = useState(3);
   useEffect(() => {
     const update = () => setMaxShow(window.innerHeight > window.innerWidth ? 4 : 3);
@@ -160,7 +161,7 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
       {expandedDay && (
         <div
           className="fixed inset-0 bg-black/40 flex items-center justify-center z-[120] px-4"
-          onClick={() => setExpandedDay(null)}
+          onClick={() => { setExpandedDay(null); setSelectedModalId(null); }}
         >
           <div
             className="bg-white rounded-2xl shadow-xl w-full max-w-sm max-h-[88vh] flex flex-col"
@@ -172,7 +173,7 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
               </h3>
               <button
                 type="button"
-                onClick={() => setExpandedDay(null)}
+                onClick={() => { setExpandedDay(null); setSelectedModalId(null); }}
                 className="text-gray-400 hover:text-gray-600 text-xl leading-none"
                 aria-label="닫기"
               >
@@ -190,10 +191,14 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
                   const isPending = r.status === 'pending' || r.status === 'cancellation_requested';
                   const isCancelRequested = r.status === 'cancellation_requested';
                   const canRequestCancel = (r.status === 'pending' || r.status === 'approved') && !isCancelRequested && r.end_time.slice(0, 10) >= today;
+                  const isSelected = selectedModalId === r.id;
                   return (
                     <div
                       key={r.id}
-                      className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50 cursor-default"
+                      onClick={() => setSelectedModalId(isSelected ? null : r.id)}
+                      className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition ${
+                        isSelected ? 'border-gray-300 bg-gray-200' : 'border-gray-100 bg-gray-50 hover:bg-gray-100'
+                      }`}
                     >
                       <span
                         className="mt-0.5 shrink-0 w-3 h-3 rounded-sm"
@@ -216,11 +221,13 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
                         <div className="text-xs text-gray-500">{formatTime(r.start_time)} – {formatTime(r.end_time)}</div>
                         <div className="flex items-center justify-between">
                           <div className="text-xs text-gray-500">담당: {r.person_in_charge}</div>
-                          {canRequestCancel && (
+                          {isSelected && canRequestCancel && (
                             <button
                               type="button"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setExpandedDay(null);
+                                setSelectedModalId(null);
                                 setCancelModalReservation(r);
                               }}
                               className="text-[10px] font-medium px-1.5 py-0.5 text-red-600 border border-red-200 rounded hover:bg-red-50 transition"

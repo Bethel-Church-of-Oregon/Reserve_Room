@@ -199,14 +199,8 @@ export default function DayView({ currentDate, reservations, onDayClick, onRefre
         })}
       </div>
 
-      {/* Selected date label */}
-      <div className="flex justify-center border-b border-gray-100 px-3 py-1.5">
-        <span className={`text-base font-semibold ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>
-          {currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월 {currentDate.getDate()}일 ({DAYS_KO[currentDate.getDay()]})
-        </span>
-      </div>
 
-      </div>{/* end sticky wrapper */}
+</div>{/* end sticky wrapper */}
 
       {/* Scrollable body */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto calendar-scroll">

@@ -9,7 +9,7 @@ const config: Config = {
   theme: {
     extend: {
       screens: {
-        'admin': '925px',
+        'admin': '1000px',
       },
     },
   },

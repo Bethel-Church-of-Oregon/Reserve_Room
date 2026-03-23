@@ -332,37 +332,26 @@ export default function HomePage() {
                 목록
               </button>
             </div>
-            {viewMode !== 'list' && (
-              <div className="ml-auto flex items-center gap-0.5">
-                <button
-                  onClick={() => navigate(-1)}
-                  className="p-1 rounded hover:bg-gray-100 text-gray-600 transition flex items-center"
-                  aria-label="이전"
-                >
-                  <span className="text-lg font-semibold text-gray-800">‹</span>
-                </button>
-                <button
-                  onClick={goToday}
-                  aria-label="오늘로 이동"
-                  className="px-2.5 py-0.5 text-sm border border-gray-200 rounded hover:bg-gray-50 text-gray-700 transition"
-                >
-                  오늘
-                </button>
-                <button
-                  onClick={() => navigate(1)}
-                  className="p-1 rounded hover:bg-gray-100 text-gray-600 transition flex items-center"
-                  aria-label="다음"
-                >
-                  <span className="text-lg font-semibold text-gray-800">›</span>
-                </button>
-              </div>
-            )}
           </div>
 
-          {/* Row 2: title (week/month only) */}
-          {viewMode !== 'day' && viewMode !== 'list' && (
-            <div className="text-center">
+          {/* Row 2: title (day/week/month) */}
+          {viewMode !== 'list' && (
+            <div className="flex items-center justify-center gap-2">
+              <button
+                onClick={() => navigate(-1)}
+                className="p-1 rounded hover:bg-gray-100 transition"
+                aria-label="이전"
+              >
+                <span className="text-4xl font-semibold text-gray-700 leading-none">‹</span>
+              </button>
               <span className="text-lg font-semibold text-gray-700">{title}</span>
+              <button
+                onClick={() => navigate(1)}
+                className="p-1 rounded hover:bg-gray-100 transition"
+                aria-label="다음"
+              >
+                <span className="text-4xl font-semibold text-gray-700 leading-none">›</span>
+              </button>
             </div>
           )}
         </div>
@@ -401,23 +390,24 @@ export default function HomePage() {
               전체 보기
             </button>
           )}
-          <div className="flex items-center gap-2 ml-auto flex-shrink-0">
-            <span
-              className={`text-xs whitespace-nowrap ${loading ? 'text-gray-400 animate-pulse' : 'text-transparent select-none'}`}
-              aria-live="polite"
-            >
-              불러오는 중...
-            </span>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <span className="w-6 h-2.5 rounded-sm bg-gray-500 flex-shrink-0" />
-              <span className="text-xs text-gray-500 whitespace-nowrap">예약 확정</span>
-            </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <span
-                className="w-6 h-2.5 rounded-sm reservation-pending flex-shrink-0"
-                style={{ backgroundColor: '#94a3b8' }}
-              />
-              <span className="text-xs text-gray-500 whitespace-nowrap">승인 대기중</span>
+          <div className="flex items-center gap-2 ml-auto">
+            {loading && (
+              <span className="text-[10px] text-gray-400 animate-pulse whitespace-nowrap" aria-live="polite">
+                불러오는 중...
+              </span>
+            )}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex items-center gap-1">
+                <span className="w-6 h-2.5 rounded-sm bg-gray-500 flex-shrink-0" />
+                <span className="text-[10px] text-gray-500 whitespace-nowrap">예약 확정</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span
+                  className="w-6 h-2.5 rounded-sm reservation-pending flex-shrink-0"
+                  style={{ backgroundColor: '#94a3b8' }}
+                />
+                <span className="text-[10px] text-gray-500 whitespace-nowrap">승인 대기</span>
+              </div>
             </div>
           </div>
         </div>

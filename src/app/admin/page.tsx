@@ -373,6 +373,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const [rejectTarget, setRejectTarget] = useState<ReservationWithRoom | null>(null);
   const [rejectSeriesTarget, setRejectSeriesTarget] = useState<{ seriesId: string; title: string; roomName: string; count: number } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ReservationWithRoom | null>(null);
+  const [detailTarget, setDetailTarget] = useState<ReservationWithRoom | null>(null);
   const [rejectCancelTarget, setRejectCancelTarget] = useState<ReservationWithRoom | null>(null);
   const [rejectCancelSeriesTarget, setRejectCancelSeriesTarget] = useState<{
     seriesId: string;
@@ -689,6 +690,12 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           onCancel={() => setRejectSeriesTarget(null)}
         />
       )}
+      {detailTarget && (
+        <ReservationDetailModal
+          reservation={detailTarget}
+          onClose={() => setDetailTarget(null)}
+        />
+      )}
       {deleteTarget && (
         <DeleteModal
           reservation={deleteTarget}
@@ -715,7 +722,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
 
       {/* Header */}
       <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
-        <div className="max-w-screen-lg mx-auto px-4 py-3 flex items-center gap-3">
+        <div className="max-w-screen-xl mx-auto px-4 py-3 flex items-center gap-3">
           <button
             onClick={() => router.push('/')}
             className="text-gray-500 hover:text-gray-700 p-1 rounded transition"
@@ -738,15 +745,15 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
         </div>
       </header>
 
-      <main className="max-w-screen-lg mx-auto px-4 py-6">
+      <main className="max-w-screen-xl mx-auto px-4 py-6">
         {/* Filter tabs + bulk actions */}
         <div className="flex flex-wrap items-center gap-3 mb-4">
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden" style={{ fontSize: 'clamp(10px, 3.5vw, 14px)' }}>
             {(['pending', 'approved', 'cancellation_requested', 'all'] as FilterStatus[]).map((f) => (
               <button
                 key={f}
                 onClick={() => { setFilter(f); setSelected(new Set()); }}
-                className={`px-3 py-2 font-medium transition border-l first:border-l-0 border-gray-200 ${
+                className={`px-2 min-[377px]:px-3 py-2 font-medium transition border-l first:border-l-0 border-gray-200 whitespace-nowrap ${
                   filter === f ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
                 }`}
               >
@@ -772,7 +779,8 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           )}
           <button
             onClick={fetchReservations}
-            className="ml-auto px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition"
+            className="ml-auto px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition"
+            style={{ fontSize: 'clamp(10px, 3.5vw, 14px)' }}
           >
             새로고침
           </button>
@@ -805,24 +813,24 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                           )}
                         </th>
                       )}
-                      <th className="text-left px-4 py-3 text-gray-600 font-medium">상태</th>
-                      <th className="text-left px-4 py-3 text-gray-600 font-medium">제목</th>
-                      <th className="text-left px-4 py-3 text-gray-600 font-medium">장소</th>
-                      <th className="text-left px-4 py-3 text-gray-600 font-medium">시간</th>
-                      <th className="text-left px-4 py-3 text-gray-600 font-medium">담당자</th>
-                      <th className="text-left px-4 py-3 text-gray-600 font-medium">신청일시</th>
-                      <th className="px-4 py-3" />
+                      <th className="text-left px-3 py-2 text-gray-600 font-medium w-px whitespace-nowrap">상태</th>
+                      <th className="text-left px-3 py-2 text-gray-600 font-medium">제목</th>
+                      <th className="text-left px-3 py-2 text-gray-600 font-medium w-[160px]">장소</th>
+                      <th className="text-left px-3 py-2 text-gray-600 font-medium w-[160px] whitespace-nowrap">시간</th>
+                      <th className="text-left px-3 py-2 text-gray-600 font-medium w-[120px] whitespace-nowrap">담당자</th>
+                      <th className="text-left px-3 py-2 text-gray-600 font-medium w-[140px] whitespace-nowrap">신청일시</th>
+                      <th className="px-3 py-2 w-px" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {displayRows.map((row) =>
                       row.type === 'series' ? (
                         <tr key={row.seriesId} className="hover:bg-gray-50">
-                          {filter === 'pending' && <td className="px-4 py-3" />}
-                          <td className="px-4 py-3">
+                          {filter === 'pending' && <td className="px-3 py-2" />}
+                          <td className="px-3 py-2">
                             <StatusBadge status={filter === 'cancellation_requested' ? 'cancellation_requested' : 'pending'} />
                           </td>
-                          <td className="px-4 py-3 font-medium text-gray-800 max-w-[200px]">
+                          <td className="px-3 py-2 font-medium text-gray-800 w-[120px] max-w-[120px]">
                             <div className="truncate">{row.reservations[0].title}</div>
                             <div className="text-xs text-gray-500 mt-0.5">반복 예약 {row.reservations.length}건</div>
                             {row.reservations[0].notes && (
@@ -832,13 +840,13 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                               <div className="text-xs text-amber-700 mt-0.5 truncate max-w-xs">취소 사유: {row.reservations[0].cancellation_reason}</div>
                             )}
                           </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
+                          <td className="px-3 py-2 w-[160px] max-w-[160px]">
+                            <div className="flex items-center gap-1.5 min-w-0">
                               <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: row.reservations[0].room_color }} />
-                              <span className="text-gray-700">{row.reservations[0].room_name}</span>
+                              <span className="text-gray-700 truncate">{row.reservations[0].room_name}</span>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                          <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
                             {(() => {
                               const lines = formatSeriesRangeLines(row.reservations);
                               return lines ? (
@@ -849,15 +857,15 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                               ) : null;
                             })()}
                           </td>
-                          <td className="px-4 py-3 text-gray-700">{row.reservations[0].person_in_charge}</td>
-                          <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{formatDateTime(row.reservations[0].created_at)}</td>
-                          <td className="px-4 py-3">
+                          <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{row.reservations[0].person_in_charge}</td>
+                          <td className="px-3 py-2 text-xs text-gray-400 whitespace-nowrap">{formatDateTime(row.reservations[0].created_at)}</td>
+                          <td className="px-3 py-2">
                             {filter === 'pending' ? (
-                              <div className="flex gap-1.5">
+                              <div className="flex gap-1.5 whitespace-nowrap">
                                 <button
                                   onClick={() => handleApproveSeries(row.seriesId)}
                                   disabled={seriesActionLoading === row.seriesId || bulkLoading}
-                                  className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs rounded-lg font-medium transition"
+                                  className="px-2 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs rounded-lg font-medium transition"
                                 >
                                   {seriesActionLoading === row.seriesId ? '...' : '시리즈 승인'}
                                 </button>
@@ -871,17 +879,17 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                                     })
                                   }
                                   disabled={seriesActionLoading === row.seriesId || bulkLoading}
-                                  className="px-3 py-1.5 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-xs rounded-lg font-medium transition"
+                                  className="px-2 py-1.5 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-xs rounded-lg font-medium transition"
                                 >
                                   시리즈 거절
                                 </button>
                               </div>
                             ) : (
-                              <div className="flex gap-1.5">
+                              <div className="flex gap-1.5 whitespace-nowrap">
                                 <button
                                   onClick={() => handleApproveCancellationSeries(row.seriesId)}
                                   disabled={seriesActionLoading === row.seriesId || bulkLoading}
-                                  className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs rounded-lg font-medium transition"
+                                  className="px-2 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs rounded-lg font-medium transition"
                                 >
                                   {seriesActionLoading === row.seriesId ? '...' : '시리즈 취소 승인'}
                                 </button>
@@ -895,7 +903,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                                     })
                                   }
                                   disabled={seriesActionLoading === row.seriesId || bulkLoading}
-                                  className="px-3 py-1.5 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-xs rounded-lg font-medium transition"
+                                  className="px-2 py-1.5 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-xs rounded-lg font-medium transition"
                                 >
                                   시리즈 취소 거절
                                 </button>
@@ -906,7 +914,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                       ) : (
                         <tr key={row.reservation.id} className={`hover:bg-gray-50 ${selected.has(row.reservation.id) ? 'bg-blue-50' : ''}`}>
                           {filter === 'pending' && (
-                            <td className="px-4 py-3">
+                            <td className="px-3 py-2">
                               {row.reservation.status === 'pending' && (
                                 <input
                                   type="checkbox"
@@ -917,10 +925,10 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                               )}
                             </td>
                           )}
-                          <td className="px-4 py-3">
+                          <td className="px-3 py-2">
                             <StatusBadge status={row.reservation.status} />
                           </td>
-                          <td className="px-4 py-3 font-medium text-gray-800 max-w-[200px]">
+                          <td className="px-3 py-2 font-medium text-gray-800 w-[120px] max-w-[120px]">
                             <div className="truncate">{row.reservation.title}</div>
                             {row.reservation.notes && (
                               <div className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{row.reservation.notes}</div>
@@ -929,22 +937,23 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                               <div className="text-xs text-amber-700 mt-0.5 truncate max-w-xs">취소 사유: {row.reservation.cancellation_reason}</div>
                             )}
                           </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
+                          <td className="px-3 py-2 w-[160px] max-w-[160px]">
+                            <div className="flex items-center gap-1.5 min-w-0">
                               <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: row.reservation.room_color }} />
-                              <span className="text-gray-700">{row.reservation.room_name}</span>
+                              <span className="text-gray-700 truncate">{row.reservation.room_name}</span>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                          <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
                             <div>{formatDateTime(row.reservation.start_time)}</div>
                             <div className="text-xs text-gray-400">~ {formatDateTime(row.reservation.end_time)}</div>
                           </td>
-                          <td className="px-4 py-3 text-gray-700">{row.reservation.person_in_charge}</td>
-                          <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{formatDateTime(row.reservation.created_at)}</td>
-                          <td className="px-4 py-3">
+                          <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{row.reservation.person_in_charge}</td>
+                          <td className="px-3 py-2 text-xs text-gray-400 whitespace-nowrap">{formatDateTime(row.reservation.created_at)}</td>
+                          <td className="px-3 py-2 w-px">
                             <ActionButtons
                               reservation={row.reservation}
                               loading={actionLoading === row.reservation.id}
+                              onDetail={() => setDetailTarget(row.reservation)}
                               onApprove={() => handleApprove(row.reservation.id)}
                               onReject={() => setRejectTarget(row.reservation)}
                               onDelete={() => setDeleteTarget(row.reservation)}
@@ -1076,6 +1085,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                         <ActionButtons
                           reservation={row.reservation}
                           loading={actionLoading === row.reservation.id}
+                          onDetail={() => setDetailTarget(row.reservation)}
                           onApprove={() => handleApprove(row.reservation.id)}
                           onReject={() => setRejectTarget(row.reservation)}
                           onDelete={() => setDeleteTarget(row.reservation)}
@@ -1102,27 +1112,91 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   );
 }
 
+function ReservationDetailModal({ reservation, onClose }: { reservation: ReservationWithRoom; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h2 className="text-base font-semibold text-gray-800">예약 상세</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+        </div>
+        <div className="px-5 py-4 space-y-3 text-sm">
+          <div>
+            <span className="text-xs text-gray-400 block mb-0.5">제목</span>
+            <span className="font-semibold text-gray-800">{reservation.title}</span>
+          </div>
+          <div>
+            <span className="text-xs text-gray-400 block mb-0.5">상태</span>
+            <StatusBadge status={reservation.status} />
+          </div>
+          <div>
+            <span className="text-xs text-gray-400 block mb-0.5">장소</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: reservation.room_color }} />
+              <span className="text-gray-700">{reservation.room_name}</span>
+            </div>
+          </div>
+          <div>
+            <span className="text-xs text-gray-400 block mb-0.5">시간</span>
+            <span className="text-gray-700">{formatDateTime(reservation.start_time)} ~ {formatDateTime(reservation.end_time)}</span>
+          </div>
+          <div>
+            <span className="text-xs text-gray-400 block mb-0.5">담당자</span>
+            <span className="text-gray-700">{reservation.person_in_charge}</span>
+          </div>
+          <div>
+            <span className="text-xs text-gray-400 block mb-0.5">이메일</span>
+            <span className="text-gray-700">{reservation.email}</span>
+          </div>
+          {reservation.notes && (
+            <div>
+              <span className="text-xs text-gray-400 block mb-0.5">메모</span>
+              <span className="text-gray-700">{reservation.notes}</span>
+            </div>
+          )}
+          {reservation.rejection_reason && (
+            <div>
+              <span className="text-xs text-gray-400 block mb-0.5">거절 사유</span>
+              <span className="text-red-600">{reservation.rejection_reason}</span>
+            </div>
+          )}
+          {reservation.cancellation_reason && (
+            <div>
+              <span className="text-xs text-gray-400 block mb-0.5">취소 사유</span>
+              <span className="text-amber-700">{reservation.cancellation_reason}</span>
+            </div>
+          )}
+          <div>
+            <span className="text-xs text-gray-400 block mb-0.5">신청일</span>
+            <span className="text-gray-500">{formatDateTime(reservation.created_at)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StatusBadge({ status }: { status: string }) {
   if (status === 'pending') return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 whitespace-nowrap">
       <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
       승인 대기중
     </span>
   );
   if (status === 'approved') return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 whitespace-nowrap">
       <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
       승인 완료
     </span>
   );
   if (status === 'cancellation_requested') return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 whitespace-nowrap">
       <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
       취소 대기중
     </span>
   );
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 whitespace-nowrap">
       <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
       거절
     </span>
@@ -1132,6 +1206,7 @@ function StatusBadge({ status }: { status: string }) {
 function ActionButtons({
   reservation,
   loading,
+  onDetail,
   onApprove,
   onReject,
   onDelete,
@@ -1140,15 +1215,26 @@ function ActionButtons({
 }: {
   reservation: ReservationWithRoom;
   loading: boolean;
+  onDetail: () => void;
   onApprove: () => void;
   onReject: () => void;
   onDelete: () => void;
   onApproveCancellation: () => void;
   onRejectCancellation: () => void;
 }) {
+  const detailBtn = (
+    <button
+      onClick={onDetail}
+      className="px-3 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-600 text-xs rounded-lg transition"
+    >
+      상세보기
+    </button>
+  );
+
   if (reservation.status === 'pending') {
     return (
-      <div className="flex gap-1.5">
+      <div className="flex gap-1.5 whitespace-nowrap">
+        {detailBtn}
         <button
           onClick={onApprove}
           disabled={loading}
@@ -1169,19 +1255,23 @@ function ActionButtons({
 
   if (reservation.status === 'approved') {
     return (
-      <button
-        onClick={onDelete}
-        disabled={loading}
-        className="px-3 py-1.5 border border-red-300 hover:bg-red-50 disabled:opacity-50 text-red-600 text-xs rounded-lg transition"
-      >
-        {loading ? '...' : '삭제'}
-      </button>
+      <div className="flex gap-1.5 whitespace-nowrap">
+        {detailBtn}
+        <button
+          onClick={onDelete}
+          disabled={loading}
+          className="px-3 py-1.5 border border-red-300 hover:bg-red-50 disabled:opacity-50 text-red-600 text-xs rounded-lg transition"
+        >
+          {loading ? '...' : '삭제'}
+        </button>
+      </div>
     );
   }
 
   if (reservation.status === 'cancellation_requested') {
     return (
-      <div className="flex gap-1.5">
+      <div className="flex gap-1.5 whitespace-nowrap">
+        {detailBtn}
         <button
           onClick={onApproveCancellation}
           disabled={loading}
@@ -1202,13 +1292,13 @@ function ActionButtons({
 
   if (reservation.status === 'rejected') {
     return (
-      <span className="text-xs text-gray-400 italic">
-        {reservation.rejection_reason ? `사유: ${reservation.rejection_reason}` : ''}
-      </span>
+      <div className="flex gap-1.5 whitespace-nowrap">
+        {detailBtn}
+      </div>
     );
   }
 
-  return null;
+  return detailBtn;
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
