@@ -351,7 +351,7 @@ export default function HomePage() {
       {/* Room legend / filter */}
       <div className="relative bg-white border-b border-gray-100 px-3 sm:px-6">
         {/* Toggle header */}
-        <div className="flex items-center gap-2 py-2">
+        <div className="relative z-50 flex items-center gap-2 py-2">
           <button
             onClick={() => setLegendOpen((v) => !v)}
             aria-label={legendOpen ? '장소 필터 접기' : '장소 필터 열기'}
@@ -373,12 +373,20 @@ export default function HomePage() {
             )}
             <span className="text-gray-400">{legendOpen ? '접기' : '열기'}</span>
           </button>
-          {selectedRooms.size > 0 && (
+          {selectedRooms.size > 0 && !legendOpen && (
             <button
               onClick={(e) => { e.stopPropagation(); clearFilter(); }}
               className="text-xs text-gray-400 hover:text-gray-600 underline transition whitespace-nowrap flex-shrink-0"
             >
               전체 보기
+            </button>
+          )}
+          {selectedRooms.size > 0 && legendOpen && (
+            <button
+              onClick={(e) => { e.stopPropagation(); clearFilter(); }}
+              className="text-xs text-gray-400 hover:text-gray-600 underline transition whitespace-nowrap flex-shrink-0"
+            >
+              선택 취소
             </button>
           )}
           <div className="flex items-center gap-2 ml-auto">

@@ -230,7 +230,7 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
                                 setSelectedModalId(null);
                                 setCancelModalReservation(r);
                               }}
-                              className="text-[10px] font-medium px-1.5 py-0.5 text-red-600 border border-red-200 rounded hover:bg-red-50 transition"
+                              className="text-[10px] font-medium px-1.5 py-0.5 text-red-600 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition"
                             >
                               취소 신청하기
                             </button>

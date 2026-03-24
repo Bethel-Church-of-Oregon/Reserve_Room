@@ -369,6 +369,9 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const [reservations, setReservations] = useState<ReservationWithRoom[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [filter, setFilter] = useState<FilterStatus>('pending');
+  const [selectedRooms, setSelectedRooms] = useState<Set<number>>(new Set());
+  const [roomFilterOpen, setRoomFilterOpen] = useState(false);
+  const [allRooms, setAllRooms] = useState<{ id: number; name: string; color: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [rejectTarget, setRejectTarget] = useState<ReservationWithRoom | null>(null);
   const [rejectSeriesTarget, setRejectSeriesTarget] = useState<{ seriesId: string; title: string; roomName: string; count: number } | null>(null);
@@ -409,11 +412,21 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   }, [onLogout]);
 
   useEffect(() => { fetchReservations(); }, [fetchReservations]);
+  useEffect(() => {
+    fetch('/api/rooms').then(r => r.json()).then(data => {
+      if (Array.isArray(data)) setAllRooms(data);
+    }).catch(() => {});
+  }, []);
+
+  const uniqueRooms = allRooms.length > 0 ? allRooms : Array.from(
+    new Map(reservations.map(r => [r.room_id, { id: r.room_id, name: r.room_name, color: r.room_color }])).values()
+  ).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
 
   const filtered = reservations.filter((r) => {
-    if (filter === 'pending') return r.status === 'pending';
-    if (filter === 'approved') return r.status === 'approved';
-    if (filter === 'cancellation_requested') return r.status === 'cancellation_requested';
+    if (filter === 'pending' && r.status !== 'pending') return false;
+    if (filter === 'approved' && r.status !== 'approved') return false;
+    if (filter === 'cancellation_requested' && r.status !== 'cancellation_requested') return false;
+    if (selectedRooms.size > 0 && !selectedRooms.has(r.room_id)) return false;
     return true;
   });
 
@@ -747,13 +760,14 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
 
       <main className="max-w-screen-xl mx-auto px-4 py-6">
         {/* Filter tabs + bulk actions */}
-        <div className="flex flex-wrap items-center gap-3 mb-4">
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden" style={{ fontSize: 'clamp(10px, 3.5vw, 14px)' }}>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden flex-shrink-0" style={{ fontSize: 'clamp(10px, 3.5vw, 14px)' }}>
             {(['pending', 'approved', 'cancellation_requested', 'all'] as FilterStatus[]).map((f) => (
               <button
                 key={f}
                 onClick={() => { setFilter(f); setSelected(new Set()); }}
-                className={`px-2 min-[377px]:px-3 py-2 font-medium transition border-l first:border-l-0 border-gray-200 whitespace-nowrap ${
+                style={{ padding: '8px clamp(4px, 2vw, 12px)' }}
+                className={`font-medium transition border-l first:border-l-0 border-gray-200 whitespace-nowrap ${
                   filter === f ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
                 }`}
               >
@@ -779,12 +793,92 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           )}
           <button
             onClick={fetchReservations}
-            className="ml-auto px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition"
-            style={{ fontSize: 'clamp(10px, 3.5vw, 14px)' }}
+            className="ml-auto border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition whitespace-nowrap flex-shrink-0"
+            style={{ fontSize: 'clamp(10px, 3.5vw, 14px)', padding: '8px clamp(8px, 2.5vw, 12px)' }}
           >
-            새로고침
+            <span className="min-[420px]:hidden">↻</span>
+            <span className="hidden min-[420px]:inline">새로고침</span>
           </button>
         </div>
+
+        {/* Room filter */}
+        {uniqueRooms.length > 0 && (
+          <div className="relative border-b border-gray-100 -mx-4 sm:-mx-6 px-4 sm:px-6 mb-4">
+            <div className="relative z-50 flex items-center gap-2 py-2">
+              <button
+                onClick={() => setRoomFilterOpen(v => !v)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition whitespace-nowrap flex-shrink-0 ${roomFilterOpen ? 'bg-gray-100 border-gray-300 text-gray-800' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+              >
+                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+                </svg>
+                <span className={selectedRooms.size > 0 ? 'hidden sm:inline' : ''}>장소 필터</span>
+                {selectedRooms.size > 0 && (
+                  <span className="ml-0.5 px-1.5 py-0.5 bg-blue-600 text-white rounded-full text-xs leading-none">{selectedRooms.size}</span>
+                )}
+                <span className="text-gray-400">{roomFilterOpen ? '접기' : '열기'}</span>
+              </button>
+              {selectedRooms.size > 0 && !roomFilterOpen && (
+                <button
+                  onClick={() => setSelectedRooms(new Set())}
+                  className="text-xs text-gray-400 hover:text-gray-600 underline transition whitespace-nowrap flex-shrink-0"
+                >
+                  전체 보기
+                </button>
+              )}
+              {selectedRooms.size > 0 && roomFilterOpen && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setSelectedRooms(new Set()); }}
+                  className="text-xs text-gray-400 hover:text-gray-600 underline transition whitespace-nowrap flex-shrink-0"
+                >
+                  선택 취소
+                </button>
+              )}
+            </div>
+
+            {/* Selected chips when collapsed */}
+            {!roomFilterOpen && selectedRooms.size > 0 && (
+              <div className="pb-2 flex flex-wrap gap-x-2 gap-y-1.5">
+                {uniqueRooms.filter(r => selectedRooms.has(r.id)).map(room => (
+                  <button
+                    key={room.id}
+                    onClick={() => setSelectedRooms(prev => { const n = new Set(prev); n.delete(room.id); return n; })}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs transition border-transparent text-white font-medium"
+                    style={{ backgroundColor: room.color }}
+                  >
+                    <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: 'rgba(255,255,255,0.7)' }} />
+                    {room.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Expandable panel */}
+            {roomFilterOpen && (
+              <>
+                <div className="fixed inset-0 z-40 sm:hidden" onClick={() => setRoomFilterOpen(false)} />
+                <div className="sm:relative sm:z-auto sm:shadow-none sm:border-0 sm:bg-transparent sm:px-0 sm:pb-2 sm:pt-0 absolute left-0 right-0 z-50 bg-white shadow-lg border-t border-gray-200 px-3 pb-3 pt-2">
+                  <div className="flex flex-wrap gap-x-2 gap-y-1.5">
+                    {uniqueRooms.map(room => {
+                      const active = selectedRooms.has(room.id);
+                      return (
+                        <button
+                          key={room.id}
+                          onClick={(e) => { e.stopPropagation(); setSelectedRooms(prev => { const n = new Set(prev); active ? n.delete(room.id) : n.add(room.id); return n; }); }}
+                          className={`flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs transition ${active ? 'border-transparent text-white font-medium' : 'border-gray-200 text-gray-600 bg-white hover:bg-gray-50'}`}
+                          style={active ? { backgroundColor: room.color, borderColor: room.color } : {}}
+                        >
+                          <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: active ? 'rgba(255,255,255,0.7)' : room.color }} />
+                          {room.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Table */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
@@ -792,7 +886,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
             <div className="text-center py-16 text-gray-400 text-sm">불러오는 중...</div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-16 text-gray-400 text-sm">
-              {filter === 'pending' ? '승인 대기 중인 예약이 없습니다.' : '예약 내역이 없습니다.'}
+              {selectedRooms.size > 0 ? '선택한 장소의 예약 내역이 없습니다.' : filter === 'pending' ? '승인 대기 중인 예약이 없습니다.' : '예약 내역이 없습니다.'}
             </div>
           ) : (
             <>
