@@ -246,9 +246,12 @@ export default function HomePage() {
         <div className="px-3 sm:px-6 py-3 flex flex-wrap items-center gap-2">
           {/* Logo / Title */}
           <div className="flex items-center gap-2 mr-auto min-w-0">
-            <span className="text-base sm:text-xl font-bold text-blue-700 truncate">
+            <button
+              onClick={() => { setCurrentDate(new Date()); setViewMode('month'); }}
+              className="text-base sm:text-xl font-bold text-blue-700 truncate hover:text-blue-800 transition-colors"
+            >
               <span className="hidden sm:inline"></span>Bethel 장소예약시스템
-            </span>
+            </button>
           </div>
 
           {/* Right buttons */}
