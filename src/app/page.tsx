@@ -295,7 +295,7 @@ export default function HomePage() {
                 onClick={() => setViewMode('day')}
                 aria-label="일간 보기"
                 aria-pressed={viewMode === 'day'}
-                className={`px-2.5 py-1 font-medium transition ${
+                className={`hidden lg:block px-2.5 py-1 font-medium transition ${
                   viewMode === 'day' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
                 }`}
               >
@@ -305,7 +305,7 @@ export default function HomePage() {
                 onClick={() => setViewMode('week')}
                 aria-label="주간 보기"
                 aria-pressed={viewMode === 'week'}
-                className={`px-2.5 py-1 font-medium transition border-l border-gray-200 ${
+                className={`hidden lg:block px-2.5 py-1 font-medium transition lg:border-l border-gray-200 ${
                   viewMode === 'week' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
                 }`}
               >
@@ -315,11 +315,12 @@ export default function HomePage() {
                 onClick={() => setViewMode('month')}
                 aria-label="월간 보기"
                 aria-pressed={viewMode === 'month'}
-                className={`px-2.5 py-1 font-medium transition border-l border-gray-200 ${
+                className={`px-2.5 py-1 font-medium transition lg:border-l border-gray-200 ${
                   viewMode === 'month' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                월간
+                <span className="lg:hidden">캘린더</span>
+                <span className="hidden lg:inline">월간</span>
               </button>
               <button
                 onClick={() => setViewMode('list')}

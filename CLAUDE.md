@@ -9,7 +9,7 @@ npm run build && npm start  # 프로덕션 (포트 8000)
 ```
 
 ## Tech Stack
-- **Framework**: Next.js 14.2.3 (App Router), TypeScript
+- **Framework**: Next.js 14.2.3 (App Router), TypeScript — `viewport` export는 `metadata`와 분리 (`src/app/layout.tsx`)
 - **Styling**: Tailwind CSS
 - **Database**: Neon Postgres via `@neondatabase/serverless`
 - **Email**: Nodemailer + Gmail SMTP (앱 비밀번호)
@@ -109,6 +109,7 @@ cancellation_requested → [approveCancellation: 삭제]
 - `<header>` 안에 로고·버튼·공지 배너·캘린더 컨트롤·장소 필터 모두 포함 (sticky top-0)
 - 컨트롤 바: 1줄 — 일간/주간/월간/목록 토글 (왼쪽), 2줄 — ‹ 날짜/주/월 제목 › (가운데, 목록 뷰에서는 숨김). 오늘 버튼 없음
 - 기본 뷰: 모든 기기에서 월간.
+- **뷰 전환 버튼 반응형**: 1024px 미만에서는 캘린더(=월간)·목록 두 버튼만 표시, 1024px 이상에서는 일간·주간·월간·목록 전부 표시
 - **목록 뷰**: 일간/주간/월간 옆 "목록" 버튼으로 전환. 오늘 이후 전체 예약을 주 단위 헤더 + 날짜별 카드로 표시. 네비게이션(‹ 오늘 ›) 숨김. fetch 범위: 오늘~1년 후. 각 카드: 제목·상태 배지 / 시간 / 장소 (3줄 구성, 좌측 5px 방 색상 border-l). 카드 클릭 시 선택(배경 진해짐) + 취소 신청하기 버튼 표시 (장소와 같은 줄 오른쪽)
 - 우측 상단: 장소 예약 신청, 관리자 모드 버튼
 - 공지 배너: 큰 행사는 사용신청서(Google Drive 링크) 제출 안내
