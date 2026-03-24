@@ -290,52 +290,42 @@ export default function HomePage() {
         <div className="flex flex-col" style={{ gap: '8px' }}>
           {/* Row 1: view mode toggle + navigation (right) */}
           <div className="flex items-center">
-            <div className="flex rounded-md border border-gray-200 overflow-hidden text-sm">
-              <button
-                onClick={() => setViewMode('day')}
-                aria-label="일간 보기"
-                aria-pressed={viewMode === 'day'}
-                className={`hidden lg:block px-2.5 py-1 font-medium transition ${
-                  viewMode === 'day' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                일간
-              </button>
-              <button
-                onClick={() => setViewMode('week')}
-                aria-label="주간 보기"
-                aria-pressed={viewMode === 'week'}
-                className={`hidden lg:block px-2.5 py-1 font-medium transition lg:border-l border-gray-200 ${
-                  viewMode === 'week' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                주간
-              </button>
-              <button
-                onClick={() => setViewMode('month')}
-                aria-label="월간 보기"
-                aria-pressed={viewMode === 'month'}
-                className={`px-2.5 py-1 font-medium transition lg:border-l border-gray-200 ${
-                  viewMode === 'month' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                <span className="lg:hidden">캘린더</span>
-                <span className="hidden lg:inline">월간</span>
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                aria-label="목록 보기"
-                aria-pressed={viewMode === 'list'}
-                className={`px-2.5 py-1 font-medium transition border-l border-gray-200 ${
-                  viewMode === 'list' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                목록
-              </button>
+            {/* Mobile: 월간 | 일간 | 목록 */}
+            <div className="lg:hidden flex rounded-md border border-gray-200 overflow-hidden text-sm">
+              {(['day', 'month', 'list'] as const).map((mode, i) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  aria-pressed={viewMode === mode}
+                  className={`px-2.5 py-1 font-medium transition ${i > 0 ? 'border-l border-gray-200' : ''} ${
+                    viewMode === mode ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {mode === 'month' ? '월간' : mode === 'day' ? '일간' : '목록'}
+                </button>
+              ))}
+            </div>
+            {/* Desktop: 일간 | 주간 | 월간 | 목록 */}
+            <div className="hidden lg:flex rounded-md border border-gray-200 overflow-hidden text-sm">
+              {(['day', 'week', 'month', 'list'] as const).map((mode, i) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  aria-pressed={viewMode === mode}
+                  className={`px-2.5 py-1 font-medium transition ${i > 0 ? 'border-l border-gray-200' : ''} ${
+                    viewMode === mode ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {mode === 'day' ? '일간' : mode === 'week' ? '주간' : mode === 'month' ? '월간' : '목록'}
+                </button>
+              ))}
             </div>
           </div>
 
           {/* Row 2: title (day/week/month) */}
+          {viewMode === 'month' && (
+            <p className="text-left text-[11px] text-gray-400 px-1">원하시는 날짜를 클릭하시면, 해당일자의 전체 예약 현황이 표시됩니다.</p>
+          )}
           {viewMode !== 'list' && (
             <div className="flex items-center justify-center gap-2">
               <button
@@ -359,7 +349,7 @@ export default function HomePage() {
       </div>
 
       {/* Room legend / filter */}
-      <div className="bg-white border-b border-gray-100 px-3 sm:px-6">
+      <div className="relative bg-white border-b border-gray-100 px-3 sm:px-6">
         {/* Toggle header */}
         <div className="flex items-center gap-2 py-2">
           <button
@@ -413,31 +403,64 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Collapsible room list */}
-        {legendOpen && (
+        {/* Selected chips shown when collapsed */}
+        {!legendOpen && selectedRooms.size > 0 && (
           <div className="pb-2 flex flex-wrap gap-x-2 gap-y-1.5">
-            {rooms.map((room) => {
-              const selected = selectedRooms.has(room.id);
-              return (
-                <button
-                  key={room.id}
-                  onClick={() => toggleRoom(room.id)}
-                  className={`flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs transition ${
-                    selected
-                      ? 'border-transparent text-white font-medium'
-                      : 'border-gray-200 text-gray-600 bg-white hover:bg-gray-50'
-                  }`}
-                  style={selected ? { backgroundColor: room.color, borderColor: room.color } : {}}
-                >
-                  <span
-                    className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
-                    style={{ backgroundColor: selected ? 'rgba(255,255,255,0.7)' : room.color }}
-                  />
-                  {room.name}
-                </button>
-              );
-            })}
+            {rooms.filter((room) => selectedRooms.has(room.id)).map((room) => (
+              <button
+                key={room.id}
+                onClick={() => toggleRoom(room.id)}
+                className="flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs transition border-transparent text-white font-medium"
+                style={{ backgroundColor: room.color, borderColor: room.color }}
+              >
+                <span
+                  className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+                  style={{ backgroundColor: 'rgba(255,255,255,0.7)' }}
+                />
+                {room.name}
+              </button>
+            ))}
           </div>
+        )}
+
+        {/* Collapsible room list — overlay on mobile, inline on desktop */}
+        {legendOpen && (
+          <>
+            {/* Mobile backdrop */}
+            <div
+              className="fixed inset-0 z-40 sm:hidden"
+              onClick={() => setLegendOpen(false)}
+            />
+            {/* Panel */}
+            <div className="
+              sm:relative sm:z-auto sm:shadow-none sm:border-0 sm:bg-transparent sm:px-0 sm:pb-2 sm:pt-0
+              absolute left-0 right-0 z-50 bg-white shadow-lg border-t border-gray-200 px-3 pb-3 pt-2
+            ">
+              <div className="flex flex-wrap gap-x-2 gap-y-1.5">
+                {rooms.map((room) => {
+                  const selected = selectedRooms.has(room.id);
+                  return (
+                    <button
+                      key={room.id}
+                      onClick={() => toggleRoom(room.id)}
+                      className={`flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs transition ${
+                        selected
+                          ? 'border-transparent text-white font-medium'
+                          : 'border-gray-200 text-gray-600 bg-white hover:bg-gray-50'
+                      }`}
+                      style={selected ? { backgroundColor: room.color, borderColor: room.color } : {}}
+                    >
+                      <span
+                        className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+                        style={{ backgroundColor: selected ? 'rgba(255,255,255,0.7)' : room.color }}
+                      />
+                      {room.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </>
         )}
       </div>
       </header>
