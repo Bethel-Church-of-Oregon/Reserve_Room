@@ -242,7 +242,7 @@ export default function HomePage() {
   return (
     <div className="flex flex-col h-screen max-w-screen-xl mx-auto w-full border-x border-gray-200 overflow-hidden">
       {/* Top navigation bar */}
-      <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-20">
+      <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
         <div className="px-3 sm:px-6 py-3 flex flex-wrap items-center gap-2">
           {/* Logo / Title */}
           <div className="flex items-center gap-2 mr-auto min-w-0">
@@ -324,7 +324,7 @@ export default function HomePage() {
 
           {/* Row 2: title (day/week/month) */}
           {viewMode === 'month' && (
-            <p className="text-left text-[11px] text-gray-400 px-1">원하시는 날짜를 클릭하시면, 해당일자의 전체 예약 현황이 표시됩니다.</p>
+            <p className="text-left text-[11px] text-gray-500 px-1">원하시는 날짜를 클릭하시면, 해당 일자의 전체 예약 현황이 표시됩니다.</p>
           )}
           {viewMode !== 'list' && (
             <div className="flex items-center justify-center gap-2">
@@ -375,7 +375,7 @@ export default function HomePage() {
           </button>
           {selectedRooms.size > 0 && (
             <button
-              onClick={clearFilter}
+              onClick={(e) => { e.stopPropagation(); clearFilter(); }}
               className="text-xs text-gray-400 hover:text-gray-600 underline transition whitespace-nowrap flex-shrink-0"
             >
               전체 보기
@@ -409,7 +409,7 @@ export default function HomePage() {
             {rooms.filter((room) => selectedRooms.has(room.id)).map((room) => (
               <button
                 key={room.id}
-                onClick={() => toggleRoom(room.id)}
+                onClick={(e) => { e.stopPropagation(); toggleRoom(room.id); }}
                 className="flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs transition border-transparent text-white font-medium"
                 style={{ backgroundColor: room.color, borderColor: room.color }}
               >
@@ -442,7 +442,7 @@ export default function HomePage() {
                   return (
                     <button
                       key={room.id}
-                      onClick={() => toggleRoom(room.id)}
+                      onClick={(e) => { e.stopPropagation(); toggleRoom(room.id); }}
                       className={`flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs transition ${
                         selected
                           ? 'border-transparent text-white font-medium'
