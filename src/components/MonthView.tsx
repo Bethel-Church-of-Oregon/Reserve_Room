@@ -58,6 +58,7 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
   const today = dateKey(new Date());
   const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
   const [expandedDay, setExpandedDay] = useState<{ date: Date; reservations: ReservationWithRoom[] } | null>(null);
+  const [selectedModalId, setSelectedModalId] = useState<number | null>(null);
 
   const reservationsByDay = new Map<string, ReservationWithRoom[]>();
   for (const r of reservations) {
@@ -156,7 +157,7 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
       {expandedDay && (
         <div
           className="fixed inset-0 bg-black/40 flex items-center justify-center z-[120] px-4"
-          onClick={() => setExpandedDay(null)}
+          onClick={() => { setExpandedDay(null); setSelectedModalId(null); }}
         >
           <div
             className="bg-white rounded-2xl shadow-xl w-full max-w-sm max-h-[80vh] flex flex-col"
@@ -168,7 +169,7 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
               </h3>
               <button
                 type="button"
-                onClick={() => setExpandedDay(null)}
+                onClick={() => { setExpandedDay(null); setSelectedModalId(null); }}
                 className="text-gray-400 hover:text-gray-600 text-xl leading-none"
                 aria-label="닫기"
               >
@@ -185,44 +186,52 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
                 .map((r) => {
                   const isPending = r.status === 'pending' || r.status === 'cancellation_requested';
                   const isCancelRequested = r.status === 'cancellation_requested';
-                  const canRequestCancel = (r.status === 'pending' || r.status === 'approved') && !isCancelRequested;
+                  const canRequestCancel = (r.status === 'pending' || r.status === 'approved') && !isCancelRequested && r.end_time.slice(0, 10) >= today;
+                  const isSelected = selectedModalId === r.id;
                   return (
                     <div
                       key={r.id}
-                      className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50 cursor-default"
+                      onClick={() => setSelectedModalId(isSelected ? null : r.id)}
+                      className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition ${
+                        isSelected ? 'border-gray-300 bg-gray-200' : 'border-gray-100 bg-gray-50 hover:bg-gray-100'
+                      }`}
                     >
                       <span
                         className="mt-0.5 shrink-0 w-3 h-3 rounded-sm"
                         style={{ backgroundColor: r.room_color }}
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-sm text-gray-800 truncate">{r.title}</div>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="font-semibold text-sm text-gray-800 truncate">{r.title}</div>
+                          <span
+                            className={`shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                              isPending
+                                ? isCancelRequested ? 'bg-amber-100 text-amber-800' : 'bg-yellow-100 text-yellow-700'
+                                : 'bg-green-100 text-green-700'
+                            }`}
+                          >
+                            {isPending ? (isCancelRequested ? '취소 대기중' : '승인 대기중') : '예약 확정'}
+                          </span>
+                        </div>
                         <div className="text-xs text-gray-500 mt-0.5">{r.room_name}</div>
                         <div className="text-xs text-gray-500">{formatTime(r.start_time)} – {formatTime(r.end_time)}</div>
-                        <div className="text-xs text-gray-500">담당: {r.person_in_charge}</div>
-                      </div>
-                      <div className="shrink-0 self-center flex flex-col items-end gap-1">
-                        <span
-                          className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                            isPending
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-gray-100 text-gray-600'
-                          }`}
-                        >
-                          {isPending ? (isCancelRequested ? '취소 신청' : '승인 대기 중') : '확정'}
-                        </span>
-                        {canRequestCancel && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setExpandedDay(null);
-                              setCancelModalReservation(r);
-                            }}
-                            className="text-[10px] font-medium px-1.5 py-0.5 text-red-600 hover:bg-red-50 rounded transition"
-                          >
-                            취소 신청
-                          </button>
-                        )}
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs text-gray-500">담당: {r.person_in_charge}</div>
+                          {isSelected && canRequestCancel && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedDay(null);
+                                setSelectedModalId(null);
+                                setCancelModalReservation(r);
+                              }}
+                              className="text-[10px] font-medium px-1.5 py-0.5 text-red-600 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition"
+                            >
+                              취소 신청하기
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );

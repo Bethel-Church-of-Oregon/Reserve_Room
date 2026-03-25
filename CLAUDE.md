@@ -117,7 +117,7 @@ cancellation_requested → [approveCancellation: 삭제]
 - **예약 상세 팝오버**: 일간/주간 캘린더 뷰에서 예약 블록 hover → 제목·장소·시간·담당자·노트·상태 표시 + 취소 신청 버튼
 - **현재 시간 라인**: 일간 뷰에서 오늘 날짜일 때만 파란 가로선 표시. `Intl.DateTimeFormat` + `America/Los_Angeles` 타임존으로 DST 자동 처리. 30초마다 갱신
 - **일간 뷰 고정 헤더**: 주간 스트립을 단일 `sticky top-0` 래퍼로 묶어 스크롤 시 항상 표시. 날짜 레이블은 page.tsx Row 2 (‹ 날짜 ›)로 이동
-- **월간 날짜 셀 클릭**: 셀 전체가 클릭 가능, 클릭 시 해당 날의 모든 예약을 시간순으로 보여주는 모달 표시 (예약 0개이면 안내 메시지, `max-h-[88vh]`). 개별 예약 블록 hover 팝오버 없음. 모달 내 카드 클릭 시 선택(배경 진해짐) + 취소 신청하기 버튼 표시 (`selectedModalId` state)
+- **월간 날짜 셀 클릭**: 셀 전체가 클릭 가능, 클릭 시 해당 날의 모든 예약을 시간순으로 보여주는 모달 표시 (예약 0개이면 안내 메시지). 개별 예약 블록 hover 팝오버 없음. 모달 내 카드 기본 상태에서는 취소 버튼 숨김 — 카드 클릭 시 선택(배경 진해짐) + 취소 신청하기 버튼 표시 (`selectedModalId` state). 오늘 이후 예약에만 취소 버튼 노출. 모달 닫힐 때 `selectedModalId` 초기화
 - **스와이프 제스처**: 일간/주간/월간 뷰에서 터치 좌우 스와이프로 날짜 이동. `page.tsx`에서 native `touchstart/touchmove/touchend` 이벤트로 처리 (passive: false on move). 수평/수직 축 5px threshold로 판별 후 lock. `swipeX`/`isDragging` state → 각 뷰에 `swipeOffset`/`swipeDragging` props로 전달. 완료 시: 220ms animate off-screen → navigate → 반대 edge 즉시 이동 → `requestAnimationFrame` 이중 호출 후 0으로 animate. 헤더(주간 스트립, 요일 헤더, 시간 레이블)는 transform 외부에 고정, 예약 그리드만 `translateX`
 - **월간 뷰**: 요일 헤더(일월화수목금토)는 고정, 날짜 그리드만 `overflow-y-auto` 스크롤. 그리드 row: `minmax(120px, 1fr)` — 셀 높이 최소 120px 보장으로 `+N개` 표시 공간 확보
 - **월간 뷰 예약 블록**: 셀당 최대 3개 표시, 초과 시 `+N개` 표시. 모바일(`< sm`)에서는 텍스트 숨김(`hidden sm:inline`), 색상 바만 표시 (`h-3 sm:h-auto sm:leading-5`)
