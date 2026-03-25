@@ -349,6 +349,15 @@ export default function HomePage() {
                 </button>
               ))}
             </div>
+            {viewMode === 'day' && (
+              <button
+                onClick={goToday}
+                aria-label="오늘로 이동"
+                className="ml-auto px-2.5 py-1 text-sm border border-gray-200 rounded hover:bg-gray-50 text-gray-700 transition"
+              >
+                오늘
+              </button>
+            )}
           </div>
 
           {/* Row 2: title (day/week/month) */}

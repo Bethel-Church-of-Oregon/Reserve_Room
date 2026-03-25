@@ -188,7 +188,7 @@ export default function DayView({ currentDate, reservations, onDayClick, onRefre
               }`}
               onClick={() => onDayClick?.(day)}
             >
-              <div className="inline-flex flex-col items-center gap-0.5">
+              <div className="inline-flex flex-col items-center gap-1">
                 <span className="text-xs text-gray-500">{DAYS_KO[day.getDay()]}</span>
                 <span
                   className={`text-base font-bold w-8 h-8 flex items-center justify-center rounded-full ${
@@ -201,7 +201,7 @@ export default function DayView({ currentDate, reservations, onDayClick, onRefre
                 >
                   {day.getDate()}
                 </span>
-                <span className={`w-1.5 h-1.5 rounded-full ${hasDot ? 'bg-gray-400' : 'invisible'}`} />
+                <span className={`mt-1 w-1.5 h-1.5 rounded-full ${hasDot ? 'bg-gray-400' : 'invisible'}`} />
               </div>
             </div>
           );

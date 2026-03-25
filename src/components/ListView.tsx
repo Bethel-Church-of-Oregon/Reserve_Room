@@ -102,7 +102,7 @@ export default function ListView({ reservations, loading, onRefresh }: Props) {
         {weeks.map((week) => (
           <div key={week.weekKey}>
             {/* Week header — sticky at top */}
-            <div className="sticky top-0 z-20 bg-gray-50 border-y border-gray-200 px-4 py-1.5">
+            <div className="sticky z-20 bg-gray-50 border-y border-gray-200 px-4 py-1.5" style={{ top: '-0.2rem' }}>
               <span className="text-xs font-semibold text-gray-500">{formatWeekLabel(week.weekKey)}</span>
             </div>
 
