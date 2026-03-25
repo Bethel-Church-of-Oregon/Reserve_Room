@@ -319,9 +319,20 @@ function ReserveForm() {
 
           {/* Room */}
           <div>
-            <label htmlFor="reserve-room" className="block text-sm font-medium text-gray-700 mb-1">
-              장소 <span className="text-red-500">*</span>
-            </label>
+            <div className="mb-1 flex items-center gap-2">
+              <label htmlFor="reserve-room" className="block text-sm font-medium text-gray-700">
+                장소 <span className="text-red-500">*</span>
+              </label>
+              <a
+                href="/church-layout.png"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-blue-600 underline underline-offset-2 hover:text-blue-700"
+                aria-label="새 탭에서 교회 장소 배치도 보기"
+              >
+                배치도 보기
+              </a>
+            </div>
             {roomsError && (
               <div className="mb-2 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between gap-2">
                 <p className="text-sm text-amber-800">{roomsError}</p>
