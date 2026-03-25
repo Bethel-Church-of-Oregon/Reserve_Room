@@ -41,6 +41,7 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
       if (!res.ok) {
         setError(data.error ?? '오류가 발생했습니다.');
       } else {
+        sessionStorage.setItem('adminVerified', '1');
         onSuccess();
       }
     } catch {
@@ -749,6 +750,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           <button
             onClick={async () => {
               await fetch('/api/admin/auth', { method: 'DELETE' });
+              sessionStorage.removeItem('adminVerified');
               onLogout();
             }}
             className="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition"
@@ -1400,6 +1402,10 @@ export default function AdminPage() {
   const [authState, setAuthState] = useState<'checking' | 'login' | 'authenticated'>('checking');
 
   useEffect(() => {
+    if (!sessionStorage.getItem('adminVerified')) {
+      setAuthState('login');
+      return;
+    }
     fetch('/api/admin/auth')
       .then((r) => r.json())
       .then((d) => setAuthState(d.authenticated ? 'authenticated' : 'login'))
