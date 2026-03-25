@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
 import ReservationDetailPopover, { CancelRequestModal } from './ReservationDetailPopover';
 
@@ -18,6 +18,8 @@ interface Props {
   weekStart: Date;
   reservations: ReservationWithRoom[];
   onRefresh?: () => void;
+  swipeOffset?: number;
+  swipeDragging?: boolean;
 }
 
 function getWeekDays(weekStart: Date): Date[] {
@@ -94,8 +96,15 @@ function groupOverlapping(items: ReservationWithRoom[]): Array<{ item: Reservati
   return result;
 }
 
-export default function WeekView({ weekStart, reservations, onRefresh }: Props) {
+export default function WeekView({ weekStart, reservations, onRefresh, swipeOffset = 0, swipeDragging = false }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const timeLabelRef = useRef<HTMLDivElement>(null);
+
+  const handleScroll = useCallback(() => {
+    if (scrollRef.current && timeLabelRef.current) {
+      timeLabelRef.current.style.top = `-${scrollRef.current.scrollTop}px`;
+    }
+  }, []);
   const days = getWeekDays(weekStart);
   const today = dateKey(new Date());
   const [hovered, setHovered] = useState<{ reservation: ReservationWithRoom; rect: DOMRect } | null>(null);
@@ -170,10 +179,10 @@ export default function WeekView({ weekStart, reservations, onRefresh }: Props) 
       </div>
 
       {/* Scrollable body */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto calendar-scroll">
-        <div className="flex" style={{ height: TOTAL_HEIGHT }}>
-          {/* Time labels */}
-          <div className="w-14 flex-shrink-0 relative">
+      <div className="flex flex-1 min-h-0">
+        {/* Time labels — fixed, synchronized via onScroll */}
+        <div className="w-14 flex-shrink-0 relative overflow-hidden bg-white z-10">
+          <div ref={timeLabelRef} className="absolute w-full" style={{ top: 0, height: TOTAL_HEIGHT }}>
             {hours.map((h) => (
               <div
                 key={h}
@@ -184,7 +193,18 @@ export default function WeekView({ weekStart, reservations, onRefresh }: Props) 
               </div>
             ))}
           </div>
+        </div>
 
+        <div ref={scrollRef} className="flex-1 overflow-y-auto calendar-scroll overflow-x-hidden" onScroll={handleScroll}>
+        <div
+          className="flex"
+          style={{
+            height: TOTAL_HEIGHT,
+            transform: `translateX(${swipeOffset}px)`,
+            transition: swipeDragging ? 'none' : 'transform 0.22s ease-out',
+            willChange: 'transform',
+          }}
+        >
           {/* Day columns */}
           {days.map((day, dayIdx) => {
             const dayReservations = getReservationsForDay(reservations, day);
@@ -261,7 +281,8 @@ export default function WeekView({ weekStart, reservations, onRefresh }: Props) 
             );
           })}
         </div>
-      </div>
+        </div>{/* end scrollable events */}
+      </div>{/* end flex row */}
 
       {hovered && (
         <ReservationDetailPopover

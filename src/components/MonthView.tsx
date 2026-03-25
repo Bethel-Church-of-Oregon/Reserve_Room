@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
 import { CancelRequestModal } from './ReservationDetailPopover';
 
@@ -10,6 +10,8 @@ interface Props {
   currentDate: Date;
   reservations: ReservationWithRoom[];
   onRefresh?: () => void;
+  swipeOffset?: number;
+  swipeDragging?: boolean;
 }
 
 function dateKey(d: Date) {
@@ -49,21 +51,13 @@ function getCalendarDays(year: number, month: number): Date[] {
   return days;
 }
 
-export default function MonthView({ currentDate, reservations, onRefresh }: Props) {
+export default function MonthView({ currentDate, reservations, onRefresh, swipeOffset = 0, swipeDragging = false }: Props) {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const calDays = getCalendarDays(year, month);
   const today = dateKey(new Date());
   const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
   const [expandedDay, setExpandedDay] = useState<{ date: Date; reservations: ReservationWithRoom[] } | null>(null);
-  const [selectedModalId, setSelectedModalId] = useState<number | null>(null);
-  const [maxShow, setMaxShow] = useState(3);
-  useEffect(() => {
-    const update = () => setMaxShow(window.innerHeight > window.innerWidth ? 4 : 3);
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
 
   const reservationsByDay = new Map<string, ReservationWithRoom[]>();
   for (const r of reservations) {
@@ -94,16 +88,17 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
       </div>
 
       {/* Calendar grid */}
-      <div className="flex-1 overflow-y-auto grid" style={{ gridTemplateRows: `repeat(${weeks.length}, minmax(110px, 1fr))` }}>
+      <div className="flex-1 overflow-y-auto grid" style={{ gridTemplateRows: `repeat(${weeks.length}, minmax(120px, 1fr))`, transform: `translateX(${swipeOffset}px)`, transition: swipeDragging ? 'none' : 'transform 0.22s ease-out', willChange: 'transform' }}>
         {weeks.map((week, wi) => (
-          <div key={wi} className="grid grid-cols-7 border-b border-gray-100 last:border-b-0">
+          <div key={wi} className="grid grid-cols-7 border-b border-gray-100 last:border-b-0" style={{ minHeight: '100px' }}>
             {week.map((day, di) => {
               const key = dateKey(day);
               const isCurrentMonth = day.getMonth() === month;
               const isToday = key === today;
               const dayReservations = reservationsByDay.get(key) ?? [];
-              const shown = dayReservations.slice(0, maxShow);
-              const extra = dayReservations.length - maxShow;
+              const MAX_SHOW = 3;
+              const shown = dayReservations.slice(0, MAX_SHOW);
+              const extra = dayReservations.length - MAX_SHOW;
 
               return (
                 <div
@@ -161,10 +156,10 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
       {expandedDay && (
         <div
           className="fixed inset-0 bg-black/40 flex items-center justify-center z-[120] px-4"
-          onClick={() => { setExpandedDay(null); setSelectedModalId(null); }}
+          onClick={() => setExpandedDay(null)}
         >
           <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-sm max-h-[88vh] flex flex-col"
+            className="bg-white rounded-2xl shadow-xl w-full max-w-sm max-h-[80vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
@@ -173,7 +168,7 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
               </h3>
               <button
                 type="button"
-                onClick={() => { setExpandedDay(null); setSelectedModalId(null); }}
+                onClick={() => setExpandedDay(null)}
                 className="text-gray-400 hover:text-gray-600 text-xl leading-none"
                 aria-label="닫기"
               >
@@ -190,52 +185,44 @@ export default function MonthView({ currentDate, reservations, onRefresh }: Prop
                 .map((r) => {
                   const isPending = r.status === 'pending' || r.status === 'cancellation_requested';
                   const isCancelRequested = r.status === 'cancellation_requested';
-                  const canRequestCancel = (r.status === 'pending' || r.status === 'approved') && !isCancelRequested && r.end_time.slice(0, 10) >= today;
-                  const isSelected = selectedModalId === r.id;
+                  const canRequestCancel = (r.status === 'pending' || r.status === 'approved') && !isCancelRequested;
                   return (
                     <div
                       key={r.id}
-                      onClick={() => setSelectedModalId(isSelected ? null : r.id)}
-                      className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition ${
-                        isSelected ? 'border-gray-300 bg-gray-200' : 'border-gray-100 bg-gray-50 hover:bg-gray-100'
-                      }`}
+                      className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50 cursor-default"
                     >
                       <span
                         className="mt-0.5 shrink-0 w-3 h-3 rounded-sm"
                         style={{ backgroundColor: r.room_color }}
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="font-semibold text-sm text-gray-800 truncate">{r.title}</div>
-                          <span
-                            className={`shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                              isPending
-                                ? isCancelRequested ? 'bg-amber-100 text-amber-800' : 'bg-yellow-100 text-yellow-700'
-                                : 'bg-green-100 text-green-700'
-                            }`}
-                          >
-                            {isPending ? (isCancelRequested ? '취소 대기중' : '승인 대기중') : '예약 확정'}
-                          </span>
-                        </div>
+                        <div className="font-semibold text-sm text-gray-800 truncate">{r.title}</div>
                         <div className="text-xs text-gray-500 mt-0.5">{r.room_name}</div>
                         <div className="text-xs text-gray-500">{formatTime(r.start_time)} – {formatTime(r.end_time)}</div>
-                        <div className="flex items-center justify-between">
-                          <div className="text-xs text-gray-500">담당: {r.person_in_charge}</div>
-                          {isSelected && canRequestCancel && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setExpandedDay(null);
-                                setSelectedModalId(null);
-                                setCancelModalReservation(r);
-                              }}
-                              className="text-[10px] font-medium px-1.5 py-0.5 text-red-600 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition"
-                            >
-                              취소 신청하기
-                            </button>
-                          )}
-                        </div>
+                        <div className="text-xs text-gray-500">담당: {r.person_in_charge}</div>
+                      </div>
+                      <div className="shrink-0 self-center flex flex-col items-end gap-1">
+                        <span
+                          className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                            isPending
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-gray-100 text-gray-600'
+                          }`}
+                        >
+                          {isPending ? (isCancelRequested ? '취소 신청' : '승인 대기 중') : '확정'}
+                        </span>
+                        {canRequestCancel && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setExpandedDay(null);
+                              setCancelModalReservation(r);
+                            }}
+                            className="text-[10px] font-medium px-1.5 py-0.5 text-red-600 hover:bg-red-50 rounded transition"
+                          >
+                            취소 신청
+                          </button>
+                        )}
                       </div>
                     </div>
                   );

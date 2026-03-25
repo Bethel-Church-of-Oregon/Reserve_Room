@@ -51,6 +51,10 @@ export default function HomePage() {
   const [viewMode, setViewMode] = useState<ViewMode>('month');
 
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
+
+  // Swipe gesture animation state
+  const [swipeX, setSwipeX] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
   const [reservations, setReservations] = useState<ReservationWithRoom[]>([]);
   const [fetchedFor, setFetchedFor] = useState<{ viewMode: ViewMode; dateKey: string } | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -79,6 +83,8 @@ export default function HomePage() {
       touchStartX.current = e.touches[0].clientX;
       touchStartY.current = e.touches[0].clientY;
       swipeLocked.current = null;
+      setIsDragging(true);
+      setSwipeX(0);
     }
 
     function onTouchMove(e: TouchEvent) {
@@ -94,6 +100,7 @@ export default function HomePage() {
 
       if (swipeLocked.current === 'horizontal') {
         e.preventDefault();
+        setSwipeX(dx);
       }
     }
 
@@ -102,10 +109,29 @@ export default function HomePage() {
       const dx = e.changedTouches[0].clientX - touchStartX.current;
       touchStartX.current = null;
       touchStartY.current = null;
-      if (swipeLocked.current !== 'horizontal') return;
+      const locked = swipeLocked.current;
       swipeLocked.current = null;
-      if (Math.abs(dx) < 70) return;
-      navigateRef.current(dx < 0 ? 1 : -1);
+      if (locked !== 'horizontal') {
+        setIsDragging(false);
+        setSwipeX(0);
+        return;
+      }
+      setIsDragging(false);
+      if (Math.abs(dx) < 60) {
+        setSwipeX(0);
+        return;
+      }
+      const dir = dx < 0 ? 1 : -1;
+      setSwipeX(dx < 0 ? -window.innerWidth : window.innerWidth);
+      setTimeout(() => {
+        navigateRef.current(dir);
+        setIsDragging(true);
+        setSwipeX(dir < 0 ? -window.innerWidth : window.innerWidth);
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          setIsDragging(false);
+          setSwipeX(0);
+        }));
+      }, 220);
     }
 
     el.addEventListener('touchstart', onTouchStart, { passive: true });
@@ -505,21 +531,21 @@ export default function HomePage() {
       )}
 
       {/* Calendar */}
-      <main className="flex-1 min-h-0">
+      <main className="flex-1 min-h-0 overflow-hidden">
         <div className="h-full">
           <div
             ref={calendarRef}
             className="bg-white border-t border-gray-200 h-full overflow-hidden"
           >
             {viewMode === 'day' ? (
-              <DayView key="day" currentDate={currentDate} reservations={filteredReservations} onDayClick={setCurrentDate} onRefresh={refreshReservations} />
+              <DayView key="day" currentDate={currentDate} reservations={filteredReservations} onDayClick={setCurrentDate} onRefresh={refreshReservations} swipeOffset={swipeX} swipeDragging={isDragging} />
             ) : viewMode === 'week' ? (
-              <WeekView key="week" weekStart={weekStart} reservations={filteredReservations} onRefresh={refreshReservations} />
+              <WeekView key="week" weekStart={weekStart} reservations={filteredReservations} onRefresh={refreshReservations} swipeOffset={swipeX} swipeDragging={isDragging} />
             ) : viewMode === 'list' ? (
               <ListView key="list" reservations={filteredReservations} loading={isFetchPending} onRefresh={refreshReservations} />
             ) : (
               <div key="month" className="h-full overflow-y-auto calendar-scroll">
-                <MonthView currentDate={currentDate} reservations={filteredReservations} onRefresh={refreshReservations} />
+                <MonthView currentDate={currentDate} reservations={filteredReservations} onRefresh={refreshReservations} swipeOffset={swipeX} swipeDragging={isDragging} />
               </div>
             )}
           </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
 import ReservationDetailPopover, { CancelRequestModal } from './ReservationDetailPopover';
 
@@ -50,6 +50,8 @@ interface Props {
   reservations: ReservationWithRoom[];
   onDayClick?: (date: Date) => void;
   onRefresh?: () => void;
+  swipeOffset?: number;
+  swipeDragging?: boolean;
 }
 
 function timeToMinutes(dateStr: string): number {
@@ -104,8 +106,15 @@ function groupOverlapping(items: ReservationWithRoom[]): Array<{ item: Reservati
   return result;
 }
 
-export default function DayView({ currentDate, reservations, onDayClick, onRefresh }: Props) {
+export default function DayView({ currentDate, reservations, onDayClick, onRefresh, swipeOffset = 0, swipeDragging = false }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const timeLabelRef = useRef<HTMLDivElement>(null);
+
+  const handleScroll = useCallback(() => {
+    if (scrollRef.current && timeLabelRef.current) {
+      timeLabelRef.current.style.top = `-${scrollRef.current.scrollTop}px`;
+    }
+  }, []);
   const dayKey = toLocalDateKey(currentDate);
   const dayReservations = reservations.filter((r) => r.start_time.slice(0, 10) === dayKey);
   const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => HOUR_START + i);
@@ -160,8 +169,8 @@ export default function DayView({ currentDate, reservations, onDayClick, onRefre
 
   return (
     <div className="flex flex-col h-full">
-      {/* Week strip + date label — sticky together */}
-      <div className="sticky top-0 z-10 bg-white">
+      {/* Week strip + date label — sticky, outside swipe transform */}
+      <div className="sticky top-0 z-30 bg-white">
 
       {/* Week strip */}
       <div className="flex border-b border-gray-200">
@@ -202,11 +211,11 @@ export default function DayView({ currentDate, reservations, onDayClick, onRefre
 
 </div>{/* end sticky wrapper */}
 
-      {/* Scrollable body */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto calendar-scroll">
-        <div className="flex" style={{ height: TOTAL_HEIGHT }}>
-          {/* Time labels */}
-          <div className="w-14 flex-shrink-0 relative">
+      {/* Scrollable body — time labels fixed left, events scroll */}
+      <div className="flex flex-1 min-h-0">
+        {/* Time labels — fixed, synchronized via onScroll DOM manipulation */}
+        <div className="w-14 flex-shrink-0 relative overflow-hidden bg-white z-10">
+          <div ref={timeLabelRef} className="absolute w-full" style={{ top: 0, height: TOTAL_HEIGHT }}>
             {hours.map((h) => (
               <div
                 key={h}
@@ -217,11 +226,19 @@ export default function DayView({ currentDate, reservations, onDayClick, onRefre
               </div>
             ))}
           </div>
+        </div>
 
-          {/* Single day column */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto calendar-scroll overflow-x-hidden" onScroll={handleScroll}>
+        <div style={{ height: TOTAL_HEIGHT }}>
+          {/* Single day column — swipe transform applied here only */}
           <div
             className={`flex-1 relative border-l border-gray-100 ${isToday ? 'bg-blue-50/30' : ''}`}
-            style={{ height: TOTAL_HEIGHT }}
+            style={{
+              height: TOTAL_HEIGHT,
+              transform: `translateX(${swipeOffset}px)`,
+              transition: swipeDragging ? 'none' : 'transform 0.22s ease-out',
+              willChange: 'transform',
+            }}
           >
             {/* Hour grid lines */}
             {hours.map((h) => (
@@ -304,7 +321,8 @@ export default function DayView({ currentDate, reservations, onDayClick, onRefre
             })}
           </div>
         </div>
-      </div>
+        </div>{/* end scrollable events */}
+      </div>{/* end flex row (time labels + events) */}
 
       {hovered && (
         <ReservationDetailPopover
