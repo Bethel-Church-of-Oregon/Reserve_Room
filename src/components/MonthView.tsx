@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
 import { CancelRequestModal } from './ReservationDetailPopover';
 
@@ -59,6 +59,16 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
   const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
   const [expandedDay, setExpandedDay] = useState<{ date: Date; reservations: ReservationWithRoom[] } | null>(null);
   const [selectedModalId, setSelectedModalId] = useState<number | null>(null);
+  const [isSmUp, setIsSmUp] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 640);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 640px)');
+    const handler = (e: MediaQueryListEvent) => setIsSmUp(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  const minCellHeight = isSmUp ? 130 : 100;
 
   const reservationsByDay = new Map<string, ReservationWithRoom[]>();
   for (const r of reservations) {
@@ -89,9 +99,9 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
       </div>
 
       {/* Calendar grid */}
-      <div className="flex-1 overflow-y-auto grid" style={{ gridTemplateRows: `repeat(${weeks.length}, minmax(120px, 1fr))`, transform: `translateX(${swipeOffset}px)`, transition: swipeDragging ? 'none' : 'transform 0.22s ease-out', willChange: 'transform' }}>
+      <div className="flex-1 overflow-y-auto grid" style={{ gridTemplateRows: `repeat(${weeks.length}, minmax(${minCellHeight}px, 1fr))`, transform: `translateX(${swipeOffset}px)`, transition: swipeDragging ? 'none' : 'transform 0.22s ease-out', willChange: 'transform' }}>
         {weeks.map((week, wi) => (
-          <div key={wi} className="grid grid-cols-7 border-b border-gray-100 last:border-b-0" style={{ minHeight: '100px' }}>
+          <div key={wi} className="grid grid-cols-7 border-b border-gray-100 last:border-b-0" style={{ minHeight: `${minCellHeight}px` }}>
             {week.map((day, di) => {
               const key = dateKey(day);
               const isCurrentMonth = day.getMonth() === month;
@@ -104,7 +114,7 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
               return (
                 <div
                   key={di}
-                  className={`border-l border-gray-100 first:border-l-0 p-1 cursor-pointer hover:bg-gray-50 transition-colors ${
+                  className={`border-l border-gray-100 first:border-l-0 p-1 cursor-pointer hover:bg-gray-50 transition-colors overflow-hidden ${
                     isCurrentMonth ? 'bg-white' : 'bg-gray-50'
                   } ${isToday ? 'bg-blue-50 hover:bg-blue-100' : ''}`}
                   onClick={() => setExpandedDay({ date: day, reservations: dayReservations })}

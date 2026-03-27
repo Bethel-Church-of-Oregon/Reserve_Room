@@ -39,3 +39,5 @@ next-env.d.ts
 /data/*.db-journal
 /data/*.db-shm
 /data/*.db-wal
+
+

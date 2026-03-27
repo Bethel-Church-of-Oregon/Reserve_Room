@@ -46,9 +46,69 @@ function toLocalDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function RulesModal({ onAgree, onClose }: { onAgree: () => void; onClose: () => void }) {
+  const [agreed, setAgreed] = useState(false);
+  return (
+    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
+          <h2 className="text-base font-bold text-gray-900">장소 사용수칙 및 주의사항</h2>
+        </div>
+        <div className="px-6 py-4 overflow-y-auto flex-1 text-sm text-gray-700 space-y-4">
+          <p>본 시설은 성도님들의 신앙 활동과 교제를 위한 공간입니다. 아래 수칙을 반드시 준수해 주시기 바랍니다.</p>
+          <div>
+            <p className="font-semibold text-gray-900">1. 사용 목적 제한 (영리 활동 금지)</p>
+            <p className="mt-1">개인적인 수입을 목적으로 하는 레슨(과외), 비즈니스 미팅, 물품 판매 등 모든 영리 활동은 엄격히 금지합니다.</p>
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900">2. 청결 및 정리 정돈</p>
+            <p className="mt-1">사용 후에는 다음 사용자를 위해 반드시 정리 정돈을 완료해 주십시오. 발생한 쓰레기는 지정된 장소에 분리배출 하거나 직접 수거해 가시기 바랍니다.</p>
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900">3. 에너지 절약 및 화재 예방</p>
+            <p className="mt-1">퇴실 시 반드시 모든 전등을 끄고, 냉난방기 및 전기 기구의 전원을 차단해 주십시오. 휴대용 버너, 양초 등 화기 사용은 절대 금지합니다.</p>
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900">4. 시설물 관리</p>
+            <p className="mt-1">교회 기물 및 비품을 소중히 다뤄 주시고, 파손 시 즉시 교회 사무실에 알려 주시기 바랍니다.</p>
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-gray-200 flex-shrink-0 space-y-3">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              className="w-4 h-4 accent-blue-600"
+            />
+            <span className="text-sm text-gray-800">주의사항을 모두 숙지하였으며, 이를 준수할 것에 동의합니다.</span>
+          </label>
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition"
+            >
+              취소
+            </button>
+            <button
+              onClick={onAgree}
+              disabled={!agreed}
+              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg font-medium transition disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-700"
+            >
+              예약 신청하기
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<ViewMode>('month');
+  const [showRulesModal, setShowRulesModal] = useState(false);
 
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
 
@@ -282,7 +342,7 @@ export default function HomePage() {
 
           {/* Right buttons */}
           <button
-            onClick={() => router.push('/reserve')}
+            onClick={() => setShowRulesModal(true)}
             className="px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition whitespace-nowrap"
           >
             <span className="hidden sm:inline">+ 장소 예약 신청</span>
@@ -362,10 +422,10 @@ export default function HomePage() {
 
           {/* Row 2: title (day/week/month) */}
           {viewMode === 'month' && (
-            <p className="text-left text-[11px] text-gray-500 px-1">원하시는 날짜를 클릭하시면, 해당 일자의 전체 예약 현황이 표시됩니다.</p>
+            <p className="text-left text-[11px] text-gray-500 px-1 -mb-[10px]">원하시는 날짜를 클릭하시면, 해당 일자의 전체 예약 현황이 표시됩니다.</p>
           )}
           {viewMode !== 'list' && (
-            <div className="flex items-center justify-center gap-2">
+            <div className="flex items-center justify-center gap-2 -mb-1">
               <button
                 onClick={() => navigate(-1)}
                 className="p-1 rounded hover:bg-gray-100 transition"
@@ -560,6 +620,12 @@ export default function HomePage() {
           </div>
         </div>
       </main>
+      {showRulesModal && (
+        <RulesModal
+          onAgree={() => { setShowRulesModal(false); router.push('/reserve'); }}
+          onClose={() => setShowRulesModal(false)}
+        />
+      )}
     </div>
   );
 }
