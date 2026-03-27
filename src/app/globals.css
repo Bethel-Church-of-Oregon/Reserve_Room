@@ -30,3 +30,13 @@
 .calendar-grid {
   user-select: none;
 }
+
+/* Month view responsive cell min-height via CSS variable */
+.month-grid {
+  --month-cell-min-h: 100px;
+}
+@media (min-width: 640px) {
+  .month-grid {
+    --month-cell-min-h: 130px;
+  }
+}

@@ -120,7 +120,7 @@ cancellation_requested → [approveCancellation: 삭제]
 - **일간 뷰 고정 헤더**: 주간 스트립을 단일 `sticky top-0` 래퍼로 묶어 스크롤 시 항상 표시. 날짜 레이블은 page.tsx Row 2 (‹ 날짜 ›)로 이동. 주간 스트립 날짜 셀: 요일·날짜 사이 `gap-1`, 날짜·점 사이 `mt-1`
 - **월간 날짜 셀 클릭**: 셀 전체가 클릭 가능, 클릭 시 해당 날의 모든 예약을 시간순으로 보여주는 모달 표시 (예약 0개이면 안내 메시지). 개별 예약 블록 hover 팝오버 없음. 모달 내 카드 기본 상태에서는 취소 버튼 숨김 — 카드 클릭 시 선택(배경 진해짐) + 취소 신청하기 버튼 표시 (`selectedModalId` state). 오늘 이후 예약에만 취소 버튼 노출. 모달 닫힐 때 `selectedModalId` 초기화
 - **스와이프 제스처**: 일간/주간/월간 뷰에서 터치 좌우 스와이프로 날짜 이동. `page.tsx`에서 native `touchstart/touchmove/touchend` 이벤트로 처리 (passive: false on move). 수평/수직 축 5px threshold로 판별 후 lock. `swipeX`/`isDragging` state → 각 뷰에 `swipeOffset`/`swipeDragging` props로 전달. 완료 시: 220ms animate off-screen → navigate → 반대 edge 즉시 이동 → `requestAnimationFrame` 이중 호출 후 0으로 animate. 헤더(주간 스트립, 요일 헤더, 시간 레이블)는 transform 외부에 고정, 예약 그리드만 `translateX`
-- **월간 뷰**: 요일 헤더(일월화수목금토)는 고정, 날짜 그리드만 `overflow-y-auto` 스크롤. 그리드 row: `minmax(minCellHeight, 1fr)` — 640px 미만 100px, 640px 이상 130px (`matchMedia`로 감지, `isSmUp` state). 셀에 `overflow-hidden`으로 콘텐츠 클리핑
+- **월간 뷰**: 요일 헤더(일월화수목금토)는 고정, 날짜 그리드만 `overflow-y-auto` 스크롤. 그리드 row: `minmax(var(--month-cell-min-h), 1fr)` — CSS 변수로 반응형 처리 (`globals.css`: 640px 미만 100px / 640px 이상 130px). JS state 없이 순수 CSS로 SSR 안전하게 적용. 셀에 `overflow-hidden`으로 콘텐츠 클리핑
 - **월간 뷰 예약 블록**: 셀당 최대 3개 표시, 초과 시 `+N개` 표시. 모바일(`< sm`)에서는 텍스트 숨김(`hidden sm:inline`), 색상 바만 표시 (`h-3 sm:h-auto sm:leading-5`)
 - 예약 신청 폼: 타이틀, 장소(드롭다운), 날짜, 시작/종료 시간(15분 단위), 반복설정, 담당자, 이메일, 노트(선택)
   - 모든 input/select/textarea: `text-base`(16px) — iOS Safari 자동 확대 방지 (예약 폼 + 관리자 페이지 모두 적용)

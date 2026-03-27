@@ -53,10 +53,10 @@ function RulesModal({ onAgree, onClose }: { onAgree: () => void; onClose: () => 
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
         <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
-          <h2 className="text-base font-bold text-gray-900">장소 사용수칙 및 주의사항</h2>
+          <h2 className="text-base font-bold text-gray-900">장소 사용 수칙 및 주의 사항</h2>
         </div>
         <div className="px-6 py-4 overflow-y-auto flex-1 text-sm text-gray-700 space-y-4">
-          <p>본 시설은 성도님들의 신앙 활동과 교제를 위한 공간입니다. 아래 수칙을 반드시 준수해 주시기 바랍니다.</p>
+          <p>교회 내 모든 시설은 신앙 생활과 교제를 위한 공간입니다. 아래 사용 수칙을 반드시 준수해 주시기 바랍니다.</p>
           <div>
             <p className="font-semibold text-gray-900">1. 사용 목적 제한 (영리 활동 금지)</p>
             <p className="mt-1">개인적인 수입을 목적으로 하는 레슨(과외), 비즈니스 미팅, 물품 판매 등 모든 영리 활동은 엄격히 금지합니다.</p>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
 import { CancelRequestModal } from './ReservationDetailPopover';
 
@@ -59,17 +59,6 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
   const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
   const [expandedDay, setExpandedDay] = useState<{ date: Date; reservations: ReservationWithRoom[] } | null>(null);
   const [selectedModalId, setSelectedModalId] = useState<number | null>(null);
-  const [isSmUp, setIsSmUp] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 640);
-
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 640px)');
-    const handler = (e: MediaQueryListEvent) => setIsSmUp(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
-
-  const minCellHeight = isSmUp ? 130 : 100;
-
   const reservationsByDay = new Map<string, ReservationWithRoom[]>();
   for (const r of reservations) {
     const key = r.start_time.slice(0, 10);
@@ -99,9 +88,9 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
       </div>
 
       {/* Calendar grid */}
-      <div className="flex-1 overflow-y-auto grid" style={{ gridTemplateRows: `repeat(${weeks.length}, minmax(${minCellHeight}px, 1fr))`, transform: `translateX(${swipeOffset}px)`, transition: swipeDragging ? 'none' : 'transform 0.22s ease-out', willChange: 'transform' }}>
+      <div className="month-grid flex-1 overflow-y-auto grid" style={{ gridTemplateRows: `repeat(${weeks.length}, minmax(var(--month-cell-min-h), 1fr))`, transform: `translateX(${swipeOffset}px)`, transition: swipeDragging ? 'none' : 'transform 0.22s ease-out', willChange: 'transform' }}>
         {weeks.map((week, wi) => (
-          <div key={wi} className="grid grid-cols-7 border-b border-gray-100 last:border-b-0" style={{ minHeight: `${minCellHeight}px` }}>
+          <div key={wi} className="grid grid-cols-7 border-b border-gray-100 last:border-b-0" style={{ minHeight: 'var(--month-cell-min-h)' }}>
             {week.map((day, di) => {
               const key = dateKey(day);
               const isCurrentMonth = day.getMonth() === month;
