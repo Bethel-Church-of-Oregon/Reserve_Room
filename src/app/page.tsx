@@ -112,6 +112,9 @@ export default function HomePage() {
 
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
 
+  // Ensure client's local date is used (SSR may initialize with server time)
+  useEffect(() => { setCurrentDate(new Date()); }, []);
+
   // Swipe gesture animation state
   const [swipeX, setSwipeX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
