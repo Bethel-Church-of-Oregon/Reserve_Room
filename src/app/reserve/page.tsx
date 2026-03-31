@@ -2,7 +2,7 @@
 
 import React, { Suspense, useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { format } from 'date-fns';
+import { format, addMonths } from 'date-fns';
 import { Room } from '@/lib/db';
 import { LIMITS } from '@/lib/constants';
 
@@ -38,6 +38,7 @@ interface SuccessInfo {
   created: number;
   conflicts: number;
   conflictDates: string[];
+  email: string;
 }
 
 function generateTimeOptions(): string[] {
@@ -54,6 +55,10 @@ const TIME_OPTIONS = generateTimeOptions();
 
 function todayStr(): string {
   return format(new Date(), 'yyyy-MM-dd');
+}
+
+function oneMonthLaterStr(): string {
+  return format(addMonths(new Date(), 1), 'yyyy-MM-dd');
 }
 
 const RECURRING_LABELS: Record<RecurringType, string> = {
@@ -79,6 +84,7 @@ function ReserveForm() {
     email: '',
     notes: '',
   });
+  const isAdmin = searchParams.get('admin') === 'true';
   const [recurring, setRecurring] = useState<RecurringType>('none');
   const [recurringUntil, setRecurringUntil] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
@@ -146,7 +152,7 @@ function ReserveForm() {
       const start_time = `${form.date}T${form.start_time}:00`;
       const end_time = `${form.date}T${form.end_time}:00`;
 
-      const res = await fetch('/api/reservations', {
+      const res = await fetch(`/api/reservations${isAdmin ? '?admin=true' : ''}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -178,8 +184,8 @@ function ReserveForm() {
 
       setSuccessInfo(
         data.created !== undefined
-          ? data
-          : { created: 1, conflicts: 0, conflictDates: [] }
+          ? { ...data, email: form.email.trim() }
+          : { created: 1, conflicts: 0, conflictDates: [], email: form.email.trim() }
       );
       setSuccess(true);
     } catch (err) {
@@ -228,12 +234,12 @@ function ReserveForm() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-3">신청 완료!</h2>
+          <h2 className="text-2xl font-bold text-gray-800 mb-3">예약 완료!</h2>
 
           {isRecurring ? (
-            <div className="text-left space-y-3 mb-6">
+            <div className="space-y-3 mb-6">
               <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
-                <span className="text-green-700 font-medium text-sm">✓ {successInfo.created}회 예약 신청 완료</span>
+                <span className="text-green-700 font-medium text-sm">✓ {successInfo.created}회 예약 완료</span>
               </div>
               {successInfo.conflicts > 0 && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
@@ -245,15 +251,15 @@ function ReserveForm() {
                   </ul>
                 </div>
               )}
-              <p className="text-gray-500 text-sm">관리자 승인 후 예약이 확정 처리됩니다.</p>
+              <p className="text-gray-500 text-sm text-center">
+                등록된 메일주소<br /><strong>{successInfo.email}</strong>로<br />확인 메일이 발송되었습니다.
+              </p>
             </div>
           ) : (
             <div className="mb-6">
-              <p className="text-gray-600 mb-2">예약 신청이 완료되었습니다.</p>
-              <p className="text-gray-500 text-sm">
-                관리자 승인 후 예약이 확정 처리됩니다.
-                <br />
-                캘린더에서 승인 대기 상태로 표시됩니다.
+              <p className="text-gray-600">예약이 완료되었습니다.</p>
+              <p className="text-gray-500 text-sm mt-1">
+                등록된 메일주소<br /><strong>{successInfo.email}</strong>로<br />확인 메일이 발송되었습니다.
               </p>
             </div>
           )}
@@ -374,12 +380,14 @@ function ReserveForm() {
               type="date"
               value={form.date}
               min={todayStr()}
+              max={isAdmin ? undefined : oneMonthLaterStr()}
               onChange={(e) => handleChange('date', e.target.value)}
               className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 errors.date ? 'border-red-400 bg-red-50' : 'border-gray-300'
               }`}
             />
             {errors.date && <p className="mt-1 text-xs text-red-500">{errors.date}</p>}
+            {!isAdmin && <p className="mt-1 text-xs text-gray-400">현재 일자 기준으로, 한 달 이내 날짜만 예약 가능합니다.</p>}
           </div>
 
           {/* Time range */}
@@ -423,8 +431,8 @@ function ReserveForm() {
             </div>
           </div>
 
-          {/* Recurring */}
-          <div className="border border-gray-200 rounded-xl p-4 space-y-3">
+          {/* Recurring — admin only */}
+          {isAdmin && <div className="border border-gray-200 rounded-xl p-4 space-y-3">
             <label className="block text-sm font-medium text-gray-700">반복 설정</label>
             <div className="flex flex-wrap gap-2">
               {(['none', 'daily', 'weekly', 'monthly'] as RecurringType[]).map((option) => (
@@ -472,7 +480,7 @@ function ReserveForm() {
                 </p>
               </div>
             )}
-          </div>
+          </div>}
 
           {/* Person in charge */}
           <div>

@@ -132,7 +132,7 @@ export interface Room {
   color: string;
 }
 
-export type ReservationStatus = 'pending' | 'approved' | 'rejected' | 'cancellation_requested';
+export type ReservationStatus = 'pending' | 'approved' | 'rejected' | 'cancellation_requested' | 'cancelled';
 
 export interface Reservation {
   id: number;
@@ -193,7 +193,7 @@ export async function getReservations(
       SELECT r.*, rm.name as room_name, rm.color as room_color
       FROM reservations r
       JOIN rooms rm ON r.room_id = rm.id
-      WHERE r.status != 'rejected' AND r.end_time >= ${from} AND r.start_time <= ${to}
+      WHERE r.status NOT IN ('rejected', 'cancelled') AND r.end_time >= ${from} AND r.start_time <= ${to}
       ORDER BY r.start_time
     `) as ReservationWithRoom[];
     return rows;
@@ -204,7 +204,7 @@ export async function getReservations(
       SELECT r.*, rm.name as room_name, rm.color as room_color
       FROM reservations r
       JOIN rooms rm ON r.room_id = rm.id
-      WHERE r.status != 'rejected' AND r.end_time >= ${from}
+      WHERE r.status NOT IN ('rejected', 'cancelled') AND r.end_time >= ${from}
       ORDER BY r.start_time
     `) as ReservationWithRoom[];
     return rows;
@@ -215,7 +215,7 @@ export async function getReservations(
       SELECT r.*, rm.name as room_name, rm.color as room_color
       FROM reservations r
       JOIN rooms rm ON r.room_id = rm.id
-      WHERE r.status != 'rejected' AND r.start_time <= ${to}
+      WHERE r.status NOT IN ('rejected', 'cancelled') AND r.start_time <= ${to}
       ORDER BY r.start_time
     `) as ReservationWithRoom[];
     return rows;
@@ -225,7 +225,7 @@ export async function getReservations(
     SELECT r.*, rm.name as room_name, rm.color as room_color
     FROM reservations r
     JOIN rooms rm ON r.room_id = rm.id
-    WHERE r.status != 'rejected'
+    WHERE r.status NOT IN ('rejected', 'cancelled')
     ORDER BY r.start_time
   `) as ReservationWithRoom[];
   return rows;
@@ -280,8 +280,8 @@ export async function createReservation(data: {
 }): Promise<Reservation> {
   await ensureDbReady();
   const rows = (await getSql()`
-    INSERT INTO reservations (series_id, series_index, title, room_id, start_time, end_time, person_in_charge, email, notes)
-    VALUES (${data.series_id ?? null}, ${data.series_index ?? null}, ${data.title}, ${data.room_id}, ${data.start_time}, ${data.end_time}, ${data.person_in_charge}, ${data.email}, ${data.notes ?? null})
+    INSERT INTO reservations (series_id, series_index, title, room_id, start_time, end_time, person_in_charge, email, notes, status)
+    VALUES (${data.series_id ?? null}, ${data.series_index ?? null}, ${data.title}, ${data.room_id}, ${data.start_time}, ${data.end_time}, ${data.person_in_charge}, ${data.email}, ${data.notes ?? null}, 'approved')
     RETURNING *
   `) as Reservation[];
   return rows[0];
@@ -299,8 +299,8 @@ export async function createReservationSeries(data: {
 }): Promise<ReservationSeries> {
   await ensureDbReady();
   const rows = (await getSql()`
-    INSERT INTO reservation_series (id, title, room_id, person_in_charge, email, notes, recurring, recurring_until)
-    VALUES (${data.id}, ${data.title}, ${data.room_id}, ${data.person_in_charge}, ${data.email}, ${data.notes ?? null}, ${data.recurring}, ${data.recurring_until})
+    INSERT INTO reservation_series (id, title, room_id, person_in_charge, email, notes, recurring, recurring_until, status)
+    VALUES (${data.id}, ${data.title}, ${data.room_id}, ${data.person_in_charge}, ${data.email}, ${data.notes ?? null}, ${data.recurring}, ${data.recurring_until}, 'approved')
     RETURNING *
   `) as ReservationSeries[];
   return rows[0];
@@ -336,8 +336,8 @@ export async function createReservationsBulk(data: {
   const endTimes = data.occurrences.map((o) => o.end_time);
   const indices = data.occurrences.map((o) => o.series_index);
   const rows = (await getSql()`
-    INSERT INTO reservations (series_id, series_index, title, room_id, start_time, end_time, person_in_charge, email, notes)
-    SELECT ${data.series_id}, idx, ${data.title}, ${data.room_id}, st, et, ${data.person_in_charge}, ${data.email}, ${data.notes ?? null}
+    INSERT INTO reservations (series_id, series_index, title, room_id, start_time, end_time, person_in_charge, email, notes, status)
+    SELECT ${data.series_id}, idx, ${data.title}, ${data.room_id}, st, et, ${data.person_in_charge}, ${data.email}, ${data.notes ?? null}, 'approved'
     FROM unnest(${startTimes}::text[], ${endTimes}::text[], ${indices}::int[]) AS t(st, et, idx)
     RETURNING *
   `) as Reservation[];
@@ -468,10 +468,7 @@ export async function requestCancellation(
   await ensureDbReady();
   const rows = (await getSql()`
     UPDATE reservations
-    SET status = 'cancellation_requested',
-        cancellation_reason = ${reason},
-        cancellation_requested_at = now(),
-        previous_status = status
+    SET status = 'cancelled', cancellation_reason = ${reason}
     WHERE id = ${id} AND status IN ('pending', 'approved')
     RETURNING id
   `) as { id: number }[];
@@ -486,10 +483,7 @@ export async function requestCancellationSeries(
   await ensureDbReady();
   const rows = (await getSql()`
     UPDATE reservations
-    SET status = 'cancellation_requested',
-        cancellation_reason = ${reason},
-        cancellation_requested_at = now(),
-        previous_status = status
+    SET status = 'cancelled', cancellation_reason = ${reason}
     WHERE series_id = ${seriesId}
       AND start_time >= ${fromStartTimeInclusive}
       AND status IN ('pending', 'approved')

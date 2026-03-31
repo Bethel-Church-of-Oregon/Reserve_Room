@@ -127,11 +127,9 @@ export default function ListView({ reservations, loading, onRefresh }: Props) {
                   {/* Reservation cards */}
                   <div className="flex-1 flex flex-col gap-2 min-w-0 py-3 pr-4 pl-1">
                     {items.map((item) => {
-                      const isPending = item.status === 'pending';
-                      const isCancelReq = item.status === 'cancellation_requested';
                       const isSelected = selectedId === item.id;
                       const canRequestCancel =
-                        (item.status === 'pending' || item.status === 'approved') &&
+                        (item.status === 'approved' || item.status === 'pending') &&
                         item.end_time.slice(0, 10) >= today;
 
                       return (
@@ -145,21 +143,14 @@ export default function ListView({ reservations, loading, onRefresh }: Props) {
                         >
                           {/* Color bar */}
                           <div
-                            className={`w-1 self-stretch rounded-full flex-shrink-0 ${isPending ? 'opacity-50' : ''}`}
+                            className="w-1 self-stretch rounded-full flex-shrink-0"
                             style={{ backgroundColor: item.room_color, minHeight: 36 }}
                           />
                           {/* Detail */}
                           <div className="flex-1 min-w-0">
-                            {/* Title + status */}
-                            <div className="flex items-start justify-between gap-2 mb-0.5">
-                              <span className="text-sm font-semibold text-gray-900 leading-snug truncate min-w-0">{item.title}</span>
-                              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0 ${
-                                isPending ? 'bg-yellow-100 text-yellow-700'
-                                : isCancelReq ? 'bg-amber-100 text-amber-800'
-                                : 'bg-green-100 text-green-700'
-                              }`}>
-                                {isPending ? '승인 대기중' : isCancelReq ? '취소 대기중' : '예약 확정'}
-                              </span>
+                            {/* Title */}
+                            <div className="mb-0.5 overflow-hidden">
+                              <span className="block text-sm font-semibold text-gray-900 leading-snug truncate">{item.title}</span>
                             </div>
                             {/* Time */}
                             <div className="text-xs text-gray-400 mb-0.5">

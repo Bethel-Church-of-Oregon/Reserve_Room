@@ -3,6 +3,7 @@ import { addMonths, addDays, format } from 'date-fns';
 import { getReservations, createReservation, createReservationSeries, checkConflict, getRooms, getConflictingReservationsForRange, createReservationsBulk } from '@/lib/db';
 import { checkReservationLimit } from '@/lib/ratelimit';
 import { LIMITS } from '@/lib/constants';
+import { sendReservationCreatedEmail, sendReservationCreatedBulkEmail } from '@/lib/email';
 
 export async function GET(req: NextRequest) {
   try {
@@ -116,6 +117,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '종료 시간은 시작 시간보다 늦어야 합니다.' }, { status: 400 });
     }
 
+    // 일반 사용자는 오늘로부터 1달 이내만 예약 가능
+    const isAdmin = req.nextUrl.searchParams.get('admin') === 'true';
+    if (!isAdmin) {
+      const maxDate = addMonths(new Date(), 1);
+      maxDate.setHours(23, 59, 59, 999);
+      if (new Date(start_time) > maxDate) {
+        return NextResponse.json({ error: '예약은 오늘로부터 1달 이내만 신청할 수 있습니다.' }, { status: 400 });
+      }
+    }
+
     // Recurring reservation
     if (recurring && recurring !== 'none' && recurring_until) {
       const seriesId = crypto.randomUUID();
@@ -175,6 +186,16 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      const roomName = rooms.find((r) => r.id === roomIdNum)?.name ?? '';
+      sendReservationCreatedBulkEmail({
+        title: titleStr,
+        room_name: roomName,
+        person_in_charge: personStr,
+        email: emailStr,
+        occurrences: toInsert,
+        created,
+      }).catch((e) => console.error('[email] 반복예약 확인 메일 발송 실패:', e));
+
       return NextResponse.json(
         { created, conflicts: conflictDates.length, conflictDates, seriesId },
         { status: 201 }
@@ -191,6 +212,17 @@ export async function POST(req: NextRequest) {
     }
 
     const reservation = await createReservation({ title: titleStr, room_id: roomIdNum, start_time, end_time, person_in_charge: personStr, email: emailStr, notes: notesStr || undefined });
+
+    const roomName = rooms.find((r) => r.id === roomIdNum)?.name ?? '';
+    sendReservationCreatedEmail({
+      title: titleStr,
+      room_name: roomName,
+      start_time,
+      end_time,
+      person_in_charge: personStr,
+      email: emailStr,
+    }).catch((e) => console.error('[email] 예약 확인 메일 발송 실패:', e));
+
     return NextResponse.json(reservation, { status: 201 });
   } catch (e) {
     console.error(e);

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ReservationWithRoom } from '@/lib/db';
 
-type FilterStatus = 'pending' | 'approved' | 'cancellation_requested' | 'all';
+type FilterStatus = 'pending' | 'approved' | 'cancelled' | 'all';
 
 function formatDateTime(dt: string): string {
   const d = new Date(dt);
@@ -369,7 +369,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const router = useRouter();
   const [reservations, setReservations] = useState<ReservationWithRoom[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [filter, setFilter] = useState<FilterStatus>('pending');
+  const [filter, setFilter] = useState<FilterStatus>('approved');
   const [selectedRooms, setSelectedRooms] = useState<Set<number>>(new Set());
   const [roomFilterOpen, setRoomFilterOpen] = useState(false);
   const [allRooms, setAllRooms] = useState<{ id: number; name: string; color: string }[]>([]);
@@ -426,7 +426,8 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const filtered = reservations.filter((r) => {
     if (filter === 'pending' && r.status !== 'pending') return false;
     if (filter === 'approved' && r.status !== 'approved') return false;
-    if (filter === 'cancellation_requested' && r.status !== 'cancellation_requested') return false;
+    if (filter === 'cancelled' && r.status !== 'cancelled') return false;
+    if (filter === 'all' && r.status === 'rejected') return false;
     if (selectedRooms.size > 0 && !selectedRooms.has(r.room_id)) return false;
     return true;
   });
@@ -446,7 +447,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           const group = filtered.filter((x) => x.series_id === r.series_id);
           // Cancellation tab: single-instance requests show as single row, not series
           const asSingle =
-            filter === 'cancellation_requested' && group.length === 1;
+            filter === 'cancelled' && group.length === 1;
           if (asSingle) {
             rows.push({ type: 'single', reservation: group[0] });
           } else {
@@ -463,10 +464,10 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const pendingRows: DisplayRow[] =
     filter === 'pending' ? buildGroupedRows() : filtered.map((r) => ({ type: 'single' as const, reservation: r }));
   const cancellationRows: DisplayRow[] =
-    filter === 'cancellation_requested' ? buildGroupedRows() : filtered.map((r) => ({ type: 'single' as const, reservation: r }));
+    filtered.map((r) => ({ type: 'single' as const, reservation: r }));
 
   const displayRows: DisplayRow[] =
-    filter === 'pending' ? pendingRows : filter === 'cancellation_requested' ? cancellationRows : filtered.map((r) => ({ type: 'single' as const, reservation: r }));
+    filter === 'pending' ? pendingRows : filter === 'cancelled' ? cancellationRows : filtered.map((r) => ({ type: 'single' as const, reservation: r }));
 
   const pendingSingleIds = filter === 'pending' ? filtered.filter((r) => !r.series_id).map((r) => r.id) : [];
 
@@ -598,7 +599,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   }
 
   const pendingCount = reservations.filter((r) => r.status === 'pending').length;
-  const cancellationRequestedCount = reservations.filter((r) => r.status === 'cancellation_requested').length;
+  const cancelledCount = reservations.filter((r) => r.status === 'cancelled').length;
   const selectedPendingCount = Array.from(selected).filter((id) => reservations.find((r) => r.id === id)?.status === 'pending').length;
 
   async function handleApproveCancellation(id: number) {
@@ -763,8 +764,15 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
       <main className="max-w-screen-xl mx-auto px-4 py-6">
         {/* Filter tabs + bulk actions */}
         <div className="flex items-center gap-2 mb-4">
+          <button
+            onClick={() => router.push('/reserve?admin=true')}
+            className="flex-shrink-0 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition whitespace-nowrap"
+            style={{ fontSize: 'clamp(10px, 3.5vw, 14px)', padding: '8px clamp(4px, 2vw, 12px)' }}
+          >
+            예약하기
+          </button>
           <div className="flex rounded-lg border border-gray-200 overflow-hidden flex-shrink-0" style={{ fontSize: 'clamp(10px, 3.5vw, 14px)' }}>
-            {(['pending', 'approved', 'cancellation_requested', 'all'] as FilterStatus[]).map((f) => (
+            {(['approved', 'cancelled', 'all'] as FilterStatus[]).map((f) => (
               <button
                 key={f}
                 onClick={() => { setFilter(f); setSelected(new Set()); }}
@@ -773,26 +781,11 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                   filter === f ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                {f === 'pending' ? '승인 대기' : f === 'approved' ? '승인 완료' : f === 'cancellation_requested' ? '취소 신청' : '전체'}
-                {f === 'pending' && pendingCount > 0 && (
-                  <span className="ml-1.5 bg-red-500 text-white text-xs rounded-full px-1.5">{pendingCount}</span>
-                )}
-                {f === 'cancellation_requested' && cancellationRequestedCount > 0 && (
-                  <span className="ml-1.5 bg-amber-500 text-white text-xs rounded-full px-1.5">{cancellationRequestedCount}</span>
-                )}
+                {f === 'approved' ? '예약 목록' : f === 'cancelled' ? '취소 목록' : '전체'}
               </button>
             ))}
           </div>
 
-          {filter === 'pending' && selectedPendingCount > 0 && (
-            <button
-              onClick={handleApproveSelected}
-              disabled={bulkLoading}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white text-sm rounded-lg font-medium transition"
-            >
-              {bulkLoading ? '처리 중...' : `선택 승인 (${selectedPendingCount}건)`}
-            </button>
-          )}
           <button
             onClick={fetchReservations}
             className="ml-auto border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition whitespace-nowrap flex-shrink-0"
@@ -909,7 +902,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                           )}
                         </th>
                       )}
-                      <th className="text-left px-3 py-2 text-gray-600 font-medium w-px whitespace-nowrap">상태</th>
+                      {filter === 'all' && <th className="text-left px-3 py-2 text-gray-600 font-medium w-px whitespace-nowrap">상태</th>}
                       <th className="text-left px-3 py-2 text-gray-600 font-medium">제목</th>
                       <th className="text-left px-3 py-2 text-gray-600 font-medium w-[160px]">장소</th>
                       <th className="text-left px-3 py-2 text-gray-600 font-medium w-[160px] whitespace-nowrap">시간</th>
@@ -922,17 +915,14 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                     {displayRows.map((row) =>
                       row.type === 'series' ? (
                         <tr key={row.seriesId} className="hover:bg-gray-50">
-                          {filter === 'pending' && <td className="px-3 py-2" />}
-                          <td className="px-3 py-2">
-                            <StatusBadge status={filter === 'cancellation_requested' ? 'cancellation_requested' : 'pending'} />
-                          </td>
+                          {filter === 'all' && <td className="px-3 py-2"><StatusBadge status={row.reservations[0].status} /></td>}
                           <td className="px-3 py-2 font-medium text-gray-800 w-[120px] max-w-[120px]">
                             <div className="truncate">{row.reservations[0].title}</div>
                             <div className="text-xs text-gray-500 mt-0.5">반복 예약 {row.reservations.length}건</div>
                             {row.reservations[0].notes && (
                               <div className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{row.reservations[0].notes}</div>
                             )}
-                            {filter === 'cancellation_requested' && row.reservations[0].cancellation_reason && (
+                            {filter === 'cancelled' && row.reservations[0].cancellation_reason && (
                               <div className="text-xs text-amber-700 mt-0.5 truncate max-w-xs">취소 사유: {row.reservations[0].cancellation_reason}</div>
                             )}
                           </td>
@@ -1021,15 +1011,13 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                               )}
                             </td>
                           )}
-                          <td className="px-3 py-2">
-                            <StatusBadge status={row.reservation.status} />
-                          </td>
+                          {filter === 'all' && <td className="px-3 py-2"><StatusBadge status={row.reservation.status} /></td>}
                           <td className="px-3 py-2 font-medium text-gray-800 w-[120px] max-w-[120px]">
                             <div className="truncate">{row.reservation.title}</div>
                             {row.reservation.notes && (
                               <div className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{row.reservation.notes}</div>
                             )}
-                            {row.reservation.status === 'cancellation_requested' && row.reservation.cancellation_reason && (
+                            {row.reservation.status === 'cancelled' && row.reservation.cancellation_reason && (
                               <div className="text-xs text-amber-700 mt-0.5 truncate max-w-xs">취소 사유: {row.reservation.cancellation_reason}</div>
                             )}
                           </td>
@@ -1070,7 +1058,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                   row.type === 'series' ? (
                     <div key={row.seriesId} className="p-4">
                       <div className="flex items-start justify-between gap-2 mb-2">
-                        <StatusBadge status={filter === 'cancellation_requested' ? 'cancellation_requested' : 'pending'} />
+                        {filter === 'all' ? <StatusBadge status={row.reservations[0].status} /> : <span />}
                         <span className="text-xs text-gray-400">{formatDateTime(row.reservations[0].created_at)}</span>
                       </div>
                       <p className="font-semibold text-gray-800 mb-1 truncate">{row.reservations[0].title}</p>
@@ -1090,7 +1078,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                       })()}
                       <p className="text-xs text-gray-500 mb-3">담당: {row.reservations[0].person_in_charge}</p>
                       {row.reservations[0].notes && <p className="text-xs text-gray-400 mb-3 italic">{row.reservations[0].notes}</p>}
-                      {filter === 'cancellation_requested' && row.reservations[0].cancellation_reason && (
+                      {filter === 'cancelled' && row.reservations[0].cancellation_reason && (
                         <p className="text-xs text-amber-700 mb-3">취소 사유: {row.reservations[0].cancellation_reason}</p>
                       )}
                       <div className="flex gap-2">
@@ -1148,17 +1136,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                   ) : (
                     <div key={row.reservation.id} className={`p-4 ${selected.has(row.reservation.id) ? 'bg-blue-50' : ''}`}>
                       <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-2">
-                          {filter === 'pending' && row.reservation.status === 'pending' && (
-                            <input
-                              type="checkbox"
-                              checked={selected.has(row.reservation.id)}
-                              onChange={() => toggleSelect(row.reservation.id)}
-                              className="rounded mt-0.5"
-                            />
-                          )}
-                          <StatusBadge status={row.reservation.status} />
-                        </div>
+                        {filter === 'all' ? <StatusBadge status={row.reservation.status} /> : <span />}
                         <span className="text-xs text-gray-400">{formatDateTime(row.reservation.created_at)}</span>
                       </div>
                       <p className="font-semibold text-gray-800 mb-1 truncate">{row.reservation.title}</p>
@@ -1171,7 +1149,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                       </p>
                       <p className="text-xs text-gray-500 mb-3">담당: {row.reservation.person_in_charge}</p>
                       {row.reservation.notes && <p className="text-xs text-gray-400 mb-3 italic">{row.reservation.notes}</p>}
-                      {row.reservation.status === 'cancellation_requested' && row.reservation.cancellation_reason && (
+                      {row.reservation.status === 'cancelled' && row.reservation.cancellation_reason && (
                         <p className="text-xs text-amber-700 mb-3">취소 사유: {row.reservation.cancellation_reason}</p>
                       )}
                       {row.reservation.status === 'rejected' && row.reservation.rejection_reason && (
@@ -1282,13 +1260,13 @@ function StatusBadge({ status }: { status: string }) {
   if (status === 'approved') return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 whitespace-nowrap">
       <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-      승인 완료
+      예약 완료
     </span>
   );
-  if (status === 'cancellation_requested') return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 whitespace-nowrap">
-      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-      취소 대기중
+  if (status === 'cancelled') return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 whitespace-nowrap">
+      <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+      취소 완료
     </span>
   );
   return (
@@ -1364,26 +1342,8 @@ function ActionButtons({
     );
   }
 
-  if (reservation.status === 'cancellation_requested') {
-    return (
-      <div className="flex gap-1.5 whitespace-nowrap">
-        {detailBtn}
-        <button
-          onClick={onApproveCancellation}
-          disabled={loading}
-          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs rounded-lg font-medium transition"
-        >
-          {loading ? '...' : '취소 승인'}
-        </button>
-        <button
-          onClick={onRejectCancellation}
-          disabled={loading}
-          className="px-3 py-1.5 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-xs rounded-lg font-medium transition"
-        >
-          취소 거절
-        </button>
-      </div>
-    );
+  if (reservation.status === 'cancelled') {
+    return <div className="flex gap-1.5 whitespace-nowrap">{detailBtn}</div>;
   }
 
   if (reservation.status === 'rejected') {

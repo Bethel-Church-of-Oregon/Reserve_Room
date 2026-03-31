@@ -31,6 +31,93 @@ function formatTime(isoStr: string): string {
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+export async function sendReservationCreatedEmail(data: {
+  title: string;
+  room_name: string;
+  start_time: string;
+  end_time: string;
+  person_in_charge: string;
+  email: string;
+}): Promise<void> {
+  if (!process.env.GMAIL_APP_PASSWORD) return;
+  const transporter = getTransporter();
+  await transporter.sendMail({
+    from: `"오레곤벧엘교회 장소예약시스템" <${getEmailSender()}>`,
+    to: data.email,
+    subject: `[오레곤벧엘교회] 장소 예약이 완료되었습니다 — ${data.title}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #333;">
+        <h2 style="color: #2563eb;">예약 완료 안내</h2>
+        <p>안녕하세요, <strong>${escapeHtml(data.person_in_charge)}</strong>성도님.</p>
+        <p>장소 예약이 <strong style="color: #16a34a;">완료</strong>되었습니다.</p>
+        <table style="width:100%; border-collapse:collapse; margin: 16px 0;">
+          <tr style="background:#f3f4f6;">
+            <td style="padding:8px 12px; font-weight:600; width:30%;">제목</td>
+            <td style="padding:8px 12px;">${escapeHtml(data.title)}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 12px; font-weight:600;">장소</td>
+            <td style="padding:8px 12px;">${escapeHtml(data.room_name)}</td>
+          </tr>
+          <tr style="background:#f3f4f6;">
+            <td style="padding:8px 12px; font-weight:600;">시작</td>
+            <td style="padding:8px 12px;">${formatTime(data.start_time)}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 12px; font-weight:600;">종료</td>
+            <td style="padding:8px 12px;">${formatTime(data.end_time)}</td>
+          </tr>
+        </table>
+        <p style="color:#6b7280; font-size:13px;">문의사항이 있으시면 교회 사무실로 연락해 주세요.</p>
+        <hr style="border:none; border-top:1px solid #e5e7eb; margin:24px 0;" />
+        <p style="font-size:12px; color:#9ca3af;">오레곤벧엘교회 장소예약시스템</p>
+      </div>
+    `,
+  }).catch((e) => console.error('[email] 발송 실패:', e));
+}
+
+export async function sendReservationCreatedBulkEmail(data: {
+  title: string;
+  room_name: string;
+  person_in_charge: string;
+  email: string;
+  occurrences: Array<{ start_time: string; end_time: string }>;
+  created: number;
+}): Promise<void> {
+  if (!process.env.GMAIL_APP_PASSWORD) return;
+  const transporter = getTransporter();
+  const rows = data.occurrences.map((o, i) => `
+    <tr style="background:${i % 2 === 0 ? '#f9fafb' : 'white'};">
+      <td style="padding:8px 12px; border-bottom:1px solid #e5e7eb; white-space:nowrap;">${formatTime(o.start_time)}</td>
+      <td style="padding:8px 12px; border-bottom:1px solid #e5e7eb; white-space:nowrap;">${formatTime(o.end_time)}</td>
+    </tr>
+  `).join('');
+  await transporter.sendMail({
+    from: `"오레곤벧엘교회 장소예약시스템" <${getEmailSender()}>`,
+    to: data.email,
+    subject: `[오레곤벧엘교회] ${data.created}건 반복 예약이 완료되었습니다 — ${data.title}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #333;">
+        <h2 style="color: #2563eb;">반복 예약 완료 안내</h2>
+        <p>안녕하세요, <strong>${escapeHtml(data.person_in_charge)}</strong>성도님.</p>
+        <p><strong>${escapeHtml(data.title)}</strong> (${escapeHtml(data.room_name)}) 반복 예약 <strong style="color:#16a34a;">${data.created}건</strong>이 완료되었습니다.</p>
+        <table style="width:100%; border-collapse:collapse; margin: 16px 0; font-size:14px;">
+          <thead>
+            <tr style="background:#1e3a8a; color:white;">
+              <th style="padding:10px 12px; text-align:left;">시작</th>
+              <th style="padding:10px 12px; text-align:left;">종료</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <p style="color:#6b7280; font-size:13px;">문의사항이 있으시면 교회 사무실로 연락해 주세요.</p>
+        <hr style="border:none; border-top:1px solid #e5e7eb; margin:24px 0;" />
+        <p style="font-size:12px; color:#9ca3af;">오레곤벧엘교회 장소예약시스템</p>
+      </div>
+    `,
+  }).catch((e) => console.error('[email] 발송 실패:', e));
+}
+
 export async function sendApprovalEmail(reservation: ReservationWithRoom): Promise<void> {
   if (!process.env.GMAIL_APP_PASSWORD) {
     console.warn('[email] GMAIL_APP_PASSWORD 환경변수가 설정되지 않아 이메일을 건너뜁니다.');

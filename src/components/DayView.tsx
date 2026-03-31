@@ -280,22 +280,17 @@ export default function DayView({ currentDate, reservations, onDayClick, onRefre
               const height = Math.max(20, (endMin - startMin) * PX_PER_MIN - 2);
               const widthPct = 100 / totalCols;
               const leftPct = col * widthPct;
-              const isPending = item.status === 'pending' || item.status === 'cancellation_requested';
-
               return (
                 <div
                   key={item.id}
-                  className={`absolute rounded text-white text-xs px-1.5 py-1 overflow-hidden cursor-default ${
-                    isPending ? 'reservation-pending opacity-80' : ''
-                  }`}
+                  className="absolute rounded text-white text-xs px-1.5 py-1 overflow-hidden cursor-default"
                   style={{
                     top,
                     height,
                     left: `${leftPct + 0.5}%`,
                     width: `${widthPct - 1}%`,
                     backgroundColor: item.room_color,
-                    border: isPending ? `2px dashed ${item.room_color}` : 'none',
-                    zIndex: isPending ? 1 : 2,
+                    zIndex: 2,
                   }}
                   onMouseEnter={(e) => showPopover(item, e.currentTarget)}
                   onMouseLeave={() => hidePopover(80)}

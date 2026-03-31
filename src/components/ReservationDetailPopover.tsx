@@ -53,9 +53,8 @@ export function CancelRequestModal({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h3 className="text-lg font-bold text-gray-800 mb-2">취소 신청 완료</h3>
-          <p className="text-sm text-gray-500 mb-1">취소 신청이 접수되었습니다.</p>
-          <p className="text-sm text-gray-500 mb-6">관리자 승인 후 취소가 완료될 예정입니다.</p>
+          <h3 className="text-lg font-bold text-gray-800 mb-2">취소 완료</h3>
+          <p className="text-sm text-gray-500 mb-6">예약이 취소되었습니다.</p>
           <button
             type="button"
             onClick={() => onConfirm(reason.trim())}
@@ -175,10 +174,8 @@ export default function ReservationDetailPopover({
   onMouseLeave,
   onRequestCancel,
 }: Props) {
-  const isPending = reservation.status === 'pending';
-  const isCancelRequested = reservation.status === 'cancellation_requested';
   const today = new Date().toISOString().slice(0, 10);
-  const canRequestCancel = (reservation.status === 'pending' || reservation.status === 'approved') && !isCancelRequested && reservation.end_time.slice(0, 10) >= today;
+  const canRequestCancel = (reservation.status === 'approved' || reservation.status === 'pending') && reservation.end_time.slice(0, 10) >= today;
 
   return (
     <div
@@ -225,20 +222,9 @@ export default function ReservationDetailPopover({
         </div>
       )}
 
-      {/* Status badge + Cancel button */}
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <span
-          className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-            isPending
-              ? 'bg-yellow-100 text-yellow-700'
-              : isCancelRequested
-              ? 'bg-amber-100 text-amber-800'
-              : 'bg-green-100 text-green-700'
-          }`}
-        >
-          {isPending ? '승인 대기중' : isCancelRequested ? '취소 대기중' : '예약 확정'}
-        </span>
-        {canRequestCancel && onRequestCancel && (
+      {/* Cancel button */}
+      {canRequestCancel && onRequestCancel && (
+        <div className="mt-2 flex justify-end">
           <button
             type="button"
             onClick={(e) => {
@@ -249,8 +235,8 @@ export default function ReservationDetailPopover({
           >
             취소 신청하기
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

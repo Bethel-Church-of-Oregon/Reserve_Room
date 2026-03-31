@@ -134,17 +134,11 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
 
                   <div className="space-y-0.5">
                     {shown.map((r) => {
-                      const isPending = r.status === 'pending' || r.status === 'cancellation_requested';
                       return (
                         <div
                           key={r.id}
-                          className={`text-white text-xs px-1 rounded truncate h-3 sm:h-auto sm:leading-5 ${
-                            isPending ? 'reservation-pending opacity-80' : ''
-                          }`}
-                          style={{
-                            backgroundColor: r.room_color,
-                            border: isPending ? `1px dashed ${r.room_color}` : 'none',
-                          }}
+                          className="text-white text-xs px-1 rounded truncate h-3 sm:h-auto sm:leading-5"
+                          style={{ backgroundColor: r.room_color }}
                         >
                           <span className="hidden sm:inline font-medium">{formatTime(r.start_time)}</span>
                           <span className="hidden sm:inline truncate"> {r.title}</span>
@@ -193,9 +187,7 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
                 .slice()
                 .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
                 .map((r) => {
-                  const isPending = r.status === 'pending' || r.status === 'cancellation_requested';
-                  const isCancelRequested = r.status === 'cancellation_requested';
-                  const canRequestCancel = (r.status === 'pending' || r.status === 'approved') && !isCancelRequested && r.end_time.slice(0, 10) >= today;
+                  const canRequestCancel = (r.status === 'approved' || r.status === 'pending') && r.end_time.slice(0, 10) >= today;
                   const isSelected = selectedModalId === r.id;
                   return (
                     <div
@@ -210,18 +202,7 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
                         style={{ backgroundColor: r.room_color }}
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="font-semibold text-sm text-gray-800 truncate">{r.title}</div>
-                          <span
-                            className={`shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                              isPending
-                                ? isCancelRequested ? 'bg-amber-100 text-amber-800' : 'bg-yellow-100 text-yellow-700'
-                                : 'bg-green-100 text-green-700'
-                            }`}
-                          >
-                            {isPending ? (isCancelRequested ? '취소 대기중' : '승인 대기중') : '예약 확정'}
-                          </span>
-                        </div>
+                        <div className="font-semibold text-sm text-gray-800 truncate">{r.title}</div>
                         <div className="text-xs text-gray-500 mt-0.5">{r.room_name}</div>
                         <div className="text-xs text-gray-500">{formatTime(r.start_time)} – {formatTime(r.end_time)}</div>
                         <div className="flex items-center justify-between">

@@ -305,7 +305,8 @@ export default function HomePage() {
       } else if (viewMode === 'week') {
         d.setDate(d.getDate() + dir * 7);
       } else {
-        d.setMonth(d.getMonth() + dir);
+        const result = new Date(d.getFullYear(), d.getMonth() + dir, 1);
+        return result;
       }
       return d;
     });
@@ -396,7 +397,7 @@ export default function HomePage() {
               {(['day', 'month', 'list'] as const).map((mode, i) => (
                 <button
                   key={mode}
-                  onClick={() => setViewMode(mode)}
+                  onClick={() => { if (mode === 'day') setCurrentDate(new Date()); setViewMode(mode); }}
                   aria-pressed={viewMode === mode}
                   className={`px-2.5 py-1 font-medium transition ${i > 0 ? 'border-l border-gray-200' : ''} ${
                     viewMode === mode ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
@@ -411,7 +412,7 @@ export default function HomePage() {
               {(['day', 'week', 'month', 'list'] as const).map((mode, i) => (
                 <button
                   key={mode}
-                  onClick={() => setViewMode(mode)}
+                  onClick={() => { if (mode === 'day' || mode === 'week') setCurrentDate(new Date()); setViewMode(mode); }}
                   aria-pressed={viewMode === mode}
                   className={`px-2.5 py-1 font-medium transition ${i > 0 ? 'border-l border-gray-200' : ''} ${
                     viewMode === mode ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
@@ -505,19 +506,6 @@ export default function HomePage() {
                 불러오는 중...
               </span>
             )}
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <div className="flex items-center gap-1">
-                <span className="w-6 h-2.5 rounded-sm bg-gray-500 flex-shrink-0" />
-                <span className="text-[10px] text-gray-500 whitespace-nowrap">예약 확정</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span
-                  className="w-6 h-2.5 rounded-sm reservation-pending flex-shrink-0"
-                  style={{ backgroundColor: '#94a3b8' }}
-                />
-                <span className="text-[10px] text-gray-500 whitespace-nowrap">승인 대기</span>
-              </div>
-            </div>
           </div>
         </div>
 
