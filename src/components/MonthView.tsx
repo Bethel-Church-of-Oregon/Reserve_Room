@@ -55,7 +55,17 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const calDays = getCalendarDays(year, month);
-  const today = dateKey(new Date());
+  const getPacificToday = () => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date());
+    const y = parts.find(p => p.type === 'year')!.value;
+    const m = parts.find(p => p.type === 'month')!.value;
+    const d = parts.find(p => p.type === 'day')!.value;
+    return `${y}-${m}-${d}`;
+  };
+  const today = getPacificToday();
   const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
   const [expandedDay, setExpandedDay] = useState<{ date: Date; reservations: ReservationWithRoom[] } | null>(null);
   const [selectedModalId, setSelectedModalId] = useState<number | null>(null);
