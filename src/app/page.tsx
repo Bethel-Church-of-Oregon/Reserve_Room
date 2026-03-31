@@ -112,8 +112,17 @@ export default function HomePage() {
 
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
 
-  // Ensure client's local date is used (SSR may initialize with server time)
-  useEffect(() => { setCurrentDate(new Date()); }, []);
+  // Sync to Pacific time (America/Los_Angeles) after SSR hydration
+  useEffect(() => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date());
+    const y = Number(parts.find(p => p.type === 'year')!.value);
+    const m = Number(parts.find(p => p.type === 'month')!.value) - 1;
+    const d = Number(parts.find(p => p.type === 'day')!.value);
+    setCurrentDate(new Date(y, m, d));
+  }, []);
 
   // Swipe gesture animation state
   const [swipeX, setSwipeX] = useState(0);
