@@ -194,6 +194,7 @@ export async function POST(req: NextRequest) {
         email: emailStr,
         occurrences: toInsert,
         created,
+        notes: notesStr || undefined,
       }).catch((e) => console.error('[email] 반복예약 확인 메일 발송 실패:', e));
 
       return NextResponse.json(
@@ -221,6 +222,7 @@ export async function POST(req: NextRequest) {
       end_time,
       person_in_charge: personStr,
       email: emailStr,
+      notes: notesStr || undefined,
     }).catch((e) => console.error('[email] 예약 확인 메일 발송 실패:', e));
 
     return NextResponse.json(reservation, { status: 201 });

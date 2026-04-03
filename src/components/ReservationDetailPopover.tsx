@@ -29,6 +29,7 @@ export function CancelRequestModal({
   onConfirm: (reason: string) => void;
   onCancel: () => void;
 }) {
+  const [email, setEmail] = useState('');
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -39,6 +40,7 @@ export function CancelRequestModal({
   // Reset to "one instance" whenever the modal is opened with a different reservation
   useEffect(() => {
     setScope('one');
+    setEmail('');
     setReason('');
     setError('');
     setSubmitted(false);
@@ -106,6 +108,22 @@ export function CancelRequestModal({
         )}
 
         <div className="mb-4">
+          <label htmlFor="cancel-email" className="block text-sm font-medium text-gray-700 mb-1">예약 시 입력한 이메일 <span className="text-red-500">*</span></label>
+          <input
+            id="cancel-email"
+            type="email"
+            value={email}
+            onChange={(e) => { setEmail(e.target.value); setError(''); }}
+            placeholder="예약에 사용한 이메일을 입력해주세요."
+            autoFocus
+            disabled={loading}
+            className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-red-400 disabled:opacity-60 ${
+              error ? 'border-red-400 bg-red-50' : 'border-gray-300'
+            }`}
+          />
+        </div>
+
+        <div className="mb-4">
           <label htmlFor="cancel-reason" className="block text-sm font-medium text-gray-700 mb-1">취소 사유 <span className="text-red-500">*</span></label>
           <textarea
             id="cancel-reason"
@@ -114,7 +132,6 @@ export function CancelRequestModal({
             placeholder="취소 사유를 입력해주세요."
             maxLength={LIMITS.reason}
             rows={3}
-            autoFocus
             disabled={loading}
             className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-red-400 resize-none disabled:opacity-60 ${
               error ? 'border-red-400 bg-red-50' : 'border-gray-300'
@@ -134,6 +151,7 @@ export function CancelRequestModal({
           <button
             type="button"
             onClick={async () => {
+              if (!email.trim()) { setError('이메일을 입력해주세요.'); return; }
               if (!reason.trim()) { setError('취소 사유를 입력해주세요.'); return; }
               if (reason.trim().length > LIMITS.reason) { setError(`취소 사유는 ${LIMITS.reason}자 이하여야 합니다.`); return; }
               setLoading(true);
@@ -142,7 +160,7 @@ export function CancelRequestModal({
                 const res = await fetch(`/api/reservations/${reservation.id}/cancel`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ reason: reason.trim(), scope }),
+                  body: JSON.stringify({ email: email.trim(), reason: reason.trim(), scope }),
                 });
                 const data = await res.json();
                 if (res.ok) {
