@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ReservationWithRoom } from '@/lib/db';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 type FilterStatus = 'pending' | 'approved' | 'cancelled' | 'all';
 
@@ -11,8 +12,6 @@ function formatDateTime(dt: string): string {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-/** e.g. "3/10 09:00 ~ 6/15 10:00 (12건)" for series range + count */
-/** Series range in same two-line style as single instance: earliest start, then ~ latest end (N건) */
 function formatSeriesRangeLines(reservations: ReservationWithRoom[]): { firstStart: string; lastEnd: string; count: number } | null {
   if (reservations.length === 0) return null;
   const byStart = [...reservations].sort((a, b) => a.start_time.localeCompare(b.start_time));
@@ -26,6 +25,7 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const { lang, setLang, t } = useLanguage();
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -39,13 +39,13 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? '오류가 발생했습니다.');
+        setError(data.error ?? t.errGeneral);
       } else {
         sessionStorage.setItem('adminVerified', '1');
         onSuccess();
       }
     } catch {
-      setError('네트워크 오류가 발생했습니다.');
+      setError(t.errNetwork);
     } finally {
       setLoading(false);
     }
@@ -60,19 +60,19 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
           </div>
-          <h1 className="text-xl font-bold text-gray-800">관리자 로그인</h1>
-          <p className="text-sm text-gray-500 mt-1">오레곤벧엘교회 예약관리시스템</p>
+          <h1 className="text-xl font-bold text-gray-800">{t.adminLoginTitle}</h1>
+          <p className="text-sm text-gray-500 mt-1">{t.adminLoginSubtitle}</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label htmlFor="admin-password" className="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
+            <label htmlFor="admin-password" className="block text-sm font-medium text-gray-700 mb-1">{t.adminPasswordLabel}</label>
             <input
               id="admin-password"
               type="password"
               value={password}
               onChange={(e) => { setPassword(e.target.value); setError(''); }}
-              placeholder="관리자 비밀번호를 입력하세요"
+              placeholder={t.adminPasswordPlaceholder}
               autoFocus
               className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-gray-700 ${
                 error ? 'border-red-400 bg-red-50' : 'border-gray-300'
@@ -85,16 +85,24 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
             disabled={loading}
             className="w-full py-2.5 bg-gray-800 hover:bg-gray-900 disabled:opacity-60 text-white rounded-lg font-medium transition text-sm"
           >
-            {loading ? '확인 중...' : '로그인'}
+            {loading ? t.adminLoginLoading : t.adminLoginBtn}
           </button>
           <button
             type="button"
             onClick={() => window.history.back()}
             className="w-full py-2.5 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 text-sm transition"
           >
-            돌아가기
+            {t.adminGoBack}
           </button>
         </form>
+        <div className="mt-4 flex justify-center">
+          <button
+            onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
+            className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition"
+          >
+            {lang === 'ko' ? 'EN' : '한국어'}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -112,21 +120,22 @@ function RejectModal({
 }) {
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
+  const { t } = useLanguage();
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
       <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
-        <h3 className="text-lg font-bold text-gray-800 mb-1">예약 거절</h3>
+        <h3 className="text-lg font-bold text-gray-800 mb-1">{t.rejectTitle}</h3>
         <p className="text-sm text-gray-500 mb-4">
-          <strong className="text-gray-700">{reservation.title}</strong> 예약을 거절합니다.
+          <strong className="text-gray-700">{reservation.title}</strong> — {t.rejectDesc(reservation.title).replace(`"${reservation.title}" `, '')}
         </p>
         <div className="mb-4">
-          <label htmlFor="reject-reason" className="block text-sm font-medium text-gray-700 mb-1">거절 사유 <span className="text-red-500">*</span></label>
+          <label htmlFor="reject-reason" className="block text-sm font-medium text-gray-700 mb-1">{t.rejectReasonLabel} <span className="text-red-500">*</span></label>
           <textarea
             id="reject-reason"
             value={reason}
             onChange={(e) => { setReason(e.target.value); setError(''); }}
-            placeholder="거절 사유를 입력해주세요."
+            placeholder={t.rejectReasonPlaceholder}
             rows={3}
             autoFocus
             className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-red-400 resize-none ${
@@ -140,16 +149,16 @@ function RejectModal({
             onClick={onCancel}
             className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm transition"
           >
-            취소
+            {t.btnCancel}
           </button>
           <button
             onClick={() => {
-              if (!reason.trim()) { setError('거절 사유를 입력해주세요.'); return; }
+              if (!reason.trim()) { setError(t.errRejectReasonRequired); return; }
               onConfirm(reason.trim());
             }}
             className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition"
           >
-            거절 확정
+            {t.btnRejectConfirm}
           </button>
         </div>
       </div>
@@ -175,21 +184,20 @@ function RejectSeriesModal({
 }) {
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
+  const { t } = useLanguage();
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
       <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
-        <h3 className="text-lg font-bold text-gray-800 mb-1">반복 예약 전체 거절</h3>
-        <p className="text-sm text-gray-500 mb-4">
-          <strong className="text-gray-700">{title}</strong> — {roomName} · {count}건을 모두 거절합니다.
-        </p>
+        <h3 className="text-lg font-bold text-gray-800 mb-1">{t.rejectSeriesTitle}</h3>
+        <p className="text-sm text-gray-500 mb-4">{t.rejectSeriesDesc(title, roomName, count)}</p>
         <div className="mb-4">
-          <label htmlFor="reject-series-reason" className="block text-sm font-medium text-gray-700 mb-1">거절 사유 <span className="text-red-500">*</span></label>
+          <label htmlFor="reject-series-reason" className="block text-sm font-medium text-gray-700 mb-1">{t.rejectReasonLabel} <span className="text-red-500">*</span></label>
           <textarea
             id="reject-series-reason"
             value={reason}
             onChange={(e) => { setReason(e.target.value); setError(''); }}
-            placeholder="거절 사유를 입력해주세요."
+            placeholder={t.rejectReasonPlaceholder}
             rows={3}
             autoFocus
             className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-red-400 resize-none ${
@@ -203,16 +211,16 @@ function RejectSeriesModal({
             onClick={onCancel}
             className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm transition"
           >
-            취소
+            {t.btnCancel}
           </button>
           <button
             onClick={() => {
-              if (!reason.trim()) { setError('거절 사유를 입력해주세요.'); return; }
+              if (!reason.trim()) { setError(t.errRejectReasonRequired); return; }
               onConfirm(reason.trim());
             }}
             className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition"
           >
-            거절 확정
+            {t.btnRejectConfirm}
           </button>
         </div>
       </div>
@@ -220,7 +228,7 @@ function RejectSeriesModal({
   );
 }
 
-// ── Reject Cancel Series Modal (optional reason) ───────────────────────────────
+// ── Reject Cancel Series Modal ───────────────────────────────────────────────
 function RejectCancelSeriesModal({
   title,
   roomName,
@@ -235,21 +243,20 @@ function RejectCancelSeriesModal({
   onCancel: () => void;
 }) {
   const [reason, setReason] = useState('');
+  const { t } = useLanguage();
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
       <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
-        <h3 className="text-lg font-bold text-gray-800 mb-1">시리즈 취소 신청 거절</h3>
-        <p className="text-sm text-gray-500 mb-4">
-          <strong className="text-gray-700">{title}</strong> — {roomName} · {count}건의 취소 신청을 거절합니다.
-        </p>
+        <h3 className="text-lg font-bold text-gray-800 mb-1">{t.rejectCancelSeriesTitle}</h3>
+        <p className="text-sm text-gray-500 mb-4">{t.rejectCancelSeriesDesc(title, roomName, count)}</p>
         <div className="mb-4">
-          <label htmlFor="reject-cancel-series-reason" className="block text-sm font-medium text-gray-700 mb-1">거절 사유 (선택, 요청자 이메일에 포함)</label>
+          <label htmlFor="reject-cancel-series-reason" className="block text-sm font-medium text-gray-700 mb-1">{t.rejectCancelReasonOptional}</label>
           <textarea
             id="reject-cancel-series-reason"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="선택 사항입니다."
+            placeholder={t.rejectCancelPlaceholderOptional}
             rows={3}
             autoFocus
             className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
@@ -260,13 +267,13 @@ function RejectCancelSeriesModal({
             onClick={onCancel}
             className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm transition"
           >
-            닫기
+            {t.btnClose}
           </button>
           <button
             onClick={() => onConfirm(reason.trim() || undefined)}
             className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition"
           >
-            취소 거절
+            {t.btnRejectCancelConfirm}
           </button>
         </div>
       </div>
@@ -285,21 +292,20 @@ function RejectCancelModal({
   onCancel: () => void;
 }) {
   const [reason, setReason] = useState('');
+  const { t } = useLanguage();
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
       <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
-        <h3 className="text-lg font-bold text-gray-800 mb-1">취소 신청 거절</h3>
-        <p className="text-sm text-gray-500 mb-4">
-          <strong className="text-gray-700">{reservation.title}</strong> 예약의 취소 신청을 거절합니다.
-        </p>
+        <h3 className="text-lg font-bold text-gray-800 mb-1">{t.rejectCancelTitle}</h3>
+        <p className="text-sm text-gray-500 mb-4">{t.rejectCancelDesc(reservation.title)}</p>
         <div className="mb-4">
-          <label htmlFor="reject-cancel-reason" className="block text-sm font-medium text-gray-700 mb-1">거절 사유 (선택, 요청자 이메일에 포함)</label>
+          <label htmlFor="reject-cancel-reason" className="block text-sm font-medium text-gray-700 mb-1">{t.rejectCancelReasonOptional}</label>
           <textarea
             id="reject-cancel-reason"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="선택 사항입니다."
+            placeholder={t.rejectCancelPlaceholderOptional}
             rows={3}
             autoFocus
             className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
@@ -310,13 +316,13 @@ function RejectCancelModal({
             onClick={onCancel}
             className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm transition"
           >
-            닫기
+            {t.btnClose}
           </button>
           <button
             onClick={() => onConfirm(reason.trim() || undefined)}
             className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition"
           >
-            취소 거절
+            {t.btnRejectCancelConfirm}
           </button>
         </div>
       </div>
@@ -334,29 +340,30 @@ function DeleteModal({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useLanguage();
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
       <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
-        <h3 className="text-lg font-bold text-gray-800 mb-2">예약 삭제</h3>
-        <p className="text-sm text-gray-600 mb-1">다음 예약을 삭제하시겠습니까?</p>
+        <h3 className="text-lg font-bold text-gray-800 mb-2">{t.deleteTitle}</h3>
+        <p className="text-sm text-gray-600 mb-1">{t.deleteConfirmMsg}</p>
         <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm">
           <p className="font-medium text-gray-800">{reservation.title}</p>
           <p className="text-gray-500">{reservation.room_name}</p>
           <p className="text-gray-500">{formatDateTime(reservation.start_time)} ~ {formatDateTime(reservation.end_time)}</p>
         </div>
-        <p className="text-xs text-red-500 mb-4">* 삭제된 예약은 복구할 수 없습니다.</p>
+        <p className="text-xs text-red-500 mb-4">{t.deleteWarning}</p>
         <div className="flex gap-3">
           <button
             onClick={onCancel}
             className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm transition"
           >
-            취소
+            {t.btnCancel}
           </button>
           <button
             onClick={onConfirm}
             className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition"
           >
-            삭제
+            {t.btnDeleteConfirm}
           </button>
         </div>
       </div>
@@ -367,6 +374,7 @@ function DeleteModal({
 // ── Admin Panel ───────────────────────────────────────────────────────────────
 function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const router = useRouter();
+  const { lang, setLang, t, tRoom } = useLanguage();
   const [reservations, setReservations] = useState<ReservationWithRoom[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [filter, setFilter] = useState<FilterStatus>('approved');
@@ -406,7 +414,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
       const data = await res.json();
       setReservations(Array.isArray(data) ? data : []);
     } catch {
-      showToast('데이터를 불러오지 못했습니다.', 'error');
+      showToast(t.adminDataError, 'error');
     } finally {
       setLoading(false);
     }
@@ -432,7 +440,6 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
     return true;
   });
 
-  // One row per series (grouped) or per single reservation
   type DisplayRow =
     | { type: 'series'; seriesId: string; reservations: ReservationWithRoom[] }
     | { type: 'single'; reservation: ReservationWithRoom };
@@ -445,9 +452,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
         if (!seenSeries.has(r.series_id)) {
           seenSeries.add(r.series_id);
           const group = filtered.filter((x) => x.series_id === r.series_id);
-          // Cancellation tab: single-instance requests show as single row, not series
-          const asSingle =
-            filter === 'cancelled' && group.length === 1;
+          const asSingle = filter === 'cancelled' && group.length === 1;
           if (asSingle) {
             rows.push({ type: 'single', reservation: group[0] });
           } else {
@@ -496,9 +501,9 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'approve' }),
       });
-      if (res.ok) { showToast('승인 완료'); fetchReservations(); setSelected((p) => { const n = new Set(p); n.delete(id); return n; }); }
-      else { const d = await res.json(); showToast(d.error ?? '오류', 'error'); }
-    } catch { showToast('네트워크 오류', 'error'); }
+      if (res.ok) { showToast(t.toastApproved); fetchReservations(); setSelected((p) => { const n = new Set(p); n.delete(id); return n; }); }
+      else { const d = await res.json(); showToast(d.error ?? t.toastError, 'error'); }
+    } catch { showToast(t.toastNetworkError, 'error'); }
     finally { setActionLoading(null); }
   }
 
@@ -512,14 +517,14 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(`${data.approved ?? 0}건 시리즈 승인 완료`);
+        showToast(t.toastSeriesApproved(data.approved ?? 0));
         setSelected(new Set());
         fetchReservations();
       } else {
-        showToast(data.error ?? '오류', 'error');
+        showToast(data.error ?? t.toastError, 'error');
       }
     } catch {
-      showToast('네트워크 오류', 'error');
+      showToast(t.toastNetworkError, 'error');
     } finally {
       setBulkLoading(false);
     }
@@ -537,14 +542,14 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(`${data.approved}건 승인 완료`);
+        showToast(t.toastBulkApproved(data.approved));
         setSelected(new Set());
         fetchReservations();
       } else {
-        showToast(data.error ?? '오류', 'error');
+        showToast(data.error ?? t.toastError, 'error');
       }
     } catch {
-      showToast('네트워크 오류', 'error');
+      showToast(t.toastNetworkError, 'error');
     } finally {
       setBulkLoading(false);
     }
@@ -558,9 +563,9 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'reject', reason }),
       });
-      if (res.ok) { showToast('거절 처리되었습니다.'); fetchReservations(); }
-      else { const d = await res.json(); showToast(d.error ?? '오류', 'error'); }
-    } catch { showToast('네트워크 오류', 'error'); }
+      if (res.ok) { showToast(t.toastRejected); fetchReservations(); }
+      else { const d = await res.json(); showToast(d.error ?? t.toastError, 'error'); }
+    } catch { showToast(t.toastNetworkError, 'error'); }
     finally { setActionLoading(null); setRejectTarget(null); }
   }
 
@@ -574,14 +579,14 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(`${data.rejected ?? 0}건 시리즈 거절 처리되었습니다.`);
+        showToast(t.toastSeriesRejected(data.rejected ?? 0));
         fetchReservations();
         setRejectSeriesTarget(null);
       } else {
-        showToast(data.error ?? '오류', 'error');
+        showToast(data.error ?? t.toastError, 'error');
       }
     } catch {
-      showToast('네트워크 오류', 'error');
+      showToast(t.toastNetworkError, 'error');
     } finally {
       setSeriesActionLoading(null);
       setRejectSeriesTarget(null);
@@ -592,13 +597,12 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
     setActionLoading(id);
     try {
       const res = await fetch(`/api/reservations/${id}`, { method: 'DELETE' });
-      if (res.ok) { showToast('삭제되었습니다.'); fetchReservations(); }
-      else { const d = await res.json(); showToast(d.error ?? '오류', 'error'); }
-    } catch { showToast('네트워크 오류', 'error'); }
+      if (res.ok) { showToast(t.toastDeleted); fetchReservations(); }
+      else { const d = await res.json(); showToast(d.error ?? t.toastError, 'error'); }
+    } catch { showToast(t.toastNetworkError, 'error'); }
     finally { setActionLoading(null); setDeleteTarget(null); }
   }
 
-  const pendingCount = reservations.filter((r) => r.status === 'pending').length;
   const cancelledCount = reservations.filter((r) => r.status === 'cancelled').length;
   const selectedPendingCount = Array.from(selected).filter((id) => reservations.find((r) => r.id === id)?.status === 'pending').length;
 
@@ -610,9 +614,9 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'approve_cancellation' }),
       });
-      if (res.ok) { showToast('취소 승인되었습니다.'); fetchReservations(); }
-      else { const d = await res.json(); showToast(d.error ?? '오류', 'error'); }
-    } catch { showToast('네트워크 오류', 'error'); }
+      if (res.ok) { showToast(t.toastCancelApproved); fetchReservations(); }
+      else { const d = await res.json(); showToast(d.error ?? t.toastError, 'error'); }
+    } catch { showToast(t.toastNetworkError, 'error'); }
     finally { setActionLoading(null); }
   }
 
@@ -624,9 +628,9 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'reject_cancellation', reason: reason ?? '' }),
       });
-      if (res.ok) { showToast('취소 거절되었습니다.'); fetchReservations(); setRejectCancelTarget(null); }
-      else { const d = await res.json(); showToast(d.error ?? '오류', 'error'); }
-    } catch { showToast('네트워크 오류', 'error'); }
+      if (res.ok) { showToast(t.toastCancelRejected); fetchReservations(); setRejectCancelTarget(null); }
+      else { const d = await res.json(); showToast(d.error ?? t.toastError, 'error'); }
+    } catch { showToast(t.toastNetworkError, 'error'); }
     finally { setActionLoading(null); setRejectCancelTarget(null); }
   }
 
@@ -640,13 +644,13 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(`${data.approved ?? 0}건 시리즈 취소 승인되었습니다.`);
+        showToast(t.toastSeriesCancelApproved(data.approved ?? 0));
         fetchReservations();
       } else {
-        showToast(data.error ?? '오류', 'error');
+        showToast(data.error ?? t.toastError, 'error');
       }
     } catch {
-      showToast('네트워크 오류', 'error');
+      showToast(t.toastNetworkError, 'error');
     } finally {
       setSeriesActionLoading(null);
     }
@@ -662,14 +666,14 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(`${data.rejected ?? 0}건 시리즈 취소 거절되었습니다.`);
+        showToast(t.toastSeriesCancelRejected(data.rejected ?? 0));
         fetchReservations();
         setRejectCancelSeriesTarget(null);
       } else {
-        showToast(data.error ?? '오류', 'error');
+        showToast(data.error ?? t.toastError, 'error');
       }
     } catch {
-      showToast('네트워크 오류', 'error');
+      showToast(t.toastNetworkError, 'error');
     } finally {
       setSeriesActionLoading(null);
       setRejectCancelSeriesTarget(null);
@@ -745,9 +749,15 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
             ←
           </button>
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold text-gray-800 truncate">관리자 모드</h1>
-            <p className="text-xs text-gray-500 truncate">오레곤벧엘교회 예약 관리</p>
+            <h1 className="text-xl font-bold text-gray-800 truncate">{t.adminTitle}</h1>
+            <p className="text-xs text-gray-500 truncate">{t.adminSubtitle}</p>
           </div>
+          <button
+            onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
+            className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition whitespace-nowrap"
+          >
+            {lang === 'ko' ? 'EN' : '한국어'}
+          </button>
           <button
             onClick={async () => {
               await fetch('/api/admin/auth', { method: 'DELETE' });
@@ -756,7 +766,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
             }}
             className="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition"
           >
-            로그아웃
+            {t.adminLogout}
           </button>
         </div>
       </header>
@@ -769,7 +779,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
             className="flex-shrink-0 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition whitespace-nowrap"
             style={{ fontSize: 'clamp(10px, 3.5vw, 14px)', padding: '8px clamp(4px, 2vw, 12px)' }}
           >
-            예약하기
+            {t.adminReserveBtn}
           </button>
           <div className="flex rounded-lg border border-gray-200 overflow-hidden flex-shrink-0" style={{ fontSize: 'clamp(10px, 3.5vw, 14px)' }}>
             {(['approved', 'cancelled', 'all'] as FilterStatus[]).map((f) => (
@@ -781,7 +791,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                   filter === f ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                {f === 'approved' ? '예약 목록' : f === 'cancelled' ? '취소 목록' : '전체'}
+                {f === 'approved' ? t.adminTabReservations : f === 'cancelled' ? t.adminTabCancellations : t.adminTabAll}
               </button>
             ))}
           </div>
@@ -792,7 +802,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
             style={{ fontSize: 'clamp(10px, 3.5vw, 14px)', padding: '8px clamp(8px, 2.5vw, 12px)' }}
           >
             <span className="min-[420px]:hidden">↻</span>
-            <span className="hidden min-[420px]:inline">새로고침</span>
+            <span className="hidden min-[420px]:inline">{t.btnRefresh}</span>
           </button>
         </div>
 
@@ -807,18 +817,18 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                 <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
                 </svg>
-                <span className={selectedRooms.size > 0 ? 'hidden sm:inline' : ''}>장소 필터</span>
+                <span className={selectedRooms.size > 0 ? 'hidden sm:inline' : ''}>{t.roomFilter}</span>
                 {selectedRooms.size > 0 && (
                   <span className="ml-0.5 px-1.5 py-0.5 bg-blue-600 text-white rounded-full text-xs leading-none">{selectedRooms.size}</span>
                 )}
-                <span className="text-gray-400">{roomFilterOpen ? '접기' : '열기'}</span>
+                <span className="text-gray-400">{roomFilterOpen ? t.filterCollapse : t.filterExpand}</span>
               </button>
               {selectedRooms.size > 0 && !roomFilterOpen && (
                 <button
                   onClick={() => setSelectedRooms(new Set())}
                   className="text-xs text-gray-400 hover:text-gray-600 underline transition whitespace-nowrap flex-shrink-0"
                 >
-                  전체 보기
+                  {t.showAll}
                 </button>
               )}
               {selectedRooms.size > 0 && roomFilterOpen && (
@@ -826,12 +836,11 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                   onClick={(e) => { e.stopPropagation(); setSelectedRooms(new Set()); }}
                   className="text-xs text-gray-400 hover:text-gray-600 underline transition whitespace-nowrap flex-shrink-0"
                 >
-                  선택 취소
+                  {t.deselect}
                 </button>
               )}
             </div>
 
-            {/* Selected chips when collapsed */}
             {!roomFilterOpen && selectedRooms.size > 0 && (
               <div className="pb-2 flex flex-wrap gap-x-2 gap-y-1.5">
                 {uniqueRooms.filter(r => selectedRooms.has(r.id)).map(room => (
@@ -842,13 +851,12 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                     style={{ backgroundColor: room.color }}
                   >
                     <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: 'rgba(255,255,255,0.7)' }} />
-                    {room.name}
+                    {tRoom(room.name)}
                   </button>
                 ))}
               </div>
             )}
 
-            {/* Expandable panel */}
             {roomFilterOpen && (
               <>
                 <div className="fixed inset-0 z-40 sm:hidden" onClick={() => setRoomFilterOpen(false)} />
@@ -864,7 +872,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                           style={active ? { backgroundColor: room.color, borderColor: room.color } : {}}
                         >
                           <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: active ? 'rgba(255,255,255,0.7)' : room.color }} />
-                          {room.name}
+                          {tRoom(room.name)}
                         </button>
                       );
                     })}
@@ -878,10 +886,10 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
         {/* Table */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
           {loading ? (
-            <div className="text-center py-16 text-gray-400 text-sm">불러오는 중...</div>
+            <div className="text-center py-16 text-gray-400 text-sm">{t.loading}</div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-16 text-gray-400 text-sm">
-              {selectedRooms.size > 0 ? '선택한 장소의 예약 내역이 없습니다.' : filter === 'pending' ? '승인 대기 중인 예약이 없습니다.' : '예약 내역이 없습니다.'}
+              {selectedRooms.size > 0 ? t.adminNoRoomFilter : filter === 'pending' ? t.adminNoPending : t.adminNoReservations}
             </div>
           ) : (
             <>
@@ -902,12 +910,12 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                           )}
                         </th>
                       )}
-                      {filter === 'all' && <th className="text-left px-3 py-2 text-gray-600 font-medium w-px whitespace-nowrap">상태</th>}
-                      <th className="text-left px-3 py-2 text-gray-600 font-medium">제목</th>
-                      <th className="text-left px-3 py-2 text-gray-600 font-medium w-[160px]">장소</th>
-                      <th className="text-left px-3 py-2 text-gray-600 font-medium w-[160px] whitespace-nowrap">시간</th>
-                      <th className="text-left px-3 py-2 text-gray-600 font-medium w-[120px] whitespace-nowrap">담당자</th>
-                      <th className="text-left px-3 py-2 text-gray-600 font-medium w-[140px] whitespace-nowrap">신청일시</th>
+                      {filter === 'all' && <th className="text-left px-3 py-2 text-gray-600 font-medium w-px whitespace-nowrap">{t.colStatus}</th>}
+                      <th className="text-left px-3 py-2 text-gray-600 font-medium">{t.colTitle}</th>
+                      <th className="text-left px-3 py-2 text-gray-600 font-medium w-[160px]">{t.colRoom}</th>
+                      <th className="text-left px-3 py-2 text-gray-600 font-medium w-[160px] whitespace-nowrap">{t.colTime}</th>
+                      <th className="text-left px-3 py-2 text-gray-600 font-medium w-[120px] whitespace-nowrap">{t.colPerson}</th>
+                      <th className="text-left px-3 py-2 text-gray-600 font-medium w-[140px] whitespace-nowrap">{t.colCreatedAt}</th>
                       <th className="px-3 py-2 w-px" />
                     </tr>
                   </thead>
@@ -918,18 +926,18 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                           {filter === 'all' && <td className="px-3 py-2"><StatusBadge status={row.reservations[0].status} /></td>}
                           <td className="px-3 py-2 font-medium text-gray-800 w-[120px] max-w-[120px]">
                             <div className="truncate">{row.reservations[0].title}</div>
-                            <div className="text-xs text-gray-500 mt-0.5">반복 예약 {row.reservations.length}건</div>
+                            <div className="text-xs text-gray-500 mt-0.5">{t.seriesCount(row.reservations.length)}</div>
                             {row.reservations[0].notes && (
                               <div className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{row.reservations[0].notes}</div>
                             )}
                             {filter === 'cancelled' && row.reservations[0].cancellation_reason && (
-                              <div className="text-xs text-amber-700 mt-0.5 truncate max-w-xs">취소 사유: {row.reservations[0].cancellation_reason}</div>
+                              <div className="text-xs text-amber-700 mt-0.5 truncate max-w-xs">{t.cancelReasonPrefix}{row.reservations[0].cancellation_reason}</div>
                             )}
                           </td>
                           <td className="px-3 py-2 w-[160px] max-w-[160px]">
                             <div className="flex items-center gap-1.5 min-w-0">
                               <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: row.reservations[0].room_color }} />
-                              <span className="text-gray-700 truncate">{row.reservations[0].room_name}</span>
+                              <span className="text-gray-700 truncate">{tRoom(row.reservations[0].room_name)}</span>
                             </div>
                           </td>
                           <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
@@ -938,7 +946,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                               return lines ? (
                                 <>
                                   <div>{lines.firstStart}</div>
-                                  <div className="text-xs text-gray-400">~ {lines.lastEnd} ({lines.count}건)</div>
+                                  <div className="text-xs text-gray-400">~ {lines.lastEnd} ({t.seriesCountSuffix(lines.count)})</div>
                                 </>
                               ) : null;
                             })()}
@@ -953,7 +961,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                                   disabled={seriesActionLoading === row.seriesId || bulkLoading}
                                   className="px-2 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs rounded-lg font-medium transition"
                                 >
-                                  {seriesActionLoading === row.seriesId ? '...' : '시리즈 승인'}
+                                  {seriesActionLoading === row.seriesId ? '...' : t.btnApproveSeries}
                                 </button>
                                 <button
                                   onClick={() =>
@@ -967,7 +975,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                                   disabled={seriesActionLoading === row.seriesId || bulkLoading}
                                   className="px-2 py-1.5 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-xs rounded-lg font-medium transition"
                                 >
-                                  시리즈 거절
+                                  {t.btnRejectSeries}
                                 </button>
                               </div>
                             ) : (
@@ -977,7 +985,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                                   disabled={seriesActionLoading === row.seriesId || bulkLoading}
                                   className="px-2 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs rounded-lg font-medium transition"
                                 >
-                                  {seriesActionLoading === row.seriesId ? '...' : '시리즈 취소 승인'}
+                                  {seriesActionLoading === row.seriesId ? '...' : t.btnApproveCancelSeries}
                                 </button>
                                 <button
                                   onClick={() =>
@@ -991,7 +999,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                                   disabled={seriesActionLoading === row.seriesId || bulkLoading}
                                   className="px-2 py-1.5 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-xs rounded-lg font-medium transition"
                                 >
-                                  시리즈 취소 거절
+                                  {t.btnRejectCancelSeries}
                                 </button>
                               </div>
                             )}
@@ -1018,13 +1026,13 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                               <div className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{row.reservation.notes}</div>
                             )}
                             {row.reservation.status === 'cancelled' && row.reservation.cancellation_reason && (
-                              <div className="text-xs text-amber-700 mt-0.5 truncate max-w-xs">취소 사유: {row.reservation.cancellation_reason}</div>
+                              <div className="text-xs text-amber-700 mt-0.5 truncate max-w-xs">{t.cancelReasonPrefix}{row.reservation.cancellation_reason}</div>
                             )}
                           </td>
                           <td className="px-3 py-2 w-[160px] max-w-[160px]">
                             <div className="flex items-center gap-1.5 min-w-0">
                               <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: row.reservation.room_color }} />
-                              <span className="text-gray-700 truncate">{row.reservation.room_name}</span>
+                              <span className="text-gray-700 truncate">{tRoom(row.reservation.room_name)}</span>
                             </div>
                           </td>
                           <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
@@ -1062,24 +1070,24 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                         <span className="text-xs text-gray-400">{formatDateTime(row.reservations[0].created_at)}</span>
                       </div>
                       <p className="font-semibold text-gray-800 mb-1 truncate">{row.reservations[0].title}</p>
-                      <p className="text-xs text-gray-500 mb-1">반복 예약 {row.reservations.length}건</p>
+                      <p className="text-xs text-gray-500 mb-1">{t.seriesCount(row.reservations.length)}</p>
                       <div className="flex items-center gap-1.5 mb-1">
                         <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: row.reservations[0].room_color }} />
-                        <span className="text-sm text-gray-600">{row.reservations[0].room_name}</span>
+                        <span className="text-sm text-gray-600">{tRoom(row.reservations[0].room_name)}</span>
                       </div>
                       {(() => {
                         const seriesLines = formatSeriesRangeLines(row.reservations);
                         return seriesLines ? (
                           <div className="text-xs text-gray-500 mb-1">
                             <div>{seriesLines.firstStart}</div>
-                            <div className="text-gray-400">~ {seriesLines.lastEnd} ({seriesLines.count}건)</div>
+                            <div className="text-gray-400">~ {seriesLines.lastEnd} ({t.seriesCountSuffix(seriesLines.count)})</div>
                           </div>
                         ) : null;
                       })()}
-                      <p className="text-xs text-gray-500 mb-3">담당: {row.reservations[0].person_in_charge}</p>
+                      <p className="text-xs text-gray-500 mb-3">{t.personLabelAdmin}{row.reservations[0].person_in_charge}</p>
                       {row.reservations[0].notes && <p className="text-xs text-gray-400 mb-3 italic">{row.reservations[0].notes}</p>}
                       {filter === 'cancelled' && row.reservations[0].cancellation_reason && (
-                        <p className="text-xs text-amber-700 mb-3">취소 사유: {row.reservations[0].cancellation_reason}</p>
+                        <p className="text-xs text-amber-700 mb-3">{t.cancelReasonPrefix}{row.reservations[0].cancellation_reason}</p>
                       )}
                       <div className="flex gap-2">
                         {filter === 'pending' ? (
@@ -1089,7 +1097,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                               disabled={seriesActionLoading === row.seriesId || bulkLoading}
                               className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs rounded-lg font-medium transition"
                             >
-                              {seriesActionLoading === row.seriesId ? '...' : '시리즈 승인'}
+                              {seriesActionLoading === row.seriesId ? '...' : t.btnApproveSeries}
                             </button>
                             <button
                               onClick={() =>
@@ -1103,7 +1111,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                               disabled={seriesActionLoading === row.seriesId || bulkLoading}
                               className="px-3 py-1.5 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-xs rounded-lg font-medium transition"
                             >
-                              시리즈 거절
+                              {t.btnRejectSeries}
                             </button>
                           </>
                         ) : (
@@ -1113,7 +1121,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                               disabled={seriesActionLoading === row.seriesId || bulkLoading}
                               className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs rounded-lg font-medium transition"
                             >
-                              {seriesActionLoading === row.seriesId ? '...' : '시리즈 취소 승인'}
+                              {seriesActionLoading === row.seriesId ? '...' : t.btnApproveCancelSeries}
                             </button>
                             <button
                               onClick={() =>
@@ -1127,7 +1135,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                               disabled={seriesActionLoading === row.seriesId || bulkLoading}
                               className="px-3 py-1.5 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-xs rounded-lg font-medium transition"
                             >
-                              시리즈 취소 거절
+                              {t.btnRejectCancelSeries}
                             </button>
                           </>
                         )}
@@ -1142,18 +1150,18 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                       <p className="font-semibold text-gray-800 mb-1 truncate">{row.reservation.title}</p>
                       <div className="flex items-center gap-1.5 mb-1">
                         <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: row.reservation.room_color }} />
-                        <span className="text-sm text-gray-600">{row.reservation.room_name}</span>
+                        <span className="text-sm text-gray-600">{tRoom(row.reservation.room_name)}</span>
                       </div>
                       <p className="text-xs text-gray-500 mb-1">
                         {formatDateTime(row.reservation.start_time)} ~ {formatDateTime(row.reservation.end_time)}
                       </p>
-                      <p className="text-xs text-gray-500 mb-3">담당: {row.reservation.person_in_charge}</p>
+                      <p className="text-xs text-gray-500 mb-3">{t.personLabelAdmin}{row.reservation.person_in_charge}</p>
                       {row.reservation.notes && <p className="text-xs text-gray-400 mb-3 italic">{row.reservation.notes}</p>}
                       {row.reservation.status === 'cancelled' && row.reservation.cancellation_reason && (
-                        <p className="text-xs text-amber-700 mb-3">취소 사유: {row.reservation.cancellation_reason}</p>
+                        <p className="text-xs text-amber-700 mb-3">{t.cancelReasonPrefix}{row.reservation.cancellation_reason}</p>
                       )}
                       {row.reservation.status === 'rejected' && row.reservation.rejection_reason && (
-                        <p className="text-xs text-red-500 mb-3">거절 사유: {row.reservation.rejection_reason}</p>
+                        <p className="text-xs text-red-500 mb-3">{t.rejectionReasonPrefix}{row.reservation.rejection_reason}</p>
                       )}
                       <div className="flex gap-2">
                         <ActionButtons
@@ -1175,10 +1183,9 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           )}
         </div>
 
-        {/* Rejection reason display in 'all' view */}
         {filter === 'all' && (
           <p className="text-xs text-gray-400 mt-3 text-center">
-            거절된 예약은 캘린더에 표시되지 않습니다.
+            {t.adminRejectedNote}
           </p>
         )}
       </main>
@@ -1187,61 +1194,62 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
 }
 
 function ReservationDetailModal({ reservation, onClose }: { reservation: ReservationWithRoom; onClose: () => void }) {
+  const { t, tRoom } = useLanguage();
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-800">예약 상세</h2>
+          <h2 className="text-base font-semibold text-gray-800">{t.detailTitle}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
         </div>
         <div className="px-5 py-4 space-y-3 text-sm">
           <div>
-            <span className="text-xs text-gray-400 block mb-0.5">제목</span>
+            <span className="text-xs text-gray-400 block mb-0.5">{t.detailFieldTitle}</span>
             <span className="font-semibold text-gray-800">{reservation.title}</span>
           </div>
           <div>
-            <span className="text-xs text-gray-400 block mb-0.5">상태</span>
+            <span className="text-xs text-gray-400 block mb-0.5">{t.detailFieldStatus}</span>
             <StatusBadge status={reservation.status} />
           </div>
           <div>
-            <span className="text-xs text-gray-400 block mb-0.5">장소</span>
+            <span className="text-xs text-gray-400 block mb-0.5">{t.detailFieldRoom}</span>
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: reservation.room_color }} />
-              <span className="text-gray-700">{reservation.room_name}</span>
+              <span className="text-gray-700">{tRoom(reservation.room_name)}</span>
             </div>
           </div>
           <div>
-            <span className="text-xs text-gray-400 block mb-0.5">시간</span>
+            <span className="text-xs text-gray-400 block mb-0.5">{t.detailFieldTime}</span>
             <span className="text-gray-700">{formatDateTime(reservation.start_time)} ~ {formatDateTime(reservation.end_time)}</span>
           </div>
           <div>
-            <span className="text-xs text-gray-400 block mb-0.5">담당자</span>
+            <span className="text-xs text-gray-400 block mb-0.5">{t.detailFieldPerson}</span>
             <span className="text-gray-700">{reservation.person_in_charge}</span>
           </div>
           <div>
-            <span className="text-xs text-gray-400 block mb-0.5">이메일</span>
+            <span className="text-xs text-gray-400 block mb-0.5">{t.detailFieldEmail}</span>
             <span className="text-gray-700">{reservation.email}</span>
           </div>
           {reservation.notes && (
             <div>
-              <span className="text-xs text-gray-400 block mb-0.5">메모</span>
+              <span className="text-xs text-gray-400 block mb-0.5">{t.detailFieldNotes}</span>
               <span className="text-gray-700">{reservation.notes}</span>
             </div>
           )}
           {reservation.rejection_reason && (
             <div>
-              <span className="text-xs text-gray-400 block mb-0.5">거절 사유</span>
+              <span className="text-xs text-gray-400 block mb-0.5">{t.detailFieldRejectionReason}</span>
               <span className="text-red-600">{reservation.rejection_reason}</span>
             </div>
           )}
           {reservation.cancellation_reason && (
             <div>
-              <span className="text-xs text-gray-400 block mb-0.5">취소 사유</span>
+              <span className="text-xs text-gray-400 block mb-0.5">{t.detailFieldCancelReason}</span>
               <span className="text-amber-700">{reservation.cancellation_reason}</span>
             </div>
           )}
           <div>
-            <span className="text-xs text-gray-400 block mb-0.5">신청일</span>
+            <span className="text-xs text-gray-400 block mb-0.5">{t.detailFieldCreatedAt}</span>
             <span className="text-gray-500">{formatDateTime(reservation.created_at)}</span>
           </div>
         </div>
@@ -1251,28 +1259,29 @@ function ReservationDetailModal({ reservation, onClose }: { reservation: Reserva
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useLanguage();
   if (status === 'pending') return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 whitespace-nowrap">
       <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
-      승인 대기중
+      {t.statusPending}
     </span>
   );
   if (status === 'approved') return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 whitespace-nowrap">
       <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-      예약 완료
+      {t.statusApproved}
     </span>
   );
   if (status === 'cancelled') return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 whitespace-nowrap">
       <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-      취소 완료
+      {t.statusCancelled}
     </span>
   );
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 whitespace-nowrap">
       <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-      거절
+      {t.statusRejected}
     </span>
   );
 }
@@ -1296,12 +1305,14 @@ function ActionButtons({
   onApproveCancellation: () => void;
   onRejectCancellation: () => void;
 }) {
+  const { t } = useLanguage();
+
   const detailBtn = (
     <button
       onClick={onDetail}
       className="px-3 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-600 text-xs rounded-lg transition"
     >
-      상세보기
+      {t.btnDetail}
     </button>
   );
 
@@ -1314,14 +1325,14 @@ function ActionButtons({
           disabled={loading}
           className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs rounded-lg font-medium transition"
         >
-          {loading ? '...' : '승인'}
+          {loading ? '...' : t.btnApprove}
         </button>
         <button
           onClick={onReject}
           disabled={loading}
           className="px-3 py-1.5 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-xs rounded-lg font-medium transition"
         >
-          거절
+          {t.btnReject}
         </button>
       </div>
     );
@@ -1336,7 +1347,7 @@ function ActionButtons({
           disabled={loading}
           className="px-3 py-1.5 border border-red-300 hover:bg-red-50 disabled:opacity-50 text-red-600 text-xs rounded-lg transition"
         >
-          {loading ? '...' : '삭제'}
+          {loading ? '...' : t.btnDelete}
         </button>
       </div>
     );
@@ -1359,6 +1370,7 @@ function ActionButtons({
 
 // ── Main export ───────────────────────────────────────────────────────────────
 export default function AdminPage() {
+  const { t } = useLanguage();
   const [authState, setAuthState] = useState<'checking' | 'login' | 'authenticated'>('checking');
 
   useEffect(() => {
@@ -1375,7 +1387,7 @@ export default function AdminPage() {
   if (authState === 'checking') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-400 text-sm animate-pulse">확인 중...</div>
+        <div className="text-gray-400 text-sm animate-pulse">{t.adminChecking}</div>
       </div>
     );
   }

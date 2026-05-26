@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
 import { LIMITS } from '@/lib/constants';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 function formatTime(dateStr: string): string {
   const d = new Date(dateStr);
@@ -29,6 +30,7 @@ export function CancelRequestModal({
   onConfirm: (reason: string) => void;
   onCancel: () => void;
 }) {
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
@@ -55,14 +57,14 @@ export function CancelRequestModal({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h3 className="text-lg font-bold text-gray-800 mb-2">취소 완료</h3>
-          <p className="text-sm text-gray-500 mb-6">예약이 취소되었습니다.</p>
+          <h3 className="text-lg font-bold text-gray-800 mb-2">{t.cancelSuccess}</h3>
+          <p className="text-sm text-gray-500 mb-6">{t.cancelSuccessDesc}</p>
           <button
             type="button"
             onClick={() => onConfirm(reason.trim())}
             className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition"
           >
-            확인
+            {t.btnConfirm}
           </button>
         </div>
       </div>
@@ -72,14 +74,12 @@ export function CancelRequestModal({
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[110] px-4">
       <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
-        <h3 className="text-lg font-bold text-gray-800 mb-1">예약 취소 신청</h3>
-        <p className="text-sm text-gray-500 mb-4">
-          <strong className="text-gray-700">{reservation.title}</strong> 예약의 취소를 신청합니다.
-        </p>
+        <h3 className="text-lg font-bold text-gray-800 mb-1">{t.cancelModalTitle}</h3>
+        <p className="text-sm text-gray-500 mb-4">{t.cancelDesc(reservation.title)}</p>
 
         {hasSeries && (
           <div className="mb-4">
-            <div className="block text-sm font-medium text-gray-700 mb-1">취소 범위</div>
+            <div className="block text-sm font-medium text-gray-700 mb-1">{t.cancelScope}</div>
             <div className="flex flex-col gap-2 text-sm">
               <label className="flex items-center gap-2">
                 <input
@@ -90,7 +90,7 @@ export function CancelRequestModal({
                   onChange={() => setScope('one')}
                   disabled={loading}
                 />
-                <span>이 일정만 취소</span>
+                <span>{t.cancelScopeOne}</span>
               </label>
               <label className="flex items-center gap-2">
                 <input
@@ -101,20 +101,20 @@ export function CancelRequestModal({
                   onChange={() => setScope('series')}
                   disabled={loading}
                 />
-                <span>이 일정부터 이후 반복 일정 모두 취소</span>
+                <span>{t.cancelScopeAll}</span>
               </label>
             </div>
           </div>
         )}
 
         <div className="mb-4">
-          <label htmlFor="cancel-email" className="block text-sm font-medium text-gray-700 mb-1">예약 시 입력한 이메일 <span className="text-red-500">*</span></label>
+          <label htmlFor="cancel-email" className="block text-sm font-medium text-gray-700 mb-1">{t.cancelEmailLabel} <span className="text-red-500">*</span></label>
           <input
             id="cancel-email"
             type="email"
             value={email}
             onChange={(e) => { setEmail(e.target.value); setError(''); }}
-            placeholder="예약에 사용한 이메일을 입력해주세요."
+            placeholder={t.cancelEmailPlaceholder}
             autoFocus
             disabled={loading}
             className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-red-400 disabled:opacity-60 ${
@@ -124,12 +124,12 @@ export function CancelRequestModal({
         </div>
 
         <div className="mb-4">
-          <label htmlFor="cancel-reason" className="block text-sm font-medium text-gray-700 mb-1">취소 사유 <span className="text-red-500">*</span></label>
+          <label htmlFor="cancel-reason" className="block text-sm font-medium text-gray-700 mb-1">{t.cancelReasonLabel} <span className="text-red-500">*</span></label>
           <textarea
             id="cancel-reason"
             value={reason}
             onChange={(e) => { setReason(e.target.value); setError(''); }}
-            placeholder="취소 사유를 입력해주세요."
+            placeholder={t.cancelReasonPlaceholder}
             maxLength={LIMITS.reason}
             rows={3}
             disabled={loading}
@@ -146,14 +146,14 @@ export function CancelRequestModal({
             disabled={loading}
             className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm transition disabled:opacity-60"
           >
-            닫기
+            {t.btnClose}
           </button>
           <button
             type="button"
             onClick={async () => {
-              if (!email.trim()) { setError('이메일을 입력해주세요.'); return; }
-              if (!reason.trim()) { setError('취소 사유를 입력해주세요.'); return; }
-              if (reason.trim().length > LIMITS.reason) { setError(`취소 사유는 ${LIMITS.reason}자 이하여야 합니다.`); return; }
+              if (!email.trim()) { setError(t.errEmailRequiredCancel); return; }
+              if (!reason.trim()) { setError(t.errReasonRequired); return; }
+              if (reason.trim().length > LIMITS.reason) { setError(t.errReasonLength(LIMITS.reason)); return; }
               setLoading(true);
               setError('');
               try {
@@ -166,10 +166,10 @@ export function CancelRequestModal({
                 if (res.ok) {
                   setSubmitted(true);
                 } else {
-                  setError(data.error ?? '오류가 발생했습니다.');
+                  setError(data.error ?? t.errGeneral);
                 }
               } catch {
-                setError('네트워크 오류가 발생했습니다.');
+                setError(t.errNetwork);
               } finally {
                 setLoading(false);
               }
@@ -177,7 +177,7 @@ export function CancelRequestModal({
             disabled={loading}
             className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition"
           >
-            {loading ? '제출 중...' : '취소 신청'}
+            {loading ? t.btnCancelSubmitting : t.btnCancelSubmit}
           </button>
         </div>
       </div>
@@ -192,13 +192,14 @@ export default function ReservationDetailPopover({
   onMouseLeave,
   onRequestCancel,
 }: Props) {
+  const { t, tRoom } = useLanguage();
   const today = new Date().toISOString().slice(0, 10);
   const canRequestCancel = (reservation.status === 'approved' || reservation.status === 'pending') && reservation.end_time.slice(0, 10) >= today;
 
   return (
     <div
       role="group"
-      aria-label={`${reservation.title} 예약 상세`}
+      aria-label={reservation.title}
       className="fixed z-[100] w-64 rounded-lg border border-gray-200 bg-white py-2.5 px-3 shadow-lg"
       style={{
         left: typeof window !== 'undefined' ? Math.min(position.left, window.innerWidth - 272) : position.left,
@@ -220,7 +221,7 @@ export default function ReservationDetailPopover({
           style={{ backgroundColor: reservation.room_color }}
           aria-hidden
         />
-        <span>{reservation.room_name}</span>
+        <span>{tRoom(reservation.room_name)}</span>
       </div>
 
       {/* Time */}
@@ -230,7 +231,7 @@ export default function ReservationDetailPopover({
 
       {/* Person in charge */}
       <div className="text-gray-600 text-xs">
-        <span className="text-gray-500">담당:</span> {reservation.person_in_charge}
+        <span className="text-gray-500">{t.personLabel}</span> {reservation.person_in_charge}
       </div>
 
       {/* Notes */}
@@ -251,7 +252,7 @@ export default function ReservationDetailPopover({
             }}
             className="text-[10px] font-medium px-1.5 py-0.5 text-red-600 hover:bg-red-50 rounded transition"
           >
-            취소 신청하기
+            {t.btnRequestCancel}
           </button>
         </div>
       )}

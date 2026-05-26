@@ -3,8 +3,8 @@
 import React, { useState } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
 import { CancelRequestModal } from './ReservationDetailPopover';
-
-const DAYS_KO = ['일', '월', '화', '수', '목', '금', '토'];
+import { useLanguage } from '@/contexts/LanguageContext';
+import { formatModalDayTitle } from '@/lib/i18n';
 
 interface Props {
   currentDate: Date;
@@ -52,6 +52,7 @@ function getCalendarDays(year: number, month: number): Date[] {
 }
 
 export default function MonthView({ currentDate, reservations, onRefresh, swipeOffset = 0, swipeDragging = false }: Props) {
+  const { t, tRoom, lang } = useLanguage();
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const calDays = getCalendarDays(year, month);
@@ -85,7 +86,7 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
     <div className="flex flex-col h-full">
       {/* Day headers */}
       <div className="grid grid-cols-7 border-b border-gray-200">
-        {DAYS_KO.map((d, i) => (
+        {t.daysShort.map((d: string, i: number) => (
           <div
             key={d}
             className={`text-center py-2 text-sm font-medium ${
@@ -168,20 +169,20 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
           >
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <h3 className="text-base font-bold text-gray-800">
-                {expandedDay.date.getFullYear()}년 {expandedDay.date.getMonth() + 1}월 {expandedDay.date.getDate()}일 ({DAYS_KO[expandedDay.date.getDay()]})
+                {formatModalDayTitle(lang, expandedDay.date)}
               </h3>
               <button
                 type="button"
                 onClick={() => { setExpandedDay(null); setSelectedModalId(null); }}
                 className="text-gray-400 hover:text-gray-600 text-xl leading-none"
-                aria-label="닫기"
+                aria-label={t.btnClose}
               >
                 ×
               </button>
             </div>
             <div className="overflow-y-auto p-4 space-y-2">
               {expandedDay.reservations.length === 0 && (
-                <div className="flex items-center justify-center h-24 text-sm text-gray-400">해당 일자에는 예약이 없습니다.</div>
+                <div className="flex items-center justify-center h-24 text-sm text-gray-400">{t.noReservationsOnDay}</div>
               )}
               {expandedDay.reservations
                 .slice()
@@ -203,10 +204,10 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
                       />
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-sm text-gray-800 truncate">{r.title}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">{r.room_name}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">{tRoom(r.room_name)}</div>
                         <div className="text-xs text-gray-500">{formatTime(r.start_time)} – {formatTime(r.end_time)}</div>
                         <div className="flex items-center justify-between">
-                          <div className="text-xs text-gray-500">담당: {r.person_in_charge}</div>
+                          <div className="text-xs text-gray-500">{t.personLabel} {r.person_in_charge}</div>
                           {isSelected && canRequestCancel && (
                             <button
                               type="button"
@@ -218,7 +219,7 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
                               }}
                               className="text-[10px] font-medium px-1.5 py-0.5 text-red-600 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition"
                             >
-                              취소 신청하기
+                              {t.btnRequestCancel}
                             </button>
                           )}
                         </div>

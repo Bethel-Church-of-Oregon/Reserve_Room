@@ -3,18 +3,11 @@
 import React, { useState } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
 import { CancelRequestModal } from './ReservationDetailPopover';
-
-const DAYS_KO = ['일', '월', '화', '수', '목', '금', '토'];
+import { useLanguage } from '@/contexts/LanguageContext';
+import { formatTimeAmPm, formatListWeekLabel } from '@/lib/i18n';
 
 function toLocalDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function formatTime(iso: string): string {
-  const [h, m] = iso.slice(11, 16).split(':').map(Number);
-  const period = h < 12 ? '오전' : '오후';
-  const hour = h % 12 || 12;
-  return `${period} ${hour}:${m.toString().padStart(2, '0')}`;
 }
 
 function startOfWeek(d: Date): Date {
@@ -24,18 +17,6 @@ function startOfWeek(d: Date): Date {
   return date;
 }
 
-function formatWeekLabel(weekStartKey: string): string {
-  const d = new Date(weekStartKey + 'T00:00:00');
-  const we = new Date(d);
-  we.setDate(d.getDate() + 6);
-  const startStr = `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
-  const endStr =
-    we.getMonth() !== d.getMonth()
-      ? `${we.getMonth() + 1}월 ${we.getDate()}일`
-      : `${we.getDate()}일`;
-  return `${startStr} – ${endStr}`;
-}
-
 interface Props {
   reservations: ReservationWithRoom[];
   loading: boolean;
@@ -43,6 +24,7 @@ interface Props {
 }
 
 export default function ListView({ reservations, loading, onRefresh }: Props) {
+  const { t, tRoom, lang } = useLanguage();
   const today = toLocalDateKey(new Date());
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
@@ -77,7 +59,7 @@ export default function ListView({ reservations, loading, onRefresh }: Props) {
   if (loading && upcoming.length === 0) {
     return (
       <div className="flex items-center justify-center h-32 text-sm text-gray-400">
-        불러오는 중...
+        {t.loading}
       </div>
     );
   }
@@ -85,7 +67,7 @@ export default function ListView({ reservations, loading, onRefresh }: Props) {
   if (!loading && upcoming.length === 0) {
     return (
       <div className="flex items-center justify-center h-32 text-sm text-gray-400">
-        예정된 예약이 없습니다.
+        {t.noUpcoming}
       </div>
     );
   }
@@ -103,7 +85,7 @@ export default function ListView({ reservations, loading, onRefresh }: Props) {
           <div key={week.weekKey}>
             {/* Week header — sticky at top */}
             <div className="sticky z-20 bg-gray-50 border-y border-gray-200 px-4 py-1.5" style={{ top: '-0.2rem' }}>
-              <span className="text-xs font-semibold text-gray-500">{formatWeekLabel(week.weekKey)}</span>
+              <span className="text-xs font-semibold text-gray-500">{formatListWeekLabel(lang, week.weekKey)}</span>
             </div>
 
             {/* Date rows */}
@@ -120,7 +102,7 @@ export default function ListView({ reservations, loading, onRefresh }: Props) {
                       {date.getDate()}
                     </span>
                     <span className={`text-xs mt-1 ${isToday ? 'text-blue-500' : 'text-gray-400'}`}>
-                      {DAYS_KO[date.getDay()]}
+                      {t.daysShort[date.getDay()]}
                     </span>
                   </div>
 
@@ -154,20 +136,20 @@ export default function ListView({ reservations, loading, onRefresh }: Props) {
                             </div>
                             {/* Time */}
                             <div className="text-xs text-gray-400 mb-0.5">
-                              {formatTime(item.start_time)} – {formatTime(item.end_time)}
+                              {formatTimeAmPm(lang, item.start_time)} – {formatTimeAmPm(lang, item.end_time)}
                             </div>
                             {/* Room + cancel */}
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-1.5 text-xs text-gray-500">
                                 <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: item.room_color }} />
-                                <span className="truncate">{item.room_name}</span>
+                                <span className="truncate">{tRoom(item.room_name)}</span>
                               </div>
                               {isSelected && canRequestCancel && (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setCancelModalReservation(item); }}
                                   className="text-[10px] text-red-500 hover:text-red-700 border border-red-300 hover:border-red-400 rounded px-1.5 py-0.5 bg-red-50 transition flex-shrink-0 whitespace-nowrap"
                                 >
-                                  취소 신청하기
+                                  {t.btnRequestCancel}
                                 </button>
                               )}
                             </div>

@@ -7,6 +7,8 @@ import MonthView from '@/components/MonthView';
 import DayView from '@/components/DayView';
 import ListView from '@/components/ListView';
 import { ReservationWithRoom, Room } from '@/lib/db';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { formatMonthTitle, formatDayTitle, formatWeekTitle } from '@/lib/i18n';
 
 type ViewMode = 'day' | 'week' | 'month' | 'list';
 
@@ -22,25 +24,6 @@ function startOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
-function formatMonthTitle(d: Date): string {
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
-}
-
-const DAYS_KO = ['일', '월', '화', '수', '목', '금', '토'];
-function formatDayTitle(d: Date): string {
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${DAYS_KO[d.getDay()]})`;
-}
-
-function formatWeekTitle(weekStart: Date): string {
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 6);
-  const s = `${weekStart.getFullYear()}년 ${weekStart.getMonth() + 1}월 ${weekStart.getDate()}일`;
-  const e = weekEnd.getMonth() !== weekStart.getMonth()
-    ? `${weekEnd.getMonth() + 1}월 ${weekEnd.getDate()}일`
-    : `${weekEnd.getDate()}일`;
-  return `${s} – ${e}`;
-}
-
 // Use local date components (avoid timezone shift from toISOString)
 function toLocalDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -48,31 +31,22 @@ function toLocalDateKey(d: Date): string {
 
 function RulesModal({ onAgree, onClose }: { onAgree: () => void; onClose: () => void }) {
   const [agreed, setAgreed] = useState(false);
+  const { t } = useLanguage();
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
         <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
-          <h2 className="text-base font-bold text-gray-900">장소 사용 수칙 및 주의 사항</h2>
+          <h2 className="text-base font-bold text-gray-900">{t.rulesTitle}</h2>
         </div>
         <div className="px-6 py-4 overflow-y-auto flex-1 text-sm text-gray-700 space-y-4">
-          <p>교회 내 모든 시설은 신앙 생활과 교제를 위한 공간입니다. 아래 사용 수칙을 반드시 준수해 주시기 바랍니다.</p>
-          <div>
-            <p className="font-semibold text-gray-900">1. 사용 목적 제한 (영리 활동 금지)</p>
-            <p className="mt-1">개인적인 수입을 목적으로 하는 레슨(과외), 비즈니스 미팅, 물품 판매 등 모든 영리 활동은 엄격히 금지합니다.</p>
-          </div>
-          <div>
-            <p className="font-semibold text-gray-900">2. 청결 및 정리 정돈</p>
-            <p className="mt-1">사용 후에는 다음 사용자를 위해 반드시 정리 정돈을 완료해 주십시오. 발생한 쓰레기는 지정된 장소에 분리배출 하거나 직접 수거해 가시기 바랍니다.</p>
-          </div>
-          <div>
-            <p className="font-semibold text-gray-900">3. 에너지 절약 및 화재 예방</p>
-            <p className="mt-1">퇴실 시 반드시 모든 전등을 끄고, 냉난방기 및 전기 기구의 전원을 차단해 주십시오. 휴대용 버너, 양초 등 화기 사용은 절대 금지합니다.</p>
-          </div>
-          <div>
-            <p className="font-semibold text-gray-900">4. 시설물 관리</p>
-            <p className="mt-1">교회 기물 및 비품을 소중히 다뤄 주시고, 파손 시 즉시 교회 사무실에 알려 주시기 바랍니다.</p>
-          </div>
+          <p>{t.rulesIntro}</p>
+          {t.rulesItems.map((item, i) => (
+            <div key={i}>
+              <p className="font-semibold text-gray-900">{item.title}</p>
+              <p className="mt-1">{item.body}</p>
+            </div>
+          ))}
         </div>
         <div className="px-6 py-4 border-t border-gray-200 flex-shrink-0 space-y-3">
           <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -82,21 +56,21 @@ function RulesModal({ onAgree, onClose }: { onAgree: () => void; onClose: () => 
               onChange={(e) => setAgreed(e.target.checked)}
               className="w-4 h-4 accent-blue-600"
             />
-            <span className="text-sm text-gray-800">주의사항을 모두 숙지하였으며, 이를 준수할 것에 동의합니다.</span>
+            <span className="text-sm text-gray-800">{t.rulesAgree}</span>
           </label>
           <div className="flex gap-2 justify-end">
             <button
               onClick={onClose}
               className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition"
             >
-              취소
+              {t.btnCancel}
             </button>
             <button
               onClick={onAgree}
               disabled={!agreed}
               className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg font-medium transition disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-700"
             >
-              예약 신청하기
+              {t.btnReserveFromRules}
             </button>
           </div>
         </div>
@@ -107,6 +81,7 @@ function RulesModal({ onAgree, onClose }: { onAgree: () => void; onClose: () => 
 
 export default function HomePage() {
   const router = useRouter();
+  const { lang, setLang, t, tRoom } = useLanguage();
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [showRulesModal, setShowRulesModal] = useState(false);
 
@@ -225,13 +200,13 @@ export default function HomePage() {
     setRoomsError(null);
     fetch('/api/rooms')
       .then((r) => {
-        if (!r.ok) throw new Error('장소 목록을 불러오지 못했습니다.');
+        if (!r.ok) throw new Error(t.errRooms);
         return r.json();
       })
       .then(setRooms)
       .catch((e) => {
         console.error('rooms fetch error:', e);
-        setRoomsError(e instanceof Error ? e.message : '장소 목록을 불러오지 못했습니다.');
+        setRoomsError(e instanceof Error ? e.message : t.errRooms);
       });
   }, []);
 
@@ -242,7 +217,6 @@ export default function HomePage() {
     let from: string, to: string;
 
     if (viewMode === 'day') {
-      // Fetch the full week so the week strip dots can be populated
       from = toLocalDateKey(ws);
       const weekEnd = new Date(ws);
       weekEnd.setDate(ws.getDate() + 7);
@@ -273,7 +247,7 @@ export default function HomePage() {
         const data = await res.json();
         if (!cancelled) {
           if (!res.ok) {
-            setReservationsError(typeof data?.error === 'string' ? data.error : '예약 목록을 불러오지 못했습니다.');
+            setReservationsError(typeof data?.error === 'string' ? data.error : t.errReservations);
             setReservations([]);
           } else {
             setReservations(Array.isArray(data) ? data : []);
@@ -283,7 +257,7 @@ export default function HomePage() {
       } catch (e) {
         console.error('fetch reservations error:', e);
         if (!cancelled) {
-          setReservationsError('네트워크 오류가 발생했습니다. 다시 시도해 주세요.');
+          setReservationsError(t.errNetwork);
           setReservations([]);
         }
       } finally {
@@ -316,7 +290,11 @@ export default function HomePage() {
     setCurrentDate(new Date());
   }
 
-  const title = viewMode === 'day' ? formatDayTitle(currentDate) : viewMode === 'week' ? formatWeekTitle(weekStart) : formatMonthTitle(currentDate);
+  const title = viewMode === 'day'
+    ? formatDayTitle(lang, currentDate)
+    : viewMode === 'week'
+    ? formatWeekTitle(lang, weekStart)
+    : formatMonthTitle(lang, currentDate);
 
   function toggleRoom(id: number) {
     setSelectedRooms((prev) => {
@@ -349,7 +327,7 @@ export default function HomePage() {
               onClick={() => { setCurrentDate(new Date()); setViewMode('month'); }}
               className="text-base sm:text-xl font-bold text-blue-700 truncate hover:text-blue-800 transition-colors"
             >
-              <span className="hidden sm:inline"></span>Bethel 장소예약시스템
+              <span className="hidden sm:inline"></span>{t.siteTitle}
             </button>
           </div>
 
@@ -358,32 +336,40 @@ export default function HomePage() {
             onClick={() => setShowRulesModal(true)}
             className="px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition whitespace-nowrap"
           >
-            <span className="hidden sm:inline">+ 장소 예약 신청</span>
-            <span className="sm:hidden">+ 예약</span>
+            <span className="hidden sm:inline">{t.btnReserve}</span>
+            <span className="sm:hidden">{t.btnReserveShort}</span>
           </button>
           <button
             onClick={() => router.push('/admin')}
             className="px-3 py-1.5 sm:px-4 sm:py-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium rounded-lg transition whitespace-nowrap"
           >
-            <span className="hidden sm:inline">관리자 모드</span>
-            <span className="sm:hidden">관리자</span>
+            <span className="hidden sm:inline">{t.btnAdmin}</span>
+            <span className="sm:hidden">{t.btnAdminShort}</span>
+          </button>
+          {/* Language toggle */}
+          <button
+            onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
+            className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition whitespace-nowrap"
+            aria-label="Switch language"
+          >
+            {lang === 'ko' ? 'EN' : '한국어'}
           </button>
         </div>
 
       {/* Notice banner */}
       <div className="bg-blue-50 border-b border-blue-100 px-3 sm:px-6 py-2">
         <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-blue-800">
-          <span className="hidden sm:inline">본 시스템은 소모임(사랑방, 사역팀 등) 전용 입니다. 결혼식 등 큰 행사는</span>
-          <span className="sm:hidden">소모임(사랑방, 사역팀 등) 전용 시스템 입니다. 결혼식 등 큰 행사는</span>
+          <span className="hidden sm:inline">{t.noticeDesktop}</span>
+          <span className="sm:hidden">{t.noticeMobile}</span>
           <a
             href="https://drive.google.com/drive/folders/1lz7kaoe8GQf2FZI1Dfb-3hDEEWpFgygj"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition whitespace-nowrap"
           >
-            사용신청서 작성
+            {t.noticeLink}
           </a>
-          <span>을 이용해 주세요.</span>
+          <span>{t.noticeSuffix}</span>
         </div>
       </div>
 
@@ -403,7 +389,7 @@ export default function HomePage() {
                     viewMode === mode ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
                   }`}
                 >
-                  {mode === 'month' ? '월간' : mode === 'day' ? '일간' : '목록'}
+                  {mode === 'month' ? t.viewMonth : mode === 'day' ? t.viewDay : t.viewList}
                 </button>
               ))}
             </div>
@@ -418,31 +404,31 @@ export default function HomePage() {
                     viewMode === mode ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
                   }`}
                 >
-                  {mode === 'day' ? '일간' : mode === 'week' ? '주간' : mode === 'month' ? '월간' : '목록'}
+                  {mode === 'day' ? t.viewDay : mode === 'week' ? t.viewWeek : mode === 'month' ? t.viewMonth : t.viewList}
                 </button>
               ))}
             </div>
             {viewMode === 'day' && (
               <button
                 onClick={goToday}
-                aria-label="오늘로 이동"
+                aria-label={t.today}
                 className="ml-auto px-2.5 py-1 text-sm border border-gray-200 rounded hover:bg-gray-50 text-gray-700 transition"
               >
-                오늘
+                {t.today}
               </button>
             )}
           </div>
 
           {/* Row 2: title (day/week/month) */}
           {viewMode === 'month' && (
-            <p className="text-left text-[11px] text-gray-500 px-1 -mb-[10px]">원하시는 날짜를 클릭하시면, 해당 일자의 전체 예약 현황이 표시됩니다.</p>
+            <p className="text-left text-[11px] text-gray-500 px-1 -mb-[10px]">{t.monthHint}</p>
           )}
           {viewMode !== 'list' && (
             <div className="flex items-center justify-center gap-2 -mb-1">
               <button
                 onClick={() => navigate(-1)}
                 className="p-1 rounded hover:bg-gray-100 transition"
-                aria-label="이전"
+                aria-label={t.prev}
               >
                 <span className="text-4xl font-semibold text-gray-700 leading-none">‹</span>
               </button>
@@ -450,7 +436,7 @@ export default function HomePage() {
               <button
                 onClick={() => navigate(1)}
                 className="p-1 rounded hover:bg-gray-100 transition"
-                aria-label="다음"
+                aria-label={t.next}
               >
                 <span className="text-4xl font-semibold text-gray-700 leading-none">›</span>
               </button>
@@ -465,7 +451,7 @@ export default function HomePage() {
         <div className="relative z-50 flex items-center gap-2 py-2">
           <button
             onClick={() => setLegendOpen((v) => !v)}
-            aria-label={legendOpen ? '장소 필터 접기' : '장소 필터 열기'}
+            aria-label={legendOpen ? t.filterCollapseLabel : t.filterExpandLabel}
             aria-expanded={legendOpen}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition whitespace-nowrap flex-shrink-0 ${
               legendOpen
@@ -476,20 +462,20 @@ export default function HomePage() {
             <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
             </svg>
-            <span className={selectedRooms.size > 0 ? 'hidden sm:inline' : ''}>장소 필터</span>
+            <span className={selectedRooms.size > 0 ? 'hidden sm:inline' : ''}>{t.roomFilter}</span>
             {selectedRooms.size > 0 && (
               <span className="ml-0.5 px-1.5 py-0.5 bg-blue-600 text-white rounded-full text-xs leading-none">
                 {selectedRooms.size}
               </span>
             )}
-            <span className="text-gray-400">{legendOpen ? '접기' : '열기'}</span>
+            <span className="text-gray-400">{legendOpen ? t.filterCollapse : t.filterExpand}</span>
           </button>
           {selectedRooms.size > 0 && !legendOpen && (
             <button
               onClick={(e) => { e.stopPropagation(); clearFilter(); }}
               className="text-xs text-gray-400 hover:text-gray-600 underline transition whitespace-nowrap flex-shrink-0"
             >
-              전체 보기
+              {t.showAll}
             </button>
           )}
           {selectedRooms.size > 0 && legendOpen && (
@@ -497,13 +483,13 @@ export default function HomePage() {
               onClick={(e) => { e.stopPropagation(); clearFilter(); }}
               className="text-xs text-gray-400 hover:text-gray-600 underline transition whitespace-nowrap flex-shrink-0"
             >
-              선택 취소
+              {t.deselect}
             </button>
           )}
           <div className="flex items-center gap-2 ml-auto">
             {loading && (
               <span className="text-[10px] text-gray-400 animate-pulse whitespace-nowrap" aria-live="polite">
-                불러오는 중...
+                {t.loading}
               </span>
             )}
           </div>
@@ -523,7 +509,7 @@ export default function HomePage() {
                   className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
                   style={{ backgroundColor: 'rgba(255,255,255,0.7)' }}
                 />
-                {room.name}
+                {tRoom(room.name)}
               </button>
             ))}
           </div>
@@ -560,7 +546,7 @@ export default function HomePage() {
                         className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
                         style={{ backgroundColor: selected ? 'rgba(255,255,255,0.7)' : room.color }}
                       />
-                      {room.name}
+                      {tRoom(room.name)}
                     </button>
                   );
                 })}
@@ -580,7 +566,7 @@ export default function HomePage() {
               onClick={() => window.location.reload()}
               className="text-sm text-amber-700 hover:text-amber-900 font-medium underline"
             >
-              새로고침
+              {t.btnRefresh}
             </button>
           </div>
         </div>
@@ -593,7 +579,7 @@ export default function HomePage() {
               onClick={refreshReservations}
               className="px-3 py-1.5 text-sm font-medium text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-lg transition"
             >
-              다시 시도
+              {t.btnRetry}
             </button>
           </div>
         </div>
