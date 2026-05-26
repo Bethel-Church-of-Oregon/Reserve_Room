@@ -4,6 +4,7 @@ import { getReservations, createReservation, createReservationSeries, checkConfl
 import { checkReservationLimit } from '@/lib/ratelimit';
 import { LIMITS } from '@/lib/constants';
 import { sendReservationCreatedEmail, sendReservationCreatedBulkEmail } from '@/lib/email';
+import { sendSmsNotifications, buildReservationSmsMessage } from '@/lib/sms';
 
 export async function GET(req: NextRequest) {
   try {
@@ -224,6 +225,17 @@ export async function POST(req: NextRequest) {
       email: emailStr,
       notes: notesStr || undefined,
     }).catch((e) => console.error('[email] 예약 확인 메일 발송 실패:', e));
+
+    // SMS 알림: 일반 사용자 예약만 (관리자 예약 제외)
+    if (!isAdmin) {
+      sendSmsNotifications(buildReservationSmsMessage({
+        title: titleStr,
+        room_name: roomName,
+        start_time,
+        end_time,
+        person_in_charge: personStr,
+      })).catch((e) => console.error('[sms] 발송 실패:', e));
+    }
 
     return NextResponse.json(reservation, { status: 201 });
   } catch (e) {

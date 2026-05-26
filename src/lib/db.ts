@@ -88,6 +88,17 @@ async function ensureDbReady(): Promise<void> {
       // Columns may already exist; ignore
     }
 
+    // Notification recipients table
+    await sql`
+      CREATE TABLE IF NOT EXISTS notification_recipients (
+        id       SERIAL PRIMARY KEY,
+        name     TEXT NOT NULL,
+        phone    TEXT NOT NULL,
+        carrier  TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `;
+
     // Seed rooms if empty
     const countRows = (await sql`SELECT COUNT(*)::int as c FROM rooms`) as { c: number }[];
     const count = Number(countRows[0]?.c ?? 0);
@@ -531,6 +542,41 @@ export async function approveCancellationBySeries(seriesId: string): Promise<Res
   `) as ReservationWithRoom[];
   await setReservationSeriesStatus(seriesId, 'cancelled');
   return rows;
+}
+
+// ---------- Notification Recipients ----------
+
+export interface NotificationRecipient {
+  id: number;
+  name: string;
+  phone: string;
+  carrier: string;
+  created_at: string;
+}
+
+export async function getNotificationRecipients(): Promise<NotificationRecipient[]> {
+  await ensureDbReady();
+  return (await getSql()`SELECT * FROM notification_recipients ORDER BY created_at`) as NotificationRecipient[];
+}
+
+export async function createNotificationRecipient(data: {
+  name: string;
+  phone: string;
+  carrier: string;
+}): Promise<NotificationRecipient> {
+  await ensureDbReady();
+  const rows = (await getSql()`
+    INSERT INTO notification_recipients (name, phone, carrier)
+    VALUES (${data.name}, ${data.phone}, ${data.carrier})
+    RETURNING *
+  `) as NotificationRecipient[];
+  return rows[0];
+}
+
+export async function deleteNotificationRecipient(id: number): Promise<boolean> {
+  await ensureDbReady();
+  const rows = (await getSql()`DELETE FROM notification_recipients WHERE id = ${id} RETURNING id`) as { id: number }[];
+  return rows.length > 0;
 }
 
 export async function rejectCancellationBySeries(seriesId: string, reason?: string | null): Promise<ReservationWithRoom[]> {

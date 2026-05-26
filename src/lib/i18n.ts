@@ -376,6 +376,24 @@ const ko = {
 
   // Admin note
   adminRejectedNote: '거절된 예약은 캘린더에 표시되지 않습니다.',
+
+  // Notification recipients
+  adminTabRecipients: '알림 수신자',
+  recipientsTitle: '문자 알림 수신자',
+  recipientsDesc: '예약·취소 신청 시 문자를 받을 담당자 목록입니다. 통신사 이메일-to-SMS 게이트웨이를 통해 무료로 발송됩니다.',
+  recipientName: '이름',
+  recipientPhone: '전화번호',
+  recipientCarrier: '통신사',
+  recipientPhonePlaceholder: '숫자만 입력 (예: 5031234567)',
+  recipientNamePlaceholder: '담당자 이름',
+  recipientAdd: '추가',
+  noRecipients: '등록된 수신자가 없습니다.',
+  recipientAdded: '수신자가 추가되었습니다.',
+  recipientDeleted: '수신자가 삭제되었습니다.',
+  errRecipientName: '이름을 입력해주세요.',
+  errRecipientPhone: '올바른 전화번호를 입력해주세요. (10자리 이상 숫자)',
+  errRecipientCarrier: '통신사를 선택해주세요.',
+  recipientSelectCarrier: '통신사 선택',
 };
 
 const en: typeof ko = {
@@ -621,6 +639,23 @@ const en: typeof ko = {
   statusRejected: 'Rejected',
 
   adminRejectedNote: 'Rejected reservations are not shown on the calendar.',
+
+  adminTabRecipients: 'SMS Recipients',
+  recipientsTitle: 'SMS Alert Recipients',
+  recipientsDesc: 'People who receive a text when a reservation or cancellation is submitted. Sent free via carrier email-to-SMS gateway.',
+  recipientName: 'Name',
+  recipientPhone: 'Phone number',
+  recipientCarrier: 'Carrier',
+  recipientPhonePlaceholder: 'Digits only (e.g. 5031234567)',
+  recipientNamePlaceholder: 'Contact name',
+  recipientAdd: 'Add',
+  noRecipients: 'No recipients added yet.',
+  recipientAdded: 'Recipient added.',
+  recipientDeleted: 'Recipient removed.',
+  errRecipientName: 'Please enter a name.',
+  errRecipientPhone: 'Please enter a valid phone number (10+ digits).',
+  errRecipientCarrier: 'Please select a carrier.',
+  recipientSelectCarrier: 'Select carrier',
 };
 
 export const translations = { ko, en } as const;

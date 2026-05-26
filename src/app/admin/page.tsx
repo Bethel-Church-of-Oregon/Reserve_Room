@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ReservationWithRoom } from '@/lib/db';
+import { ReservationWithRoom, NotificationRecipient } from '@/lib/db';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { CARRIER_LABELS } from '@/lib/sms';
 
 type FilterStatus = 'pending' | 'approved' | 'cancelled' | 'all';
 
@@ -397,6 +398,14 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const [seriesActionLoading, setSeriesActionLoading] = useState<string | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [adminView, setAdminView] = useState<'reservations' | 'recipients'>('reservations');
+  const [recipients, setRecipients] = useState<NotificationRecipient[]>([]);
+  const [recipientsLoading, setRecipientsLoading] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [newCarrier, setNewCarrier] = useState('');
+  const [addError, setAddError] = useState('');
+  const [addLoading, setAddLoading] = useState(false);
 
   function showToast(msg: string, type: 'success' | 'error' = 'success') {
     setToast({ msg, type });
@@ -426,6 +435,22 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
       if (Array.isArray(data)) setAllRooms(data);
     }).catch(() => {});
   }, []);
+
+  const fetchRecipients = useCallback(async () => {
+    setRecipientsLoading(true);
+    try {
+      const res = await fetch('/api/admin/recipients');
+      if (res.ok) {
+        const data = await res.json();
+        setRecipients(Array.isArray(data) ? data : []);
+      }
+    } catch { /* silent */ }
+    finally { setRecipientsLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    if (adminView === 'recipients') fetchRecipients();
+  }, [adminView, fetchRecipients]);
 
   const uniqueRooms = allRooms.length > 0 ? allRooms : Array.from(
     new Map(reservations.map(r => [r.room_id, { id: r.room_id, name: r.room_name, color: r.room_color }])).values()
@@ -797,6 +822,15 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           </div>
 
           <button
+            onClick={() => setAdminView(v => v === 'recipients' ? 'reservations' : 'recipients')}
+            style={{ fontSize: 'clamp(10px, 3.5vw, 14px)', padding: '8px clamp(4px, 2vw, 12px)' }}
+            className={`flex-shrink-0 rounded-lg border font-medium transition whitespace-nowrap ${
+              adminView === 'recipients' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            {t.adminTabRecipients}
+          </button>
+          <button
             onClick={fetchReservations}
             className="ml-auto border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition whitespace-nowrap flex-shrink-0"
             style={{ fontSize: 'clamp(10px, 3.5vw, 14px)', padding: '8px clamp(8px, 2.5vw, 12px)' }}
@@ -806,8 +840,106 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           </button>
         </div>
 
+        {adminView === 'recipients' && (
+          <div className="max-w-lg">
+            <h2 className="text-base font-bold text-gray-800 mb-1">{t.recipientsTitle}</h2>
+            <p className="text-xs text-gray-500 mb-5">{t.recipientsDesc}</p>
+
+            {/* Add form */}
+            <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-4">
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newName}
+                    onChange={(e) => { setNewName(e.target.value); setAddError(''); }}
+                    placeholder={t.recipientNamePlaceholder}
+                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
+                  />
+                  <input
+                    type="tel"
+                    value={newPhone}
+                    onChange={(e) => { setNewPhone(e.target.value.replace(/\D/g, '')); setAddError(''); }}
+                    placeholder={t.recipientPhonePlaceholder}
+                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <select
+                    value={newCarrier}
+                    onChange={(e) => { setNewCarrier(e.target.value); setAddError(''); }}
+                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400 bg-white"
+                  >
+                    <option value="">{t.recipientSelectCarrier}</option>
+                    {Object.entries(CARRIER_LABELS).map(([val, label]) => (
+                      <option key={val} value={val}>{label}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={async () => {
+                      if (!newName.trim()) { setAddError(t.errRecipientName); return; }
+                      if (newPhone.length < 10) { setAddError(t.errRecipientPhone); return; }
+                      if (!newCarrier) { setAddError(t.errRecipientCarrier); return; }
+                      setAddLoading(true);
+                      try {
+                        const res = await fetch('/api/admin/recipients', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ name: newName.trim(), phone: newPhone, carrier: newCarrier }),
+                        });
+                        if (res.ok) {
+                          setNewName(''); setNewPhone(''); setNewCarrier('');
+                          showToast(t.recipientAdded);
+                          fetchRecipients();
+                        } else {
+                          const d = await res.json();
+                          setAddError(d.error ?? t.errGeneral);
+                        }
+                      } catch { setAddError(t.errNetwork); }
+                      finally { setAddLoading(false); }
+                    }}
+                    disabled={addLoading}
+                    className="flex-shrink-0 px-4 py-2 bg-gray-800 hover:bg-gray-900 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition"
+                  >
+                    {t.recipientAdd}
+                  </button>
+                </div>
+                {addError && <p className="text-xs text-red-500">{addError}</p>}
+              </div>
+            </div>
+
+            {/* Recipients list */}
+            {recipientsLoading ? (
+              <div className="text-sm text-gray-400 py-4">{t.loading}</div>
+            ) : recipients.length === 0 ? (
+              <div className="text-sm text-gray-400 py-4">{t.noRecipients}</div>
+            ) : (
+              <div className="space-y-2">
+                {recipients.map((r) => (
+                  <div key={r.id} className="flex items-center justify-between gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3">
+                    <div className="min-w-0">
+                      <div className="font-medium text-sm text-gray-800">{r.name}</div>
+                      <div className="text-xs text-gray-500">{r.phone} · {CARRIER_LABELS[r.carrier] ?? r.carrier}</div>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        const res = await fetch(`/api/admin/recipients/${r.id}`, { method: 'DELETE' });
+                        if (res.ok) { showToast(t.recipientDeleted); fetchRecipients(); }
+                        else { const d = await res.json(); showToast(d.error ?? t.toastError, 'error'); }
+                      }}
+                      className="flex-shrink-0 text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 rounded-lg px-2.5 py-1.5 transition"
+                    >
+                      {t.btnDelete}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Room filter */}
-        {uniqueRooms.length > 0 && (
+        {adminView === 'reservations' && uniqueRooms.length > 0 && (
           <div className="relative border-b border-gray-100 -mx-4 sm:-mx-6 px-4 sm:px-6 mb-4">
             <div className="relative z-50 flex items-center gap-2 py-2">
               <button
@@ -884,6 +1016,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
         )}
 
         {/* Table */}
+        {adminView === 'reservations' && <>
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
           {loading ? (
             <div className="text-center py-16 text-gray-400 text-sm">{t.loading}</div>
@@ -1188,6 +1321,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
             {t.adminRejectedNote}
           </p>
         )}
+        </>}
       </main>
     </div>
   );

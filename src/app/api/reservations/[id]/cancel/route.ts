@@ -3,6 +3,7 @@ import { getReservationById, requestCancellation, requestCancellationSeries, set
 import { checkCancelLimit } from '@/lib/ratelimit';
 import { LIMITS } from '@/lib/constants';
 import { sendReservationCancelledEmail, sendReservationCancelledSeriesEmail } from '@/lib/email';
+import { sendSmsNotifications, buildCancellationSmsMessage } from '@/lib/sms';
 
 export async function POST(
   req: NextRequest,
@@ -69,6 +70,14 @@ export async function POST(
         cancelled_count: requested,
         cancellation_reason: reason,
       });
+
+      sendSmsNotifications(buildCancellationSmsMessage({
+        title: reservation.title,
+        room_name: reservation.room_name,
+        start_time: reservation.start_time,
+        end_time: reservation.end_time,
+        person_in_charge: reservation.person_in_charge,
+      })).catch((e) => console.error('[sms] 발송 실패:', e));
     } else {
       const reservation = await getReservationById(id);
       if (!reservation) {
@@ -94,6 +103,14 @@ export async function POST(
         email: reservation.email,
         cancellation_reason: reason,
       });
+
+      sendSmsNotifications(buildCancellationSmsMessage({
+        title: reservation.title,
+        room_name: reservation.room_name,
+        start_time: reservation.start_time,
+        end_time: reservation.end_time,
+        person_in_charge: reservation.person_in_charge,
+      })).catch((e) => console.error('[sms] 발송 실패:', e));
     }
 
     return NextResponse.json({ success: true });
