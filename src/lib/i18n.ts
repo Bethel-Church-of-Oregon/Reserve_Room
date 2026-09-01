@@ -1,5 +1,16 @@
 export type Lang = 'ko' | 'en';
 
+/** Building prefixes, translated separately from the room itself. */
+export const buildingNameMap: Record<string, string> = {
+  '비전홀': 'Vision Hall',
+  '은혜성전': 'Grace Hall',
+};
+
+/**
+ * Room names without the building prefix. Look these up through
+ * `translateRoomName`, not directly: stored names carry the building prefix
+ * ('은혜성전 친교실'), so a direct lookup on this map never matches.
+ */
 export const roomNameMap: Record<string, string> = {
   '대예배실': 'Main Sanctuary',
   '새가족실': 'New Members Room',
@@ -13,15 +24,30 @@ export const roomNameMap: Record<string, string> = {
   '2층 교실 4': '2F Classroom 4',
   '2층 올리브홀(초등부)': '2F Olive Hall (Elementary)',
   '2층 초등부 교사실': '2F Elementary Teachers Room',
+  '예배실': 'Sanctuary',
   '친교실': 'Fellowship Hall',
-  '교실 1': 'Classroom 1',
-  '교실 2': 'Classroom 2',
-  '교실 3': 'Classroom 3',
-  '교실 4': 'Classroom 4',
-  '교실 5': 'Classroom 5',
+  '2층 교실 302': '2F Classroom 302',
+  '2층 교실 303': '2F Classroom 303',
+  '2층 교실 305': '2F Classroom 305',
+  '2층 교실 306': '2F Classroom 306',
   '청년부실': 'Youth Room',
-  '(구)교역자실': '(Former) Pastors Office',
+  '(구)부교역자실': '(Former) Associate Pastors Office',
 };
+
+/**
+ * '은혜성전 2층 교실 302' -> 'Grace Hall 2F Classroom 302'.
+ * Anything unmapped falls back to the Korean text, so a new room shows up
+ * readably even before it has a translation.
+ */
+export function translateRoomName(name: string): string {
+  for (const [ko, en] of Object.entries(buildingNameMap)) {
+    if (name.startsWith(`${ko} `)) {
+      const room = name.slice(ko.length + 1);
+      return `${en} ${roomNameMap[room] ?? room}`;
+    }
+  }
+  return roomNameMap[name] ?? name;
+}
 
 // Date formatting utilities
 export function formatMonthTitle(lang: Lang, d: Date): string {
@@ -180,9 +206,9 @@ const ko = {
   fieldNotesOptional: '(선택)',
   fieldAccessCode: '예약 코드',
   accessCodePlaceholder: '교회에서 안내받은 코드',
-  accessCodeHint: '교인 확인을 위한 코드입니다. 주보 또는 담당자에게 문의해 주세요.',
+  accessCodeHint: '확인을 위한 코드입니다. 담당자에게 문의해 주세요.',
   errAccessCodeRequired: '예약 코드를 입력해주세요.',
-  errAccessCodeWrong: '예약 코드가 올바르지 않습니다. 주보를 확인하시거나 교회 사무실로 문의해 주세요.',
+  errAccessCodeWrong: '예약 코드가 올바르지 않습니다. 담당자에게 문의해 주세요.',
   optional: '선택',
 
   // Form placeholders
@@ -403,7 +429,6 @@ const ko = {
   adminRejectedNote: '거절된 예약은 캘린더에 표시되지 않습니다.',
 
   // Notification recipients
-  adminTabRecipients: '알림 수신자',
   adminTabSettings: '설정',
   settingsTitle: '예약 코드',
   settingsDesc: '예약 신청 시 입력해야 하는 공유 코드입니다. 비워두면 코드 없이 누구나 신청할 수 있습니다.',
@@ -496,7 +521,7 @@ const en: typeof ko = {
   fieldNotesOptional: '(Optional)',
   fieldAccessCode: 'Reservation Code',
   accessCodePlaceholder: 'Code provided by the church',
-  accessCodeHint: 'Used to confirm you are a member. Check the bulletin or ask the church office.',
+  accessCodeHint: 'Used to confirm you are a member. Ask the church office.',
   errAccessCodeRequired: 'Please enter the reservation code.',
   errAccessCodeWrong: 'That reservation code is not correct. Please check the bulletin or contact the church office.',
   optional: 'Optional',
@@ -697,7 +722,6 @@ const en: typeof ko = {
 
   adminRejectedNote: 'Rejected reservations are not shown on the calendar.',
 
-  adminTabRecipients: 'SMS Recipients',
   adminTabSettings: 'Settings',
   settingsTitle: 'Reservation Code',
   settingsDesc: 'The shared code people must enter to submit a reservation. Leave it empty to let anyone reserve without a code.',

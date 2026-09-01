@@ -135,7 +135,9 @@ function ReserveForm() {
 
   const loadRooms = useCallback(() => {
     setRoomsError(null);
-    fetch('/api/rooms')
+    // Retired rooms only in admin mode, so the member form never lists them even
+    // when an administrator happens to be signed in on this browser.
+    fetch(isAdmin ? '/api/rooms?all=true' : '/api/rooms')
       .then((r) => {
         if (!r.ok) throw new Error(t.errRooms);
         return r.json();
@@ -145,7 +147,7 @@ function ReserveForm() {
         console.error('rooms fetch error:', e);
         setRoomsError(e instanceof Error ? e.message : t.errRooms);
       });
-  }, []);
+  }, [isAdmin]);
   useEffect(() => { loadRooms(); }, [loadRooms]);
 
   function validate(): FormErrors {

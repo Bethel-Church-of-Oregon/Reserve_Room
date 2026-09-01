@@ -48,7 +48,7 @@ npm run build && npm start  # 프로덕션 (포트 8000)
 
 ## DB 스키마
 - `app_settings`: key(PK), value, updated_at — 런타임 설정 key/value. 현재 키: `reservation_access_code`
-- `rooms`: id, name, color — 비전홀 + 은혜성전 20개 시드 데이터
+- `rooms`: id, name, color, hidden, sort_order — 비전홀 + 은혜성전 20개 시드 데이터
 - `reservation_series`: id(TEXT/UUID), title, room_id, person_in_charge, email, notes, recurring, recurring_until, status(pending/approved/rejected/cancelled), rejection_reason, created_at
 - `reservations`: id, series_id(→reservation_series), series_index, title, room_id, start_time, end_time, person_in_charge, email, notes, status(pending/approved/rejected/cancellation_requested), rejection_reason, cancellation_reason, cancellation_requested_at, previous_status, created_at, updated_at, previous_start_time, previous_end_time
 - Postgres: Vercel Marketplace에서 Neon 연동 시 `POSTGRES_URL` 또는 `DATABASE_URL` 자동 주입
@@ -56,9 +56,32 @@ npm run build && npm start  # 프로덕션 (포트 8000)
 - 장소 변경 시 Neon 콘솔에서 `DELETE FROM reservations; DELETE FROM rooms;` 후 앱 재시작
 - 스키마 마이그레이션: `ensureDbReady()`에서 `ADD COLUMN IF NOT EXISTS`로 idempotent 처리
 
-## 장소 목록 (20개)
+## 장소 숨김 (은퇴 처리)
+- `rooms.hidden = true` 인 장소는 **일반 사용자 선택 목록에서 사라지지만 DB에는 남음.** 기존 예약은 그대로 캘린더에 표시됨 (예약 조회는 join으로 room_name/color를 가져오므로 영향 없음)
+- **관리자는 계속 선택 가능.** `GET /api/rooms`가 세션 쿠키를 보고 관리자면 숨김 장소까지 반환 → 예약 폼·관리자 장소 필터가 자동으로 전체를 받음
+- **서버에서도 강제.** `POST /api/reservations`가 `getRooms(isAdmin)`로 검증하므로 일반 사용자가 숨김 장소 id를 직접 POST해도 400 (`선택할 수 없는 장소입니다.`)
+- `/api/rooms`는 쿠키를 읽어 동적이며 `fetchCache = 'force-no-store'` 필요 (Neon이 fetch로 통신 → 없으면 hidden 변경이 한동안 반영 안 됨)
+- 현재 숨김: **비전홀 유아부실, 비전홀 유치부실** (2026-09). `ensureDbReady()`에서 `app_settings.rooms_hidden_init_v1` 마커로 **1회만** 실행 — 관리자가 나중에 숨김을 풀어도 재시작 때 다시 숨겨지지 않음
+- 숨김/해제 UI는 아직 없음. 변경은 Neon 콘솔에서 `UPDATE rooms SET hidden = true/false WHERE name = '...'`
+
+## 장소 표시 순서
+- **`ORDER BY sort_order, id`.** id 순이 아님 — 나중에 추가한 장소가 물리적 위치와 무관하게 맨 끝에 붙는 문제 때문에 도입 (2026-09)
+- 순서의 단일 출처는 `ensureDbReady()`의 **`ROOM_ORDER` 배열.** 여기 적힌 순서대로 `sort_order`가 매겨짐
+- **매 콜드스타트마다 단일 UPDATE로 적용 (멱등).** `sort_order <> t.ord` 조건이 있어 실제로 다를 때만 씀. 순서 변경 UI가 없으므로 코드가 곧 정답이고, 재시작해도 항상 이 순서로 수렴
+- 장소를 추가·이름 변경할 때는 **`ROOM_ORDER`에도 반영**해야 함 (누락되면 `sort_order = 0`으로 맨 앞에 옴)
+- 은퇴(숨김) 장소는 원래 자리를 유지
+- `은혜성전 교실 5`는 실재하지 않는 곳이라 **완전 삭제됨** (2026-09). 삭제문은 참조가 없을 때만 실행되도록 자기방어형이라 멱등하고, 예약이 붙어 있으면 스스로 건너뜀
+
+## 장소 목록 (20개, 일반 사용자에게는 18개)
 비전홀: 대예배실, 새가족실, 영아부실, 유아부실, 유치부실, 찬양대실, 2층 교실 1~4, 2층 올리브홀(초등부), 2층 초등부 교사실
-은혜성전: 친교실, 교실 1~5, 청년부실, (구)교역자실
+은혜성전: 예배실, 친교실, 2층 교실 302·303·305·306, 청년부실, (구)부교역자실 (2026-09 개편)
+
+## 장소명 영문 변환
+- `translateRoomName(name)` 이 **단일 창구.** `roomNameMap`을 직접 조회하지 말 것
+  - DB 이름은 접두사를 포함(`'은혜성전 친교실'`)하는데 `roomNameMap` 키는 접두사가 없어서(`'친교실'`), 예전에는 직접 조회가 **한 번도 매칭되지 않아 영어 모드에서 한국어 이름이 그대로 나왔음** (2026-09 수정)
+  - `buildingNameMap`(비전홀→Vision Hall, 은혜성전→Grace Hall) + `roomNameMap` 조합으로 변환
+  - 미등록 장소는 한국어로 fallback → 새 장소를 추가해도 화면이 깨지지 않음
+- **장소 이름을 바꿀 때는 `roomNameMap`도 함께 갱신할 것**
 
 ## 환경변수 (.env.local)
 ```env
@@ -208,10 +231,14 @@ approved → cancelled (취소 신청 시 즉시 처리)
 - 예약 신청 폼: 타이틀, 장소(드롭다운), 날짜, 시작/종료 시간(15분 단위), 반복설정(관리자 전용), 담당자, 이메일, 노트(선택)
   - 일반 사용자: 날짜 `max` = 오늘+1달, 반복 섹션 숨김. 관리자(`?admin=true`): 날짜 제한 없음, 반복 섹션 표시, 사용수칙 모달 미표시
   - 모든 input/select/textarea: `text-base`(16px) — iOS Safari 자동 확대 방지 (예약 폼 + 관리자 페이지 모두 적용)
-- 관리자: "예약하기" 버튼 + 탭(예약 목록 / 취소 목록 / 전체). 예약 목록: 삭제 가능. 취소 목록: 개별 행으로 표시(시리즈 묶음 없음), 상세보기만. 전체: 상태 컬럼 표시(거절 제외)
+- 관리자: "예약하기" 버튼 + 탭(예약 목록 / 취소 목록 / 전체) + 설정. 예약 목록: 삭제 가능. 취소 목록: 개별 행으로 표시(시리즈 묶음 없음), 상세보기만. 전체: 상태 컬럼 표시(거절 제외)
 - **관리자 상세보기**: 각 행 버튼 영역 맨 왼쪽 "상세보기" 버튼 → `ReservationDetailModal` 팝업 (제목·상태·장소·시간·담당자·이메일·메모·취소사유·신청일). `z-[200]`으로 장소 필터 패널(`z-50`)보다 항상 위에 표시
 - **관리자 장소 필터**: 메인 캘린더와 동일한 UI (토글 버튼, 선택 chip, 오버레이 패널). `/api/rooms`에서 전체 20개 장소 fetch. 선택한 장소에 내역 없으면 "선택한 장소의 예약 내역이 없습니다." 표시
 - 관리자 테이블 컬럼 너비 고정: 장소(160px)·시간(160px)·담당자(120px)·신청일시(140px)·버튼(`w-px`)·제목(나머지). 전체 탭에만 상태 컬럼 추가
 - 관리자 반응형: 1000px 기준 테이블 ↔ 카드 레이아웃 전환 (커스텀 Tailwind breakpoint `admin: 1000px`), 최대 너비 1280px (`max-w-screen-xl`)
-- 관리자 탭 버튼: font-size + padding 모두 `clamp` vw 비례로 어떤 너비에서도 한 줄 유지. 새로고침 버튼 425px 미만에서 ↻ 아이콘으로 표시
+- **관리자 상단 버튼 행**: 예약하기 / [예약 목록·취소 목록·전체] / 설정 / 새로고침 — **320px에서도 한 줄**에 들어가도록 튜닝됨
+  - font-size `clamp(10px, 3.5vw, 14px)`, padding `clamp(4px, 1.5vw, 12px)`, 간격 `gap-1.5 sm:gap-2`
+  - `flex-wrap`은 안전망 — 더 좁아지면 가로 넘침 대신 줄바꿈
+  - 새로고침 버튼은 425px 미만에서 ↻ 아이콘
+  - **알림 수신자는 상단 버튼이 아니라 '설정' 화면의 하위 섹션.** 예전에는 별도 탭이었는데 버튼 행이 모바일 가로를 넘겨서 설정 안으로 옮김 (2026-09). `adminView`는 `'reservations' | 'settings'` 둘뿐
 - 제목 말줄임: 모든 뷰(일간 캘린더 블록, 주간, 월간, 목록 보기, 팝오버, 관리자 테이블/카드)에서 긴 제목은 `truncate`로 처리

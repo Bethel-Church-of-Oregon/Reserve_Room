@@ -409,7 +409,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const [seriesActionLoading, setSeriesActionLoading] = useState<string | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
-  const [adminView, setAdminView] = useState<'reservations' | 'recipients' | 'settings'>('reservations');
+  const [adminView, setAdminView] = useState<'reservations' | 'settings'>('reservations');
   const [accessCode, setAccessCode] = useState('');
   const [accessCodeSaved, setAccessCodeSaved] = useState('');
   const [accessCodeLoading, setAccessCodeLoading] = useState(false);
@@ -444,7 +444,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
 
   useEffect(() => { fetchReservations(); }, [fetchReservations]);
   useEffect(() => {
-    fetch('/api/rooms').then(r => r.json()).then(data => {
+    fetch('/api/rooms?all=true').then(r => r.json()).then(data => {
       if (Array.isArray(data)) setAllRooms(data);
     }).catch(() => {});
   }, []);
@@ -478,8 +478,8 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   }, [onLogout]);
 
   useEffect(() => {
-    if (adminView === 'recipients') fetchRecipients();
-    if (adminView === 'settings') fetchAccessCode();
+    // Notification recipients live inside Settings, so both loads happen together.
+    if (adminView === 'settings') { fetchAccessCode(); fetchRecipients(); }
   }, [adminView, fetchRecipients, fetchAccessCode]);
 
   const uniqueRooms = allRooms.length > 0 ? allRooms : Array.from(
@@ -839,12 +839,14 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
       </header>
 
       <main className="max-w-screen-xl mx-auto px-4 py-6">
-        {/* Filter tabs + bulk actions */}
-        <div className="flex items-center gap-2 mb-4">
+        {/* Filter tabs + bulk actions. Wraps rather than overflowing: the row is
+            tuned to fit one line at 360px, and anything narrower breaks onto a
+            second line instead of running off the side of the screen. */}
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-4">
           <button
             onClick={() => router.push('/reserve?admin=true')}
             className="flex-shrink-0 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition whitespace-nowrap"
-            style={{ fontSize: 'clamp(10px, 3.5vw, 14px)', padding: '8px clamp(4px, 2vw, 12px)' }}
+            style={{ fontSize: 'clamp(10px, 3.5vw, 14px)', padding: '8px clamp(4px, 1.5vw, 12px)' }}
           >
             {t.adminReserveBtn}
           </button>
@@ -853,7 +855,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
               <button
                 key={f}
                 onClick={() => { setFilter(f); setSelected(new Set()); setAdminView('reservations'); }}
-                style={{ padding: '8px clamp(4px, 2vw, 12px)' }}
+                style={{ padding: '8px clamp(4px, 1.5vw, 12px)' }}
                 className={`font-medium transition border-l first:border-l-0 border-gray-200 whitespace-nowrap ${
                   adminView === 'reservations' && filter === f ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
                 }`}
@@ -864,17 +866,8 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           </div>
 
           <button
-            onClick={() => setAdminView(v => v === 'recipients' ? 'reservations' : 'recipients')}
-            style={{ fontSize: 'clamp(10px, 3.5vw, 14px)', padding: '8px clamp(4px, 2vw, 12px)' }}
-            className={`flex-shrink-0 rounded-lg border font-medium transition whitespace-nowrap ${
-              adminView === 'recipients' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-            }`}
-          >
-            {t.adminTabRecipients}
-          </button>
-          <button
             onClick={() => setAdminView(v => v === 'settings' ? 'reservations' : 'settings')}
-            style={{ fontSize: 'clamp(10px, 3.5vw, 14px)', padding: '8px clamp(4px, 2vw, 12px)' }}
+            style={{ fontSize: 'clamp(10px, 3.5vw, 14px)', padding: '8px clamp(4px, 1.5vw, 12px)' }}
             className={`flex-shrink-0 rounded-lg border font-medium transition whitespace-nowrap ${
               adminView === 'settings' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
             }`}
@@ -882,9 +875,9 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
             {t.adminTabSettings}
           </button>
           <button
-            onClick={adminView === 'recipients' ? fetchRecipients : adminView === 'settings' ? fetchAccessCode : fetchReservations}
+            onClick={adminView === 'settings' ? () => { fetchAccessCode(); fetchRecipients(); } : fetchReservations}
             className="ml-auto border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition whitespace-nowrap flex-shrink-0"
-            style={{ fontSize: 'clamp(10px, 3.5vw, 14px)', padding: '8px clamp(8px, 2.5vw, 12px)' }}
+            style={{ fontSize: 'clamp(10px, 3.5vw, 14px)', padding: '8px clamp(6px, 2vw, 12px)' }}
           >
             <span className="min-[420px]:hidden">↻</span>
             <span className="hidden min-[420px]:inline">{t.btnRefresh}</span>
@@ -957,8 +950,11 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           </div>
         )}
 
-        {adminView === 'recipients' && (
-          <div className="max-w-lg">
+        {/* Second section of Settings. It used to be a top-level tab, but the button
+            row overflowed the width of a phone; folding it in here removes a button
+            and groups it with the other church-wide setting. */}
+        {adminView === 'settings' && (
+          <div className="max-w-lg mt-10 pt-8 border-t border-gray-200">
             <h2 className="text-base font-bold text-gray-800 mb-1">{t.recipientsTitle}</h2>
             <p className="text-xs text-gray-500 mb-5">{t.recipientsDesc}</p>
 

@@ -127,6 +127,68 @@ async function ensureDbReady(): Promise<void> {
       // Already nullable; ignore
     }
 
+    // Rooms can be retired without deleting them: existing reservations keep their
+    // room, but the room disappears from the pickers that regular members see.
+    try {
+      await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT false`;
+    } catch {
+      // Column may already exist; ignore
+    }
+
+    // One-time retirement of the two nursery/preschool rooms. Guarded by a marker
+    // so an administrator who later un-hides a room does not get it re-hidden on
+    // the next start.
+    try {
+      const marker = 'rooms_hidden_init_v1';
+      const done = (await sql`SELECT 1 FROM app_settings WHERE key = ${marker}`) as unknown[];
+      if (done.length === 0) {
+        await sql`
+          UPDATE rooms SET hidden = true
+          WHERE name IN ('비전홀 유아부실', '비전홀 유치부실')
+        `;
+        await sql`INSERT INTO app_settings (key, value) VALUES (${marker}, 'done')
+                  ON CONFLICT (key) DO NOTHING`;
+      }
+    } catch (e) {
+      console.error('[db] 장소 숨김 초기화 실패:', e);
+    }
+
+    // Explicit display order. Rooms used to come out in id order, which put a
+    // newly added room at the end regardless of where it belongs physically.
+    try {
+      await sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0`;
+    } catch {
+      // Column may already exist; ignore
+    }
+
+    // One-time rename of the Grace Sanctuary rooms (2026-09). Renaming in place
+    // keeps existing reservations attached to their room, and the sanctuary itself
+    // is a genuinely new space.
+    try {
+      const marker = 'rooms_grace_rename_v1';
+      const done = (await sql`SELECT 1 FROM app_settings WHERE key = ${marker}`) as unknown[];
+      if (done.length === 0) {
+        const renames: Array<[string, string]> = [
+          ['은혜성전 교실 1', '은혜성전 2층 교실 302'],
+          ['은혜성전 교실 2', '은혜성전 2층 교실 303'],
+          ['은혜성전 교실 3', '은혜성전 2층 교실 305'],
+          ['은혜성전 교실 4', '은혜성전 2층 교실 306'],
+          ['은혜성전 (구)교역자실', '은혜성전 (구)부교역자실'],
+        ];
+        for (const [from, to] of renames) {
+          await sql`UPDATE rooms SET name = ${to} WHERE name = ${from}`;
+        }
+        await sql`
+          INSERT INTO rooms (name, color) VALUES ('은혜성전 예배실', '#3F51B5')
+          ON CONFLICT (name) DO NOTHING
+        `;
+        await sql`INSERT INTO app_settings (key, value) VALUES (${marker}, 'done')
+                  ON CONFLICT (key) DO NOTHING`;
+      }
+    } catch (e) {
+      console.error('[db] 은혜성전 장소명 변경 실패:', e);
+    }
+
     // Seed rooms if empty
     const countRows = (await sql`SELECT COUNT(*)::int as c FROM rooms`) as { c: number }[];
     const count = Number(countRows[0]?.c ?? 0);
@@ -144,19 +206,70 @@ async function ensureDbReady(): Promise<void> {
         { name: '비전홀 2층 교실 4',           color: '#D35400' },
         { name: '비전홀 2층 올리브홀(초등부)', color: '#af645cff' },
         { name: '비전홀 2층 초등부 교사실',    color: '#16A085' },
+        { name: '은혜성전 예배실',             color: '#3F51B5' },
         { name: '은혜성전 친교실',        color: '#27AE60' },
-        { name: '은혜성전 교실 1',             color: '#F39C12' },
-        { name: '은혜성전 교실 2',             color: '#E91E63' },
-        { name: '은혜성전 교실 3',             color: '#00BCD4' },
-        { name: '은혜성전 교실 4',             color: '#8BC34A' },
-        { name: '은혜성전 교실 5',             color: '#FF5722' },
+        { name: '은혜성전 2층 교실 302',       color: '#F39C12' },
+        { name: '은혜성전 2층 교실 303',       color: '#E91E63' },
+        { name: '은혜성전 2층 교실 305',       color: '#00BCD4' },
+        { name: '은혜성전 2층 교실 306',       color: '#8BC34A' },
         { name: '은혜성전 청년부실',           color: '#96c9e2ff' },
-        { name: '은혜성전 (구)교역자실',       color: '#34495E' },
+        { name: '은혜성전 (구)부교역자실',     color: '#34495E' },
       ];
 
       for (const r of rooms) {
         await sql`INSERT INTO rooms (name, color) VALUES (${r.name}, ${r.color})`;
       }
+    }
+
+    // 은혜성전 교실 5 does not exist as a physical room. The delete guards itself
+    // on having no references, so it is idempotent and can never orphan a
+    // reservation: if anything still points at the room it is simply left alone.
+    try {
+      const removed = (await sql`
+        DELETE FROM rooms
+        WHERE name = '은혜성전 교실 5'
+          AND NOT EXISTS (SELECT 1 FROM reservations WHERE room_id = rooms.id)
+          AND NOT EXISTS (SELECT 1 FROM reservation_series WHERE room_id = rooms.id)
+        RETURNING id
+      `) as { id: number }[];
+      if (removed.length > 0) console.log('[db] 은혜성전 교실 5 삭제됨');
+    } catch (e) {
+      console.error('[db] 은혜성전 교실 5 삭제 실패:', e);
+    }
+
+    // Canonical display order, applied every start in one statement. Idempotent by
+    // design: there is no UI for reordering, so this list is the single source of
+    // truth. Retired (hidden) rooms keep their place in the list.
+    const ROOM_ORDER = [
+      '비전홀 대예배실',
+      '비전홀 새가족실',
+      '비전홀 영아부실',
+      '비전홀 유아부실',
+      '비전홀 유치부실',
+      '비전홀 찬양대실',
+      '비전홀 2층 교실 1',
+      '비전홀 2층 교실 2',
+      '비전홀 2층 교실 3',
+      '비전홀 2층 교실 4',
+      '비전홀 2층 올리브홀(초등부)',
+      '비전홀 2층 초등부 교사실',
+      '은혜성전 예배실',
+      '은혜성전 친교실',
+      '은혜성전 2층 교실 302',
+      '은혜성전 2층 교실 303',
+      '은혜성전 2층 교실 305',
+      '은혜성전 2층 교실 306',
+      '은혜성전 청년부실',
+      '은혜성전 (구)부교역자실',
+    ];
+    try {
+      await sql`
+        UPDATE rooms SET sort_order = t.ord
+        FROM unnest(${ROOM_ORDER}::text[], ${ROOM_ORDER.map((_, i) => i + 1)}::int[]) AS t(name, ord)
+        WHERE rooms.name = t.name AND rooms.sort_order <> t.ord
+      `;
+    } catch (e) {
+      console.error('[db] 장소 정렬 적용 실패:', e);
     }
   })();
 
@@ -169,6 +282,10 @@ export interface Room {
   id: number;
   name: string;
   color: string;
+  /** Retired room: kept for existing reservations, hidden from member pickers. */
+  hidden: boolean;
+  /** Explicit display position; see ROOM_ORDER in ensureDbReady. */
+  sort_order: number;
 }
 
 export type ReservationStatus = 'pending' | 'approved' | 'rejected' | 'cancellation_requested' | 'cancelled';
@@ -218,9 +335,14 @@ export interface ReservationSeries {
 
 // ---------- Queries ----------
 
-export async function getRooms(): Promise<Room[]> {
+/** @param includeHidden pass true for administrators, who may still book retired rooms. */
+export async function getRooms(includeHidden = false): Promise<Room[]> {
   await ensureDbReady();
-  const rows = (await getSql()`SELECT * FROM rooms ORDER BY id`) as Room[];
+  const sql = getSql();
+  const rows = (includeHidden
+    ? await sql`SELECT * FROM rooms ORDER BY sort_order, id`
+    : await sql`SELECT * FROM rooms WHERE hidden = false ORDER BY sort_order, id`
+  ) as Room[];
   return rows;
 }
 

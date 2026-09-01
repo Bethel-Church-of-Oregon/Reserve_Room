@@ -131,9 +131,11 @@ export async function POST(req: NextRequest) {
     if (!Number.isInteger(roomIdNum) || roomIdNum < 1) {
       return NextResponse.json({ error: '올바른 장소를 선택해 주세요.' }, { status: 400 });
     }
-    const rooms = await getRooms();
+    // Regular members are validated against visible rooms only, so hiding a room
+    // in the picker cannot be undone by posting its id directly.
+    const rooms = await getRooms(isAdmin);
     if (!rooms.some((r) => r.id === roomIdNum)) {
-      return NextResponse.json({ error: '존재하지 않는 장소입니다.' }, { status: 400 });
+      return NextResponse.json({ error: '선택할 수 없는 장소입니다.' }, { status: 400 });
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailStr)) {
