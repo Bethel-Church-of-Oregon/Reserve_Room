@@ -20,9 +20,11 @@ npm run build && npm start  # 프로덕션 (포트 8000)
 ## 주요 파일
 - `src/lib/db.ts` — Postgres 스키마, 쿼리, TypeScript 타입
 - `src/lib/email.ts` — 이메일 발송 (예약 확인/취소 알림), nodemailer 사용
+  - transporter는 **인스턴스당 1회 생성(메모이즈), 풀링은 일부러 안 함.** Vercel이 응답 직후 인스턴스를 얼려서 유지된 SMTP 소켓은 다음 호출 때 대개 죽어 있고, 죽은 소켓을 기다리는 발송은 **await 중인 요청을 정지시킴**
+  - `connectionTimeout`/`greetingTimeout` 10초, `socketTimeout` 20초 — 발송을 응답 전에 await 하므로 타임아웃이 없으면 Gmail 무응답 시 Vercel의 300초 상한까지 요청이 잡힘 (실측: 옵션 없으면 30초 넘게 대기, 있으면 10초에 실패)
 - `src/lib/sms.ts` — Twilio 문자 발송 (`sendSmsNotifications`) + 메시지 생성 (`build*SmsMessage`) + `toE164()`
 - `src/lib/telegram.ts` — 텔레그램 발송 (`sendTelegramNotification`) + 메시지 생성 (`build*TelegramMessage`)
-- `src/lib/auth.ts` — HMAC-SHA256 관리자 세션 토큰 생성/검증
+- `src/lib/auth.ts` — HMAC-SHA256 관리자 세션 토큰 생성/검증(12시간 만료) + 타이밍 안전 비밀번호 비교
 - `src/lib/constants.ts` — 입력값 길이 제한 상수 (`LIMITS`)
 - `src/lib/ratelimit.ts` — Upstash Redis 기반 rate limiting. **IP 계층(느슨한 상한) + 이메일 계층(엄격)** 2단
 - `src/lib/date.ts` — **모든 날짜/시각 판단의 단일 창구.** 서부시간(`America/Los_Angeles`) 기준 `pacificDateKey()` / `pacificTodayDate()` / `pacificNow()` / `toDateKey()` + 입력 검증·정규화 `normalizeDateTime()`
@@ -35,7 +37,7 @@ npm run build && npm start  # 프로덕션 (포트 8000)
 - `src/components/ReservationDetailPopover.tsx` — 예약 상세 팝오버 + `CancelRequestModal` (취소 신청)
 - `src/app/reserve/page.tsx` — 예약 신청 폼 (Suspense로 useSearchParams 감쌈)
 - `src/app/admin/page.tsx` — 관리자 패널 (로그인 → 예약 목록/취소 목록/전체 조회, 삭제)
-- `src/app/api/reservations/route.ts` — GET, POST (단건 + 반복 예약, 즉시 approved 처리)
+- `src/app/api/reservations/route.ts` — GET(최대 400일 범위), POST (단건 + 반복 예약, 즉시 approved 처리)
 - `src/app/api/reservations/[id]/route.ts` — PATCH (관리자 전용: `edit` 등), DELETE
 - `src/app/api/reservations/[id]/cancel/route.ts` — POST 취소 신청 (즉시 cancelled 처리)
 - `src/app/api/reservations/[id]/edit/route.ts` — POST 예약 변경 (동일 룸·동일 날짜 내 시간/제목/담당자/노트)
@@ -111,8 +113,12 @@ TELEGRAM_CHAT_ID=                 # 담당자 그룹 chat_id (그룹은 -100… 
 - `TELEGRAM_*` 둘 중 하나라도 미설정 시 텔레그램만 건너뜀 (경고 로그 후 예약은 정상 동작)
 
 ## 관리자 인증
-- 쿠키 기반: `admin_auth` 쿠키 (httpOnly, maxAge 없음 = 세션 쿠키)
-- 값: `randomToken.hmac_sha256_signature` 형식 (HMAC-SHA256, `ADMIN_PASSWORD` 키)
+- 쿠키 기반: `admin_auth` 쿠키 (httpOnly, sameSite lax, 프로덕션 secure, maxAge 없음 = 세션 쿠키)
+- 값: `randomToken.issuedAt.hmac_sha256_signature` (HMAC-SHA256, `ADMIN_PASSWORD` 키)
+- **서버 측 만료 12시간.** 발급시각이 서명 대상에 포함돼 있어 조작 불가
+  - 쿠키의 "브라우저 닫으면 사라짐"은 브라우저의 약속일 뿐 서버 보장이 아님. 예전에는 토큰에 시각이 없어서 **쿠키 값이 유출되면 `ADMIN_PASSWORD`를 바꿀 때까지 무기한 유효**했음 (2026-09 수정)
+  - 구형 2-파트 토큰은 검증 실패 → 재로그인. 하위호환 없음
+- 비밀번호 비교는 `adminPasswordMatches()` — 양쪽을 SHA-256으로 고정 길이화한 뒤 `timingSafeEqual`. 길이 자체가 정보를 흘리므로 해시를 먼저 함
 - `src/lib/auth.ts`의 `createAdminSession()` / `verifyAdminSession()` 사용
 - `sessionStorage.adminVerified` 이중 체크: 브라우저 닫으면 sessionStorage 초기화 → 재접속 시 무조건 비밀번호 재입력 (브라우저 세션 복원 우회)
 

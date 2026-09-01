@@ -6,15 +6,36 @@ function getEmailSender(): string {
   return sender || 'bethel.oregon.dev@gmail.com';
 }
 
-function getTransporter() {
-  const sender = getEmailSender();
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: sender,
-      pass: process.env.GMAIL_APP_PASSWORD,
-    },
-  });
+let _transporter: nodemailer.Transporter | null = null;
+
+/**
+ * One transporter per instance, built on first use.
+ *
+ * Deliberately *not* pooled. Pooling would keep SMTP sockets open between sends,
+ * but Vercel freezes the instance the moment a response goes out, so those
+ * sockets are usually dead by the next invocation — and a send that waits on a
+ * dead socket stalls a request we already await before responding. A fresh
+ * connection per message is the cheaper failure mode here.
+ *
+ * The timeouts matter for the same reason: every send is awaited before the
+ * route responds, so without them an unresponsive Gmail would hold the request
+ * open until Vercel's own 300-second ceiling instead of failing and letting the
+ * reservation succeed without its confirmation mail.
+ */
+function getTransporter(): nodemailer.Transporter {
+  if (!_transporter) {
+    _transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: getEmailSender(),
+        pass: process.env.GMAIL_APP_PASSWORD,
+      },
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 20_000,
+    });
+  }
+  return _transporter;
 }
 
 function escapeHtml(s: string): string {

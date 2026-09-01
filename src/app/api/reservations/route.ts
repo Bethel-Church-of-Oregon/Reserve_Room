@@ -6,15 +6,40 @@ import { LIMITS } from '@/lib/constants';
 import { sendReservationCreatedEmail, sendReservationCreatedBulkEmail } from '@/lib/email';
 import { sendSmsNotifications, buildReservationSmsMessage } from '@/lib/sms';
 import { sendTelegramNotification, buildReservationTelegramMessage } from '@/lib/telegram';
-import { pacificTodayDate, normalizeDateTime, DATE_RE } from '@/lib/date';
+import { pacificTodayDate, pacificDateKey, normalizeDateTime, DATE_RE } from '@/lib/date';
 import { cookies } from 'next/headers';
 import { verifyAdminSession } from '@/lib/auth';
+
+/**
+ * Widest window a single calendar request may ask for. The list view asks for a
+ * year, so this leaves room without letting an unbounded request walk the whole
+ * table: `from` and `to` were both optional, and omitting them returned every
+ * reservation ever made in one response.
+ */
+const MAX_RANGE_DAYS = 400;
+
+function addDaysToKey(key: string, days: number): string {
+  const [y, m, d] = key.split('-').map(Number);
+  return format(addDays(new Date(y, m - 1, d), days), 'yyyy-MM-dd');
+}
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const from = searchParams.get('from') ?? undefined;
-    const to = searchParams.get('to') ?? undefined;
+    const fromParam = searchParams.get('from');
+    const toParam = searchParams.get('to');
+
+    if ((fromParam && !DATE_RE.test(fromParam)) || (toParam && !DATE_RE.test(toParam))) {
+      return NextResponse.json({ error: '조회 기간 형식이 올바르지 않습니다.' }, { status: 400 });
+    }
+
+    // An absent bound is anchored rather than left open: today for `from`, and
+    // the widest allowed window for `to`. Navigating into the past still works —
+    // the cap is on the width of the window, not on how far back it starts.
+    const from = fromParam ?? pacificDateKey();
+    const cap = addDaysToKey(from, MAX_RANGE_DAYS);
+    const to = toParam && toParam <= cap ? toParam : cap;
+
     const reservations = await getReservations(from, to);
     return NextResponse.json(reservations);
   } catch (e) {

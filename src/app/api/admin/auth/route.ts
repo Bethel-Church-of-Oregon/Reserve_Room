@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { createAdminSession, verifyAdminSession } from '@/lib/auth';
+import { createAdminSession, verifyAdminSession, adminPasswordMatches } from '@/lib/auth';
 import { checkAdminLoginLimit } from '@/lib/ratelimit';
 
 export async function POST(req: NextRequest) {
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { password } = await req.json();
-    if (password !== adminPassword) {
+    if (!adminPasswordMatches(password, adminPassword)) {
       return NextResponse.json({ error: '비밀번호가 올바르지 않습니다.' }, { status: 401 });
     }
 
