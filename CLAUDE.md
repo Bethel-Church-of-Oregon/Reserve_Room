@@ -25,7 +25,7 @@ npm run build && npm start  # 프로덕션 (포트 8000)
 - `src/lib/auth.ts` — HMAC-SHA256 관리자 세션 토큰 생성/검증
 - `src/lib/constants.ts` — 입력값 길이 제한 상수 (`LIMITS`)
 - `src/lib/ratelimit.ts` — Upstash Redis 기반 rate limiting. **IP 계층(느슨한 상한) + 이메일 계층(엄격)** 2단
-- `src/lib/date.ts` — **모든 날짜/시각 판단의 단일 창구.** 서부시간(`America/Los_Angeles`) 기준 `pacificDateKey()` / `pacificTodayDate()` / `pacificNow()` / `toDateKey()`
+- `src/lib/date.ts` — **모든 날짜/시각 판단의 단일 창구.** 서부시간(`America/Los_Angeles`) 기준 `pacificDateKey()` / `pacificTodayDate()` / `pacificNow()` / `toDateKey()` + 입력 검증·정규화 `normalizeDateTime()`
 - `src/lib/editReservation.ts` — `applyReservationEdit()`: 예약 변경 검증·저장·알림 (공개 라우트와 관리자 라우트가 공유)
 - `src/app/page.tsx` — 메인 캘린더 (day/week/month/list, 클라이언트 컴포넌트)
 - `src/components/DayView.tsx` — 일간 캘린더 (오전 6시~오후 11시, 1.5px/분) + 현재 시간 라인 (Pacific time)
@@ -169,6 +169,10 @@ approved → cancelled (취소 신청 시 즉시 처리)
   - `pacificTodayDate()` — 서부시간 연/월/일을 가진 **로컬 자정** Date (캘린더 네비게이션 state용. 뷰들이 `getFullYear()` 등 로컬 getter로 되읽기 때문)
   - `pacificNow()` — `{ dateKey, totalMinutes }` (일간 뷰 현재 시간 라인)
   - `toDateKey(d)` — Date의 **로컬** 성분으로 키 생성 (캘린더 격자 셀. 셀은 서부 달력일을 나타내는 로컬 자정 Date이므로 `pacificDateKey()`와 비교해도 정확)
+  - `normalizeDateTime(raw)` — **클라이언트가 보낸 시각의 유일한 검증·정규화 창구.** `'YYYY-MM-DDTHH:MM(:SS)'`을 받아 19자로 정규화, 불가능한 시각이면 `null`
+    - 예약 **생성과 변경 양쪽**이 같은 함수를 씀. 예전에는 생성 경로에 검증이 아예 없어서 `new Date(x) >= new Date(y)`가 `NaN >= NaN`(=false)로 통과해 버렸고, 나중에 배타 제약이 거부하면서 400이 아니라 **500**으로 나갔음 (2026-09 수정)
+    - 정규식만으로는 부족함 — `2026-02-30T25:00`은 형식은 맞지만 실재하지 않음. 실제 날짜 검증까지 함께 함
+    - 19자 통일이 중요한 이유: 앱 전체가 이 값들을 **문자열로 비교**하므로 16자 행이 섞이면 조용히 잘못 정렬됨
 - DST는 `Intl.DateTimeFormat`이 처리 → PST/PDT 분기 불필요
 - 날짜/시간 비교는 가능하면 `YYYY-MM-DDTHH:MM:SS` **문자열 비교**로 (DB 저장 형식과 동일, 시간대 파싱 없음). 1달 제한·시작<종료·같은 날짜 검증 모두 이 방식
 - 적용 범위: 캘린더 4개 뷰 + 팝오버 + 예약 폼(`max` 날짜) + 관리자 조회 범위 + 서버의 1달 제한 및 지난 예약 차단
@@ -202,6 +206,9 @@ approved → cancelled (취소 신청 시 즉시 처리)
 - 취소는 즉시 `cancelled` 처리 (삭제 대신 DB 보존, 캘린더에서는 필터링)
 - 캘린더 뷰: 상태 배지 없음, 장소 색상 솔리드 블록만 표시 (빗금 패턴 없음)
 - 반복 예약: 관리자 전용 (`/reserve?admin=true`). daily/weekly/monthly, 최대 500회 (매주 약 9.6년)
+  - `recurring` 값과 `recurring_until` 형식을 검증한 뒤 **occurrence를 먼저 생성**하고, 비어 있으면 400
+  - **`reservation_series` INSERT는 모든 조기 return을 통과한 뒤에 수행.** 예전에는 맨 앞에서 만들어서, 종료일이 시작일보다 이른 경우(`occurrences[0]`에서 크래시 → 500)와 모든 날짜가 충돌한 경우(409) 양쪽 모두 **고아 series 행**을 남겼음 (2026-09 수정)
+  - bulk INSERT가 경합으로 실패하는 드문 경우에만 고아 행이 남을 수 있음. 트랜잭션 왕복을 매번 추가할 만한 빈도가 아니라고 판단해 그대로 둠
   - 충돌 날짜 자동 제외하고 나머지만 bulk INSERT
   - 생성 시 DB 쿼리 2번으로 고정 (범위 내 충돌 SELECT 1번 + 비충돌 건 UNNEST bulk INSERT 1번)
 - 1달 날짜 제한: 일반 사용자는 오늘~1달 이내만 예약. 클라이언트(date input `max`) + 서버(세션 쿠키 기반 `isAdmin`) 이중 검증

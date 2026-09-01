@@ -6,7 +6,7 @@ import { LIMITS } from '@/lib/constants';
 import { sendReservationCreatedEmail, sendReservationCreatedBulkEmail } from '@/lib/email';
 import { sendSmsNotifications, buildReservationSmsMessage } from '@/lib/sms';
 import { sendTelegramNotification, buildReservationTelegramMessage } from '@/lib/telegram';
-import { pacificTodayDate } from '@/lib/date';
+import { pacificTodayDate, normalizeDateTime, DATE_RE } from '@/lib/date';
 import { cookies } from 'next/headers';
 import { verifyAdminSession } from '@/lib/auth';
 
@@ -127,6 +127,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `노트는 ${LIMITS.notes}자 이하여야 합니다.` }, { status: 400 });
     }
 
+    // Times arrive from the form as 'YYYY-MM-DDTHH:MM'; the database stores them
+    // with seconds. Validate and normalize once here, so every comparison below
+    // and every row written share the single 19-character format the rest of the
+    // app compares as a plain string. There was no check at all before: a
+    // malformed value sailed past `new Date(x) >= new Date(y)` — NaN >= NaN is
+    // false — and only failed later inside the overlap constraint, surfacing as
+    // a 500 where it should have been a 400.
+    const startStr = normalizeDateTime(String(start_time).trim());
+    const endStr = normalizeDateTime(String(end_time).trim());
+    if (!startStr || !endStr) {
+      return NextResponse.json({ error: '시간 형식이 올바르지 않습니다.' }, { status: 400 });
+    }
+
     const roomIdNum = Number(room_id);
     if (!Number.isInteger(roomIdNum) || roomIdNum < 1) {
       return NextResponse.json({ error: '올바른 장소를 선택해 주세요.' }, { status: 400 });
@@ -157,14 +170,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (new Date(start_time) >= new Date(end_time)) {
+    if (startStr >= endStr) {
       return NextResponse.json({ error: '종료 시간은 시작 시간보다 늦어야 합니다.' }, { status: 400 });
     }
 
     // 일반 사용자는 오늘로부터 1달 이내만 예약 가능 (서부시간 기준 날짜 문자열 비교)
     if (!isAdmin) {
       const maxDateKey = format(addMonths(pacificTodayDate(), 1), 'yyyy-MM-dd');
-      if (String(start_time).slice(0, 10) > maxDateKey) {
+      if (startStr.slice(0, 10) > maxDateKey) {
         return NextResponse.json({ error: '예약은 오늘로부터 1달 이내만 신청할 수 있습니다.' }, { status: 400 });
       }
     }
@@ -179,19 +192,24 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const seriesId = crypto.randomUUID();
-      await createReservationSeries({
-        id: seriesId,
-        title: titleStr,
-        room_id: roomIdNum,
-        person_in_charge: personStr,
-        email: emailStr,
-        notes: notesStr || undefined,
-        recurring,
-        recurring_until,
-      });
+      if (recurring !== 'daily' && recurring !== 'weekly' && recurring !== 'monthly') {
+        return NextResponse.json({ error: '반복 주기가 올바르지 않습니다.' }, { status: 400 });
+      }
+      const untilStr = String(recurring_until).trim();
+      if (!DATE_RE.test(untilStr)) {
+        return NextResponse.json({ error: '반복 종료일 형식이 올바르지 않습니다.' }, { status: 400 });
+      }
 
-      const occurrences = generateOccurrences(start_time, end_time, recurring, recurring_until);
+      // Generated before the series row is written. The other order meant an end
+      // date earlier than the start date produced an empty list, threw on
+      // `occurrences[0]` below, and left an orphaned reservation_series behind.
+      const occurrences = generateOccurrences(startStr, endStr, recurring, untilStr);
+      if (occurrences.length === 0) {
+        return NextResponse.json(
+          { error: '반복 종료일이 시작일보다 빠릅니다. 종료일을 다시 선택해 주세요.' },
+          { status: 400 }
+        );
+      }
 
       // Fetch all existing conflicts in the full date range with a single query
       const minStart = occurrences[0].start_time;
@@ -215,39 +233,55 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Bulk INSERT all non-conflicting occurrences in a single query
-      if (toInsert.length > 0) {
-        try {
-          await createReservationsBulk({
-            series_id: seriesId,
-            title: titleStr,
-            room_id: roomIdNum,
-            person_in_charge: personStr,
-            email: emailStr,
-            notes: notesStr || undefined,
-            occurrences: toInsert,
-          });
-        } catch (e) {
-          // The bulk insert is one statement, so a single late-arriving conflict
-          // rolls back the whole series. Ask for a retry rather than reporting a
-          // partial success that did not happen.
-          if (isOverlapViolation(e)) {
-            return NextResponse.json(
-              { error: 'conflict', message: '방금 다른 예약이 등록되어 일정이 겹칩니다. 다시 시도해 주세요.' },
-              { status: 409 }
-            );
-          }
-          throw e;
-        }
-      }
-      const created = toInsert.length;
-
-      if (created === 0) {
+      if (toInsert.length === 0) {
         return NextResponse.json(
           { error: 'conflict', message: '선택한 기간의 모든 날짜에 이미 예약이 있습니다.', conflictDates },
           { status: 409 }
         );
       }
+
+      // Written only now that at least one occurrence is certain to be stored.
+      // This used to run before both checks above, so an end date earlier than
+      // the start date, or a range whose every date was already taken, each left
+      // an orphaned reservation_series row behind.
+      const seriesId = crypto.randomUUID();
+      await createReservationSeries({
+        id: seriesId,
+        title: titleStr,
+        room_id: roomIdNum,
+        person_in_charge: personStr,
+        email: emailStr,
+        notes: notesStr || undefined,
+        recurring,
+        recurring_until: untilStr,
+      });
+
+      // Bulk INSERT all non-conflicting occurrences in a single query
+      try {
+        await createReservationsBulk({
+          series_id: seriesId,
+          title: titleStr,
+          room_id: roomIdNum,
+          person_in_charge: personStr,
+          email: emailStr,
+          notes: notesStr || undefined,
+          occurrences: toInsert,
+        });
+      } catch (e) {
+        // The bulk insert is one statement, so a single late-arriving conflict
+        // rolls back the whole series. Ask for a retry rather than reporting a
+        // partial success that did not happen. The series row written just above
+        // is left behind in that case; it is harmless and rare enough not to be
+        // worth a transaction round trip on every recurring booking.
+        if (isOverlapViolation(e)) {
+          return NextResponse.json(
+            { error: 'conflict', message: '방금 다른 예약이 등록되어 일정이 겹칩니다. 다시 시도해 주세요.' },
+            { status: 409 }
+          );
+        }
+        throw e;
+      }
+      const created = toInsert.length;
 
       const roomName = rooms.find((r) => r.id === roomIdNum)?.name ?? '';
       await sendReservationCreatedBulkEmail({
@@ -267,7 +301,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Single reservation
-    const hasConflict = await checkConflict(roomIdNum, start_time, end_time);
+    const hasConflict = await checkConflict(roomIdNum, startStr, endStr);
     if (hasConflict) {
       return NextResponse.json(
         { error: 'conflict', message: '해당 시간에 이미 예약이 있습니다.' },
@@ -277,7 +311,7 @@ export async function POST(req: NextRequest) {
 
     let reservation;
     try {
-      reservation = await createReservation({ title: titleStr, room_id: roomIdNum, start_time, end_time, person_in_charge: personStr, email: emailStr, notes: notesStr || undefined });
+      reservation = await createReservation({ title: titleStr, room_id: roomIdNum, start_time: startStr, end_time: endStr, person_in_charge: personStr, email: emailStr, notes: notesStr || undefined });
     } catch (e) {
       // Someone booked the slot between the check above and this insert.
       if (isOverlapViolation(e)) {
@@ -297,8 +331,8 @@ export async function POST(req: NextRequest) {
       sendReservationCreatedEmail({
         title: titleStr,
         room_name: roomName,
-        start_time,
-        end_time,
+        start_time: startStr,
+        end_time: endStr,
         person_in_charge: personStr,
         email: emailStr,
         notes: notesStr || undefined,
@@ -310,8 +344,8 @@ export async function POST(req: NextRequest) {
         : sendSmsNotifications(buildReservationSmsMessage({
             title: titleStr,
             room_name: roomName,
-            start_time,
-            end_time,
+            start_time: startStr,
+            end_time: endStr,
             person_in_charge: personStr,
           })).catch((e) => console.error('[sms] 발송 실패:', e)),
 
@@ -320,8 +354,8 @@ export async function POST(req: NextRequest) {
         : sendTelegramNotification(buildReservationTelegramMessage({
             title: titleStr,
             room_name: roomName,
-            start_time,
-            end_time,
+            start_time: startStr,
+            end_time: endStr,
             person_in_charge: personStr,
             notes: notesStr || undefined,
           })).catch((e) => console.error('[telegram] 발송 실패:', e)),

@@ -5,14 +5,12 @@ import {
   isOverlapViolation,
 } from '@/lib/db';
 import { LIMITS } from '@/lib/constants';
-import { pacificDateKey } from '@/lib/date';
+import { pacificDateKey, normalizeDateTime } from '@/lib/date';
 import { sendReservationUpdatedEmail } from '@/lib/email';
 import { sendSmsNotifications, buildUpdateSmsMessage } from '@/lib/sms';
 import { sendTelegramNotification, buildUpdateTelegramMessage } from '@/lib/telegram';
 
 export type EditResult = { ok: true } | { ok: false; error: string; status: number };
-
-const TIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
 
 const fail = (error: string, status: number): EditResult => ({ ok: false, error, status });
 
@@ -64,14 +62,15 @@ export async function applyReservationEdit(
     return fail(`담당자명은 ${LIMITS.person_in_charge}자 이하여야 합니다.`, 400);
   }
   if (notesRaw.length > LIMITS.notes) return fail(`노트는 ${LIMITS.notes}자 이하여야 합니다.`, 400);
-  if (!TIME_RE.test(startRaw) || !TIME_RE.test(endRaw)) {
+
+  // Validated and normalized by the same helper the create route uses, so both
+  // paths reject the same impossible instants and write the same 19-character
+  // format the "nothing changed" and previous-time comparisons rely on.
+  const start_time = normalizeDateTime(startRaw);
+  const end_time = normalizeDateTime(endRaw);
+  if (!start_time || !end_time) {
     return fail('시간 형식이 올바르지 않습니다.', 400);
   }
-
-  // Stored times always carry seconds ('2024-03-10T09:00:00'); normalize so the
-  // "nothing changed" and previous-time comparisons are string-exact.
-  const start_time = startRaw.length === 16 ? `${startRaw}:00` : startRaw;
-  const end_time = endRaw.length === 16 ? `${endRaw}:00` : endRaw;
 
   if (start_time.slice(0, 10) !== originalDate || end_time.slice(0, 10) !== originalDate) {
     return fail(

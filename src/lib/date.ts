@@ -58,3 +58,39 @@ export function pacificNow(): { dateKey: string; totalMinutes: number } {
 export function toDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+
+/** Shape of a reservation timestamp: 'YYYY-MM-DDTHH:MM' with optional seconds. */
+export const DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
+
+/** 'YYYY-MM-DD', the shape of a recurrence end date. */
+export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Validate a reservation timestamp and normalize it to the 19-character form
+ * the database stores ('2026-03-10T09:00:00'). Returns null if it is not a real
+ * instant.
+ *
+ * Both halves matter. The shape check alone lets '2026-02-30T25:00' through,
+ * which Postgres then refuses when the overlap constraint builds a timestamp
+ * from it — surfacing as a 500 rather than a 400. And normalizing here is what
+ * keeps every stored value the same length, since the whole app compares these
+ * timestamps as plain strings; a 16-character row would silently mis-sort
+ * against 19-character ones.
+ */
+export function normalizeDateTime(raw: string): string | null {
+  if (!DATETIME_RE.test(raw)) return null;
+
+  const [datePart, timePart] = raw.split('T');
+  const [y, m, d] = datePart.split('-').map(Number);
+  const [hh, mm, ss = 0] = timePart.split(':').map(Number);
+
+  if (m < 1 || m > 12 || d < 1 || hh > 23 || mm > 59 || ss > 59) return null;
+
+  // Rejects day-of-month overflow (Feb 30, Apr 31) and two-digit-year coercion.
+  const probe = new Date(y, m - 1, d);
+  if (probe.getFullYear() !== y || probe.getMonth() !== m - 1 || probe.getDate() !== d) {
+    return null;
+  }
+
+  return `${datePart}T${timePart.length === 5 ? `${timePart}:00` : timePart}`;
+}
