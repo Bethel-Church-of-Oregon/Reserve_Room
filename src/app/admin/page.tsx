@@ -4,9 +4,19 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ReservationWithRoom, NotificationRecipient } from '@/lib/db';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { CARRIER_LABELS } from '@/lib/sms';
+import { pacificTodayDate, toDateKey } from '@/lib/date';
+import { LIMITS } from '@/lib/constants';
+import { EditRequestModal } from '@/components/ReservationDetailPopover';
 
 type FilterStatus = 'pending' | 'approved' | 'cancelled' | 'all';
+
+/** '5039545830' → '(503) 954-5830'; anything unexpected is shown as-is. */
+function formatPhone(phone: string): string {
+  const d = phone.replace(/\D/g, '');
+  if (d.length === 10) return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+  if (d.length === 11 && d.startsWith('1')) return `+1 (${d.slice(1, 4)}) ${d.slice(4, 7)}-${d.slice(7)}`;
+  return phone;
+}
 
 function formatDateTime(dt: string): string {
   const d = new Date(dt);
@@ -387,6 +397,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const [rejectSeriesTarget, setRejectSeriesTarget] = useState<{ seriesId: string; title: string; roomName: string; count: number } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ReservationWithRoom | null>(null);
   const [detailTarget, setDetailTarget] = useState<ReservationWithRoom | null>(null);
+  const [editTarget, setEditTarget] = useState<ReservationWithRoom | null>(null);
   const [rejectCancelTarget, setRejectCancelTarget] = useState<ReservationWithRoom | null>(null);
   const [rejectCancelSeriesTarget, setRejectCancelSeriesTarget] = useState<{
     seriesId: string;
@@ -398,12 +409,14 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const [seriesActionLoading, setSeriesActionLoading] = useState<string | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
-  const [adminView, setAdminView] = useState<'reservations' | 'recipients'>('reservations');
+  const [adminView, setAdminView] = useState<'reservations' | 'recipients' | 'settings'>('reservations');
+  const [accessCode, setAccessCode] = useState('');
+  const [accessCodeSaved, setAccessCodeSaved] = useState('');
+  const [accessCodeLoading, setAccessCodeLoading] = useState(false);
   const [recipients, setRecipients] = useState<NotificationRecipient[]>([]);
   const [recipientsLoading, setRecipientsLoading] = useState(false);
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
-  const [newCarrier, setNewCarrier] = useState('');
   const [addError, setAddError] = useState('');
   const [addLoading, setAddLoading] = useState(false);
 
@@ -415,9 +428,9 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const fetchReservations = useCallback(async () => {
     setLoading(true);
     try {
-      const yesterday = new Date();
+      const yesterday = pacificTodayDate();
       yesterday.setDate(yesterday.getDate() - 1);
-      const from = yesterday.toISOString().slice(0, 10);
+      const from = toDateKey(yesterday);
       const res = await fetch(`/api/admin/reservations?from=${from}`);
       if (res.status === 401) { onLogout(); return; }
       const data = await res.json();
@@ -448,9 +461,26 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
     finally { setRecipientsLoading(false); }
   }, []);
 
+  const fetchAccessCode = useCallback(async () => {
+    setAccessCodeLoading(true);
+    try {
+      const res = await fetch('/api/admin/access-code');
+      if (res.status === 401) { onLogout(); return; }
+      const d = await res.json();
+      setAccessCode(d.code ?? '');
+      setAccessCodeSaved(d.code ?? '');
+    } catch {
+      showToast(t.adminDataError, 'error');
+    } finally {
+      setAccessCodeLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onLogout]);
+
   useEffect(() => {
     if (adminView === 'recipients') fetchRecipients();
-  }, [adminView, fetchRecipients]);
+    if (adminView === 'settings') fetchAccessCode();
+  }, [adminView, fetchRecipients, fetchAccessCode]);
 
   const uniqueRooms = allRooms.length > 0 ? allRooms : Array.from(
     new Map(reservations.map(r => [r.room_id, { id: r.room_id, name: r.room_name, color: r.room_color }])).values()
@@ -740,6 +770,18 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           onClose={() => setDetailTarget(null)}
         />
       )}
+      {editTarget && (
+        <EditRequestModal
+          admin
+          reservation={editTarget}
+          onConfirm={() => {
+            setEditTarget(null);
+            showToast(t.toastEdited);
+            fetchReservations();
+          }}
+          onCancel={() => setEditTarget(null)}
+        />
+      )}
       {deleteTarget && (
         <DeleteModal
           reservation={deleteTarget}
@@ -810,10 +852,10 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
             {(['approved', 'cancelled', 'all'] as FilterStatus[]).map((f) => (
               <button
                 key={f}
-                onClick={() => { setFilter(f); setSelected(new Set()); }}
+                onClick={() => { setFilter(f); setSelected(new Set()); setAdminView('reservations'); }}
                 style={{ padding: '8px clamp(4px, 2vw, 12px)' }}
                 className={`font-medium transition border-l first:border-l-0 border-gray-200 whitespace-nowrap ${
-                  filter === f ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                  adminView === 'reservations' && filter === f ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
                 }`}
               >
                 {f === 'approved' ? t.adminTabReservations : f === 'cancelled' ? t.adminTabCancellations : t.adminTabAll}
@@ -831,7 +873,16 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
             {t.adminTabRecipients}
           </button>
           <button
-            onClick={fetchReservations}
+            onClick={() => setAdminView(v => v === 'settings' ? 'reservations' : 'settings')}
+            style={{ fontSize: 'clamp(10px, 3.5vw, 14px)', padding: '8px clamp(4px, 2vw, 12px)' }}
+            className={`flex-shrink-0 rounded-lg border font-medium transition whitespace-nowrap ${
+              adminView === 'settings' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            {t.adminTabSettings}
+          </button>
+          <button
+            onClick={adminView === 'recipients' ? fetchRecipients : adminView === 'settings' ? fetchAccessCode : fetchReservations}
             className="ml-auto border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition whitespace-nowrap flex-shrink-0"
             style={{ fontSize: 'clamp(10px, 3.5vw, 14px)', padding: '8px clamp(8px, 2.5vw, 12px)' }}
           >
@@ -839,6 +890,72 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
             <span className="hidden min-[420px]:inline">{t.btnRefresh}</span>
           </button>
         </div>
+
+        {adminView === 'settings' && (
+          <div className="max-w-lg">
+            <h2 className="text-base font-bold text-gray-800 mb-1">{t.settingsTitle}</h2>
+            <p className="text-xs text-gray-500 mb-5">{t.settingsDesc}</p>
+
+            {accessCodeLoading ? (
+              <div className="text-sm text-gray-400 py-4">{t.loading}</div>
+            ) : (
+              <>
+                <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
+                  accessCodeSaved
+                    ? 'border-green-200 bg-green-50 text-green-800'
+                    : 'border-amber-200 bg-amber-50 text-amber-800'
+                }`}>
+                  {accessCodeSaved ? t.settingsEnabled(accessCodeSaved) : t.settingsDisabled}
+                </div>
+
+                <label htmlFor="admin-access-code" className="block text-sm font-medium text-gray-700 mb-1">
+                  {t.settingsCodeLabel}
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="admin-access-code"
+                    type="text"
+                    value={accessCode}
+                    onChange={(e) => setAccessCode(e.target.value)}
+                    placeholder={t.settingsCodePlaceholder}
+                    autoComplete="off"
+                    maxLength={LIMITS.accessCode}
+                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
+                  />
+                  <button
+                    onClick={async () => {
+                      setAccessCodeLoading(true);
+                      try {
+                        const res = await fetch('/api/admin/access-code', {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ code: accessCode.trim() }),
+                        });
+                        const d = await res.json();
+                        if (res.ok) {
+                          setAccessCode(d.code ?? '');
+                          setAccessCodeSaved(d.code ?? '');
+                          showToast(t.settingsSaved);
+                        } else {
+                          showToast(d.error ?? t.toastError, 'error');
+                        }
+                      } catch {
+                        showToast(t.toastNetworkError, 'error');
+                      } finally {
+                        setAccessCodeLoading(false);
+                      }
+                    }}
+                    disabled={accessCodeLoading || accessCode.trim() === accessCodeSaved}
+                    className="flex-shrink-0 px-4 py-2 bg-gray-800 hover:bg-gray-900 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition"
+                  >
+                    {t.settingsSave}
+                  </button>
+                </div>
+                <p className="mt-3 text-xs text-gray-400">{t.settingsWarn}</p>
+              </>
+            )}
+          </div>
+        )}
 
         {adminView === 'recipients' && (
           <div className="max-w-lg">
@@ -864,31 +981,20 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                     className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
                   />
                 </div>
-                <div className="flex gap-2">
-                  <select
-                    value={newCarrier}
-                    onChange={(e) => { setNewCarrier(e.target.value); setAddError(''); }}
-                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400 bg-white"
-                  >
-                    <option value="">{t.recipientSelectCarrier}</option>
-                    {Object.entries(CARRIER_LABELS).map(([val, label]) => (
-                      <option key={val} value={val}>{label}</option>
-                    ))}
-                  </select>
+                <div className="flex justify-end">
                   <button
                     onClick={async () => {
                       if (!newName.trim()) { setAddError(t.errRecipientName); return; }
                       if (newPhone.length < 10) { setAddError(t.errRecipientPhone); return; }
-                      if (!newCarrier) { setAddError(t.errRecipientCarrier); return; }
                       setAddLoading(true);
                       try {
                         const res = await fetch('/api/admin/recipients', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ name: newName.trim(), phone: newPhone, carrier: newCarrier }),
+                          body: JSON.stringify({ name: newName.trim(), phone: newPhone }),
                         });
                         if (res.ok) {
-                          setNewName(''); setNewPhone(''); setNewCarrier('');
+                          setNewName(''); setNewPhone('');
                           showToast(t.recipientAdded);
                           fetchRecipients();
                         } else {
@@ -919,7 +1025,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                   <div key={r.id} className="flex items-center justify-between gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3">
                     <div className="min-w-0">
                       <div className="font-medium text-sm text-gray-800">{r.name}</div>
-                      <div className="text-xs text-gray-500">{r.phone} · {CARRIER_LABELS[r.carrier] ?? r.carrier}</div>
+                      <div className="text-xs text-gray-500">{formatPhone(r.phone)}</div>
                     </div>
                     <button
                       onClick={async () => {
@@ -1179,6 +1285,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                               reservation={row.reservation}
                               loading={actionLoading === row.reservation.id}
                               onDetail={() => setDetailTarget(row.reservation)}
+                              onEdit={() => setEditTarget(row.reservation)}
                               onApprove={() => handleApprove(row.reservation.id)}
                               onReject={() => setRejectTarget(row.reservation)}
                               onDelete={() => setDeleteTarget(row.reservation)}
@@ -1301,6 +1408,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                           reservation={row.reservation}
                           loading={actionLoading === row.reservation.id}
                           onDetail={() => setDetailTarget(row.reservation)}
+                          onEdit={() => setEditTarget(row.reservation)}
                           onApprove={() => handleApprove(row.reservation.id)}
                           onReject={() => setRejectTarget(row.reservation)}
                           onDelete={() => setDeleteTarget(row.reservation)}
@@ -1382,10 +1490,24 @@ function ReservationDetailModal({ reservation, onClose }: { reservation: Reserva
               <span className="text-amber-700">{reservation.cancellation_reason}</span>
             </div>
           )}
+          {reservation.previous_start_time && reservation.previous_end_time && (
+            <div>
+              <span className="text-xs text-gray-400 block mb-0.5">{t.detailFieldPreviousTime}</span>
+              <span className="text-gray-400 line-through">
+                {formatDateTime(reservation.previous_start_time)} ~ {formatDateTime(reservation.previous_end_time)}
+              </span>
+            </div>
+          )}
           <div>
             <span className="text-xs text-gray-400 block mb-0.5">{t.detailFieldCreatedAt}</span>
             <span className="text-gray-500">{formatDateTime(reservation.created_at)}</span>
           </div>
+          {reservation.updated_at && (
+            <div>
+              <span className="text-xs text-gray-400 block mb-0.5">{t.detailFieldUpdatedAt}</span>
+              <span className="text-gray-500">{formatDateTime(reservation.updated_at)}</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1424,6 +1546,7 @@ function ActionButtons({
   reservation,
   loading,
   onDetail,
+  onEdit,
   onApprove,
   onReject,
   onDelete,
@@ -1433,6 +1556,7 @@ function ActionButtons({
   reservation: ReservationWithRoom;
   loading: boolean;
   onDetail: () => void;
+  onEdit: () => void;
   onApprove: () => void;
   onReject: () => void;
   onDelete: () => void;
@@ -1476,6 +1600,13 @@ function ActionButtons({
     return (
       <div className="flex gap-1.5 whitespace-nowrap">
         {detailBtn}
+        <button
+          onClick={onEdit}
+          disabled={loading}
+          className="px-3 py-1.5 border border-blue-300 hover:bg-blue-50 disabled:opacity-50 text-blue-600 text-xs rounded-lg transition"
+        >
+          {t.adminBtnEdit}
+        </button>
         <button
           onClick={onDelete}
           disabled={loading}

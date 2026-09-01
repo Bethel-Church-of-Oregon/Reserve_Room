@@ -2,7 +2,8 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
-import ReservationDetailPopover, { CancelRequestModal } from './ReservationDetailPopover';
+import ReservationDetailPopover, { CancelRequestModal, EditRequestModal } from './ReservationDetailPopover';
+import { pacificDateKey, toDateKey } from '@/lib/date';
 
 const HOUR_START = 6;   // 6am
 const HOUR_END = 23;    // 11pm
@@ -30,9 +31,6 @@ function getWeekDays(weekStart: Date): Date[] {
   });
 }
 
-function dateKey(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
 
 function timeToMinutes(dateStr: string): number {
   const d = new Date(dateStr);
@@ -45,7 +43,7 @@ function formatTime(dateStr: string): string {
 }
 
 function getReservationsForDay(reservations: ReservationWithRoom[], day: Date): ReservationWithRoom[] {
-  const key = dateKey(day);
+  const key = toDateKey(day);
   return reservations.filter((r) => {
     const startDate = r.start_time.slice(0, 10);
     return startDate === key;
@@ -106,9 +104,10 @@ export default function WeekView({ weekStart, reservations, onRefresh, swipeOffs
     }
   }, []);
   const days = getWeekDays(weekStart);
-  const today = dateKey(new Date());
+  const today = pacificDateKey();
   const [hovered, setHovered] = useState<{ reservation: ReservationWithRoom; rect: DOMRect } | null>(null);
   const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
+  const [editModalReservation, setEditModalReservation] = useState<ReservationWithRoom | null>(null);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showPopover = (reservation: ReservationWithRoom, el: HTMLElement) => {
@@ -152,7 +151,7 @@ export default function WeekView({ weekStart, reservations, onRefresh, swipeOffs
       <div className="flex border-b border-gray-200 bg-white sticky top-0 z-10">
         <div className="w-14 flex-shrink-0" />
         {days.map((day, idx) => {
-          const key = dateKey(day);
+          const key = toDateKey(day);
           const isToday = key === today;
           return (
             <div
@@ -209,7 +208,7 @@ export default function WeekView({ weekStart, reservations, onRefresh, swipeOffs
           {days.map((day, dayIdx) => {
             const dayReservations = getReservationsForDay(reservations, day);
             const grouped = groupOverlapping(dayReservations);
-            const key = dateKey(day);
+            const key = toDateKey(day);
             const isToday = key === today;
 
             return (
@@ -286,6 +285,7 @@ export default function WeekView({ weekStart, reservations, onRefresh, swipeOffs
           onMouseEnter={cancelHide}
           onMouseLeave={() => hidePopover(80)}
           onRequestCancel={(r) => setCancelModalReservation(r)}
+          onRequestEdit={(r) => setEditModalReservation(r)}
         />
       )}
 
@@ -297,6 +297,17 @@ export default function WeekView({ weekStart, reservations, onRefresh, swipeOffs
             onRefresh?.();
           }}
           onCancel={() => setCancelModalReservation(null)}
+        />
+      )}
+
+      {editModalReservation && (
+        <EditRequestModal
+          reservation={editModalReservation}
+          onConfirm={() => {
+            setEditModalReservation(null);
+            onRefresh?.();
+          }}
+          onCancel={() => setEditModalReservation(null)}
         />
       )}
     </div>

@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { addMonths, addDays, format } from 'date-fns';
-import { getReservations, createReservation, createReservationSeries, checkConflict, getRooms, getConflictingReservationsForRange, createReservationsBulk } from '@/lib/db';
+import { getReservations, createReservation, createReservationSeries, checkConflict, getRooms, getConflictingReservationsForRange, createReservationsBulk, getReservationAccessCode } from '@/lib/db';
 import { checkReservationLimit } from '@/lib/ratelimit';
 import { LIMITS } from '@/lib/constants';
 import { sendReservationCreatedEmail, sendReservationCreatedBulkEmail } from '@/lib/email';
 import { sendSmsNotifications, buildReservationSmsMessage } from '@/lib/sms';
+import { sendTelegramNotification, buildReservationTelegramMessage } from '@/lib/telegram';
+import { pacificTodayDate } from '@/lib/date';
+import { cookies } from 'next/headers';
+import { verifyAdminSession } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
@@ -78,6 +82,28 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { title, room_id, start_time, end_time, person_in_charge, email, notes, recurring, recurring_until } = body;
 
+    // Admin status comes from the signed session cookie, never from the URL. The
+    // `?admin=true` query parameter is only a client-side hint about which form
+    // fields to show — trusting it here let anyone lift the one-month limit,
+    // create recurring series, and suppress the administrator notifications.
+    const isAdmin = verifyAdminSession(cookies().get('admin_auth')?.value);
+
+    // Shared reservation code, checked before anything else touches the database
+    // and skipped for administrators, who are already authenticated. With no code
+    // configured the gate is simply off, so the app works without one.
+    if (!isAdmin) {
+      const accessCode = await getReservationAccessCode();
+      if (accessCode) {
+        const supplied = String(body?.access_code ?? '').trim();
+        if (supplied.toLowerCase() !== accessCode.toLowerCase()) {
+          return NextResponse.json(
+            { error: 'code', message: '예약 코드가 올바르지 않습니다. 주보를 확인하시거나 교회 사무실로 문의해 주세요.' },
+            { status: 403 }
+          );
+        }
+      }
+    }
+
     // Validate required fields
     if (!title || !room_id || !start_time || !end_time || !person_in_charge || !email) {
       return NextResponse.json({ error: '필수 항목을 모두 입력해주세요.' }, { status: 400 });
@@ -118,18 +144,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '종료 시간은 시작 시간보다 늦어야 합니다.' }, { status: 400 });
     }
 
-    // 일반 사용자는 오늘로부터 1달 이내만 예약 가능
-    const isAdmin = req.nextUrl.searchParams.get('admin') === 'true';
+    // 일반 사용자는 오늘로부터 1달 이내만 예약 가능 (서부시간 기준 날짜 문자열 비교)
     if (!isAdmin) {
-      const maxDate = addMonths(new Date(), 1);
-      maxDate.setHours(23, 59, 59, 999);
-      if (new Date(start_time) > maxDate) {
+      const maxDateKey = format(addMonths(pacificTodayDate(), 1), 'yyyy-MM-dd');
+      if (String(start_time).slice(0, 10) > maxDateKey) {
         return NextResponse.json({ error: '예약은 오늘로부터 1달 이내만 신청할 수 있습니다.' }, { status: 400 });
       }
     }
 
-    // Recurring reservation
+    // Recurring reservation — admin only. This was previously hidden in the UI but
+    // not enforced here, so a single request could insert up to MAX_OCCURRENCES rows.
     if (recurring && recurring !== 'none' && recurring_until) {
+      if (!isAdmin) {
+        return NextResponse.json(
+          { error: '반복 예약은 관리자만 신청할 수 있습니다.' },
+          { status: 403 }
+        );
+      }
+
       const seriesId = crypto.randomUUID();
       await createReservationSeries({
         id: seriesId,
@@ -188,7 +220,7 @@ export async function POST(req: NextRequest) {
       }
 
       const roomName = rooms.find((r) => r.id === roomIdNum)?.name ?? '';
-      sendReservationCreatedBulkEmail({
+      await sendReservationCreatedBulkEmail({
         title: titleStr,
         room_name: roomName,
         person_in_charge: personStr,
@@ -216,26 +248,42 @@ export async function POST(req: NextRequest) {
     const reservation = await createReservation({ title: titleStr, room_id: roomIdNum, start_time, end_time, person_in_charge: personStr, email: emailStr, notes: notesStr || undefined });
 
     const roomName = rooms.find((r) => r.id === roomIdNum)?.name ?? '';
-    sendReservationCreatedEmail({
-      title: titleStr,
-      room_name: roomName,
-      start_time,
-      end_time,
-      person_in_charge: personStr,
-      email: emailStr,
-      notes: notesStr || undefined,
-    }).catch((e) => console.error('[email] 예약 확인 메일 발송 실패:', e));
 
-    // SMS 알림: 일반 사용자 예약만 (관리자 예약 제외)
-    if (!isAdmin) {
-      sendSmsNotifications(buildReservationSmsMessage({
+    // Awaited (in parallel) before responding: serverless freezes the instance
+    // once the response is sent, which would kill an un-awaited send mid-flight.
+    await Promise.all([
+      sendReservationCreatedEmail({
         title: titleStr,
         room_name: roomName,
         start_time,
         end_time,
         person_in_charge: personStr,
-      })).catch((e) => console.error('[sms] 발송 실패:', e));
-    }
+        email: emailStr,
+        notes: notesStr || undefined,
+      }).catch((e) => console.error('[email] 예약 확인 메일 발송 실패:', e)),
+
+      // 담당자 알림: 일반 사용자 예약만 (관리자 예약 제외)
+      isAdmin
+        ? Promise.resolve()
+        : sendSmsNotifications(buildReservationSmsMessage({
+            title: titleStr,
+            room_name: roomName,
+            start_time,
+            end_time,
+            person_in_charge: personStr,
+          })).catch((e) => console.error('[sms] 발송 실패:', e)),
+
+      isAdmin
+        ? Promise.resolve()
+        : sendTelegramNotification(buildReservationTelegramMessage({
+            title: titleStr,
+            room_name: roomName,
+            start_time,
+            end_time,
+            person_in_charge: personStr,
+            notes: notesStr || undefined,
+          })).catch((e) => console.error('[telegram] 발송 실패:', e)),
+    ]);
 
     return NextResponse.json(reservation, { status: 201 });
   } catch (e) {

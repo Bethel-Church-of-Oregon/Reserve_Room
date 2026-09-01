@@ -38,7 +38,7 @@ export async function PATCH(
       const approvedReservations = await approveReservationsBySeries(seriesId);
       await setReservationSeriesStatus(seriesId, 'approved');
 
-      sendBulkApprovalEmail(approvedReservations).catch((e) =>
+      await sendBulkApprovalEmail(approvedReservations).catch((e) =>
         console.error('[email] 시리즈 승인 이메일 발송 실패:', e)
       );
 
@@ -55,7 +55,7 @@ export async function PATCH(
 
       const rejectedReservations = await rejectReservationsBySeries(seriesId, reason);
       for (const r of rejectedReservations) {
-        sendRejectionEmail(r, reason).catch((e) =>
+        await sendRejectionEmail(r, reason).catch((e) =>
           console.error('[email] 시리즈 거절 이메일 발송 실패:', e)
         );
       }
@@ -65,7 +65,7 @@ export async function PATCH(
     if (action === 'approve_cancellation') {
       const cancelled = await approveCancellationBySeries(seriesId);
       for (const r of cancelled) {
-        sendCancellationApprovedEmail(r).catch((e) =>
+        await sendCancellationApprovedEmail(r).catch((e) =>
           console.error('[email] 시리즈 취소 승인 이메일 발송 실패:', e)
         );
       }
@@ -79,7 +79,7 @@ export async function PATCH(
       }
       const reverted = await rejectCancellationBySeries(seriesId, rejectReason || null);
       for (const r of reverted) {
-        sendCancellationRejectedEmail(r, rejectReason).catch((e) =>
+        await sendCancellationRejectedEmail(r, rejectReason).catch((e) =>
           console.error('[email] 시리즈 취소 거절 이메일 발송 실패:', e)
         );
       }

@@ -102,6 +102,7 @@ export function formatTimeAmPm(lang: Lang, iso: string): string {
 const ko = {
   // Site
   siteTitle: 'Bethel 장소예약시스템',
+  siteTitleShort: 'Bethel 장소예약',
 
   // Header buttons
   btnReserve: '+ 장소 예약 신청',
@@ -111,9 +112,9 @@ const ko = {
 
   // Notice banner
   noticeDesktop: '본 시스템은 소모임(사랑방, 사역팀 등) 전용 입니다. 결혼식 등 큰 행사는',
-  noticeMobile: '소모임(사랑방, 사역팀 등) 전용 시스템 입니다. 결혼식 등 큰 행사는',
+  noticeMobile: '소모임(사랑방, 사역팀 등) 전용 시스템입니다. 결혼식 등 큰 행사는',
   noticeLink: '사용신청서 작성',
-  noticeSuffix: '을 이용해 주세요.',
+  noticeSuffix: '  을 이용해 주세요.',
 
   // View modes
   viewDay: '일간',
@@ -177,6 +178,11 @@ const ko = {
   fieldEmail: '이메일',
   fieldNotes: '기타 노트',
   fieldNotesOptional: '(선택)',
+  fieldAccessCode: '예약 코드',
+  accessCodePlaceholder: '교회에서 안내받은 코드',
+  accessCodeHint: '교인 확인을 위한 코드입니다. 주보 또는 담당자에게 문의해 주세요.',
+  errAccessCodeRequired: '예약 코드를 입력해주세요.',
+  errAccessCodeWrong: '예약 코드가 올바르지 않습니다. 주보를 확인하시거나 교회 사무실로 문의해 주세요.',
   optional: '선택',
 
   // Form placeholders
@@ -265,6 +271,25 @@ const ko = {
 
   // Cancel button
   btnRequestCancel: '취소 신청하기',
+
+  // Edit reservation modal
+  editModalTitle: '예약 변경',
+  editDesc: (title: string) => `"${title}" 예약의 시간·내용을 변경합니다.`,
+  editFixedNote: '장소와 날짜는 변경할 수 없습니다. 바꾸시려면 예약을 취소하신 후 다시 신청해 주세요.',
+  editEmailLabel: '예약 시 입력한 이메일',
+  editEmailPlaceholder: '예약에 사용한 이메일을 입력해주세요.',
+  btnEditSubmit: '변경 저장',
+  btnEditSubmitting: '저장 중...',
+  editSuccess: '변경 완료',
+  editSuccessDesc: '예약이 변경되었습니다.',
+  errEmailRequiredEdit: '이메일을 입력해주세요.',
+  errNoChanges: '변경된 내용이 없습니다.',
+  btnRequestEdit: '변경하기',
+  editFixedNoteAdmin: '장소와 날짜는 변경할 수 없습니다. 같은 날짜 안에서 시간과 내용만 수정됩니다.',
+  adminBtnEdit: '변경',
+  toastEdited: '변경 완료',
+  detailFieldPreviousTime: '변경 전 시간',
+  detailFieldUpdatedAt: '변경일시',
 
   // Popover
   personLabel: '담당:',
@@ -379,11 +404,20 @@ const ko = {
 
   // Notification recipients
   adminTabRecipients: '알림 수신자',
+  adminTabSettings: '설정',
+  settingsTitle: '예약 코드',
+  settingsDesc: '예약 신청 시 입력해야 하는 공유 코드입니다. 비워두면 코드 없이 누구나 신청할 수 있습니다.',
+  settingsCodeLabel: '코드',
+  settingsCodePlaceholder: '예: bethel2026 (비우면 사용 안 함)',
+  settingsSave: '저장',
+  settingsSaved: '예약 코드를 저장했습니다.',
+  settingsDisabled: '현재 코드가 설정되지 않아 누구나 예약할 수 있습니다.',
+  settingsEnabled: (code: string) => `현재 코드: ${code}`,
+  settingsWarn: '코드는 시간이 지나면 알려지게 됩니다. 필요할 때 여기서 바꾸시면 됩니다.',
   recipientsTitle: '문자 알림 수신자',
-  recipientsDesc: '예약·취소 신청 시 문자를 받을 담당자 목록입니다. 통신사 이메일-to-SMS 게이트웨이를 통해 무료로 발송됩니다.',
+  recipientsDesc: '예약·취소·변경 신청 시 문자를 받을 담당자 목록입니다. Twilio를 통해 발송됩니다.',
   recipientName: '이름',
   recipientPhone: '전화번호',
-  recipientCarrier: '통신사',
   recipientPhonePlaceholder: '숫자만 입력 (예: 5031234567)',
   recipientNamePlaceholder: '담당자 이름',
   recipientAdd: '추가',
@@ -392,21 +426,20 @@ const ko = {
   recipientDeleted: '수신자가 삭제되었습니다.',
   errRecipientName: '이름을 입력해주세요.',
   errRecipientPhone: '올바른 전화번호를 입력해주세요. (10자리 이상 숫자)',
-  errRecipientCarrier: '통신사를 선택해주세요.',
-  recipientSelectCarrier: '통신사 선택',
 };
 
 const en: typeof ko = {
   siteTitle: 'Bethel Room Reservation',
+  siteTitleShort: 'Bethel Rooms',
 
   btnReserve: '+ Reserve a Room',
   btnReserveShort: '+ Reserve',
   btnAdmin: 'Admin',
   btnAdminShort: 'Admin',
 
-  noticeDesktop: 'This system is for small groups (home groups, ministry teams, etc.) only. For large events such as weddings, please use the',
+  noticeDesktop: 'This system is for small groups only. For large events such as weddings, please use the',
   noticeMobile: 'For small groups only. For large events like weddings, please use the',
-  noticeLink: 'Facility Request Form',
+  noticeLink: 'Request Form',
   noticeSuffix: '.',
 
   viewDay: 'Day',
@@ -461,6 +494,11 @@ const en: typeof ko = {
   fieldEmail: 'Email',
   fieldNotes: 'Notes',
   fieldNotesOptional: '(Optional)',
+  fieldAccessCode: 'Reservation Code',
+  accessCodePlaceholder: 'Code provided by the church',
+  accessCodeHint: 'Used to confirm you are a member. Check the bulletin or ask the church office.',
+  errAccessCodeRequired: 'Please enter the reservation code.',
+  errAccessCodeWrong: 'That reservation code is not correct. Please check the bulletin or contact the church office.',
   optional: 'Optional',
 
   placeholderTitle: 'e.g. Home Group, Ministry Team Meeting',
@@ -539,6 +577,25 @@ const en: typeof ko = {
   errReasonLength: (n: number) => `Reason must be ${n} characters or fewer.`,
 
   btnRequestCancel: 'Request Cancellation',
+
+  // Edit reservation modal
+  editModalTitle: 'Edit Reservation',
+  editDesc: (title: string) => `Editing the time and details of "${title}".`,
+  editFixedNote: 'Room and date cannot be changed here. To change either, cancel the reservation and book again.',
+  editEmailLabel: 'Email used for reservation',
+  editEmailPlaceholder: 'Enter the email used when making the reservation.',
+  btnEditSubmit: 'Save Changes',
+  btnEditSubmitting: 'Saving...',
+  editSuccess: 'Changes Saved',
+  editSuccessDesc: 'Your reservation has been updated.',
+  errEmailRequiredEdit: 'Please enter your email address.',
+  errNoChanges: 'Nothing has been changed.',
+  btnRequestEdit: 'Edit',
+  editFixedNoteAdmin: 'Room and date cannot be changed. Only the time and details within the same date are updated.',
+  adminBtnEdit: 'Edit',
+  toastEdited: 'Changes saved.',
+  detailFieldPreviousTime: 'Previous Time',
+  detailFieldUpdatedAt: 'Last Edited',
 
   personLabel: 'Contact:',
 
@@ -641,11 +698,20 @@ const en: typeof ko = {
   adminRejectedNote: 'Rejected reservations are not shown on the calendar.',
 
   adminTabRecipients: 'SMS Recipients',
+  adminTabSettings: 'Settings',
+  settingsTitle: 'Reservation Code',
+  settingsDesc: 'The shared code people must enter to submit a reservation. Leave it empty to let anyone reserve without a code.',
+  settingsCodeLabel: 'Code',
+  settingsCodePlaceholder: 'e.g. bethel2026 (empty = off)',
+  settingsSave: 'Save',
+  settingsSaved: 'Reservation code saved.',
+  settingsDisabled: 'No code is set, so anyone can reserve.',
+  settingsEnabled: (code: string) => `Current code: ${code}`,
+  settingsWarn: 'Shared codes get around over time. Change it here whenever you need to.',
   recipientsTitle: 'SMS Alert Recipients',
-  recipientsDesc: 'People who receive a text when a reservation or cancellation is submitted. Sent free via carrier email-to-SMS gateway.',
+  recipientsDesc: 'People who receive a text when a reservation, cancellation or change is submitted. Sent via Twilio.',
   recipientName: 'Name',
   recipientPhone: 'Phone number',
-  recipientCarrier: 'Carrier',
   recipientPhonePlaceholder: 'Digits only (e.g. 5031234567)',
   recipientNamePlaceholder: 'Contact name',
   recipientAdd: 'Add',
@@ -654,8 +720,6 @@ const en: typeof ko = {
   recipientDeleted: 'Recipient removed.',
   errRecipientName: 'Please enter a name.',
   errRecipientPhone: 'Please enter a valid phone number (10+ digits).',
-  errRecipientCarrier: 'Please select a carrier.',
-  recipientSelectCarrier: 'Select carrier',
 };
 
 export const translations = { ko, en } as const;

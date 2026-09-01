@@ -32,6 +32,9 @@ const reservationLimiter = createRatelimit(10, '1 m', 'reservation');
 // Cancel request: 10 per minute per IP
 const cancelLimiter = createRatelimit(10, '1 m', 'cancel');
 
+// Edit request: 10 per minute per IP
+const editLimiter = createRatelimit(10, '1 m', 'edit');
+
 export async function checkAdminLoginLimit(req: NextRequest): Promise<{ limited: boolean }> {
   if (!adminLoginLimiter) return { limited: false };
   const ip = getClientIp(req);
@@ -50,5 +53,12 @@ export async function checkCancelLimit(req: NextRequest): Promise<{ limited: boo
   if (!cancelLimiter) return { limited: false };
   const ip = getClientIp(req);
   const { success } = await cancelLimiter.limit(ip);
+  return { limited: !success };
+}
+
+export async function checkEditLimit(req: NextRequest): Promise<{ limited: boolean }> {
+  if (!editLimiter) return { limited: false };
+  const ip = getClientIp(req);
+  const { success } = await editLimiter.limit(ip);
   return { limited: !success };
 }

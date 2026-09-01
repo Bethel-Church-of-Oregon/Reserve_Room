@@ -2,13 +2,11 @@
 
 import React, { useState } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
-import { CancelRequestModal } from './ReservationDetailPopover';
+import { CancelRequestModal, EditRequestModal } from './ReservationDetailPopover';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatTimeAmPm, formatListWeekLabel } from '@/lib/i18n';
+import { pacificDateKey, toDateKey } from '@/lib/date';
 
-function toLocalDateKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
 
 function startOfWeek(d: Date): Date {
   const date = new Date(d);
@@ -25,9 +23,10 @@ interface Props {
 
 export default function ListView({ reservations, loading, onRefresh }: Props) {
   const { t, tRoom, lang } = useLanguage();
-  const today = toLocalDateKey(new Date());
+  const today = pacificDateKey();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
+  const [editModalReservation, setEditModalReservation] = useState<ReservationWithRoom | null>(null);
 
   const upcoming = [...reservations]
     .filter((r) => r.start_time.slice(0, 10) >= today && r.status !== 'rejected')
@@ -48,7 +47,7 @@ export default function ListView({ reservations, loading, onRefresh }: Props) {
 
   for (const dateKey of Array.from(byDate.keys())) {
     const date = new Date(dateKey + 'T00:00:00');
-    const wsKey = toLocalDateKey(startOfWeek(date));
+    const wsKey = toDateKey(startOfWeek(date));
     if (!currentWeek || currentWeek.weekKey !== wsKey) {
       currentWeek = { weekKey: wsKey, dates: [] };
       weeks.push(currentWeek);
@@ -113,6 +112,8 @@ export default function ListView({ reservations, loading, onRefresh }: Props) {
                       const canRequestCancel =
                         (item.status === 'approved' || item.status === 'pending') &&
                         item.end_time.slice(0, 10) >= today;
+                      const canEdit =
+                        item.status === 'approved' && item.start_time.slice(0, 10) >= today;
 
                       return (
                         <div
@@ -144,13 +145,25 @@ export default function ListView({ reservations, loading, onRefresh }: Props) {
                                 <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: item.room_color }} />
                                 <span className="truncate">{tRoom(item.room_name)}</span>
                               </div>
-                              {isSelected && canRequestCancel && (
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); setCancelModalReservation(item); }}
-                                  className="text-[10px] text-red-500 hover:text-red-700 border border-red-300 hover:border-red-400 rounded px-1.5 py-0.5 bg-red-50 transition flex-shrink-0 whitespace-nowrap"
-                                >
-                                  {t.btnRequestCancel}
-                                </button>
+                              {isSelected && (canEdit || canRequestCancel) && (
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                  {canEdit && (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setEditModalReservation(item); }}
+                                      className="text-[10px] text-blue-500 hover:text-blue-700 border border-blue-300 hover:border-blue-400 rounded px-1.5 py-0.5 bg-blue-50 transition whitespace-nowrap"
+                                    >
+                                      {t.btnRequestEdit}
+                                    </button>
+                                  )}
+                                  {canRequestCancel && (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setCancelModalReservation(item); }}
+                                      className="text-[10px] text-red-500 hover:text-red-700 border border-red-300 hover:border-red-400 rounded px-1.5 py-0.5 bg-red-50 transition whitespace-nowrap"
+                                    >
+                                      {t.btnRequestCancel}
+                                    </button>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </div>
@@ -174,6 +187,18 @@ export default function ListView({ reservations, loading, onRefresh }: Props) {
             onRefresh?.();
           }}
           onCancel={() => setCancelModalReservation(null)}
+        />
+      )}
+
+      {editModalReservation && (
+        <EditRequestModal
+          reservation={editModalReservation}
+          onConfirm={() => {
+            setEditModalReservation(null);
+            setSelectedId(null);
+            onRefresh?.();
+          }}
+          onCancel={() => setEditModalReservation(null)}
         />
       )}
     </>

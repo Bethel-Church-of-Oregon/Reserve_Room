@@ -6,6 +6,7 @@ import { format, addMonths } from 'date-fns';
 import { Room } from '@/lib/db';
 import { LIMITS } from '@/lib/constants';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { pacificDateKey, pacificTodayDate } from '@/lib/date';
 
 type RecurringType = 'none' | 'daily' | 'weekly' | 'monthly';
 
@@ -30,6 +31,7 @@ interface FormErrors {
   email?: string;
   notes?: string;
   recurring_until?: string;
+  access_code?: string;
   conflict?: string;
   conflictDates?: string[];
   general?: string;
@@ -55,11 +57,11 @@ function generateTimeOptions(): string[] {
 const TIME_OPTIONS = generateTimeOptions();
 
 function todayStr(): string {
-  return format(new Date(), 'yyyy-MM-dd');
+  return pacificDateKey();
 }
 
 function oneMonthLaterStr(): string {
-  return format(addMonths(new Date(), 1), 'yyyy-MM-dd');
+  return format(addMonths(pacificTodayDate(), 1), 'yyyy-MM-dd');
 }
 
 function ReserveForm() {
@@ -79,7 +81,44 @@ function ReserveForm() {
     email: '',
     notes: '',
   });
-  const isAdmin = searchParams.get('admin') === 'true';
+  // `?admin=true` states the intent; the actual session decides. The admin form
+  // (no date cap, recurring section) only appears once the server confirms the
+  // session, so a visitor who types the parameter no longer sees fields whose
+  // submission the API would reject.
+  const wantsAdmin = searchParams.get('admin') === 'true';
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!wantsAdmin) return;
+    let cancelled = false;
+    fetch('/api/admin/auth')
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled) setIsAdmin(Boolean(d?.authenticated)); })
+      .catch(() => { /* stay a normal user when the check fails */ });
+    return () => { cancelled = true; };
+  }, [wantsAdmin]);
+  // The shared reservation code. Whether it is needed at all comes from the
+  // server; the value itself is remembered locally so members type it once.
+  const ACCESS_CODE_STORAGE_KEY = 'bethel_reservation_code';
+  const [codeRequired, setCodeRequired] = useState(false);
+  const [accessCode, setAccessCode] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/access-code')
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled) setCodeRequired(Boolean(d?.required)); })
+      .catch(() => { /* leave the field hidden if the check fails */ });
+    try {
+      const saved = localStorage.getItem(ACCESS_CODE_STORAGE_KEY);
+      if (saved) setAccessCode(saved);
+    } catch {
+      // Private mode or blocked storage — the member just types it again.
+    }
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [recurring, setRecurring] = useState<RecurringType>('none');
   const [recurringUntil, setRecurringUntil] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
@@ -131,6 +170,9 @@ function ReserveForm() {
       errs.email = t.errEmailFormat;
     } else if (email.length > LIMITS.email) errs.email = t.errEmailLength(LIMITS.email);
     if (form.notes.trim().length > LIMITS.notes) errs.notes = t.errNotesLength(LIMITS.notes);
+    if (codeRequired && !isAdmin && !accessCode.trim()) {
+      errs.access_code = t.errAccessCodeRequired;
+    }
     if (recurring !== 'none') {
       if (!recurringUntil) {
         errs.recurring_until = t.errRecurringUntilRequired;
@@ -154,7 +196,7 @@ function ReserveForm() {
       const start_time = `${form.date}T${form.start_time}:00`;
       const end_time = `${form.date}T${form.end_time}:00`;
 
-      const res = await fetch(`/api/reservations${isAdmin ? '?admin=true' : ''}`, {
+      const res = await fetch('/api/reservations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -167,6 +209,7 @@ function ReserveForm() {
           notes: form.notes.trim() || undefined,
           recurring: recurring !== 'none' ? recurring : undefined,
           recurring_until: recurring !== 'none' ? recurringUntil : undefined,
+          access_code: accessCode.trim() || undefined,
         }),
       });
 
@@ -176,6 +219,13 @@ function ReserveForm() {
         const msg = typeof data?.message === 'string' ? data.message : t.errConflictDefault;
         const dates = Array.isArray(data?.conflictDates) ? data.conflictDates : undefined;
         setErrors({ conflict: msg, conflictDates: dates });
+        return;
+      }
+
+      if (res.status === 403 && data?.error === 'code') {
+        // The stored code is stale or wrong; drop it so the member retypes.
+        try { localStorage.removeItem(ACCESS_CODE_STORAGE_KEY); } catch { /* ignore */ }
+        setErrors({ access_code: t.errAccessCodeWrong });
         return;
       }
 
@@ -189,6 +239,9 @@ function ReserveForm() {
           ? { ...data, email: form.email.trim() }
           : { created: 1, conflicts: 0, conflictDates: [], email: form.email.trim() }
       );
+      if (accessCode.trim()) {
+        try { localStorage.setItem(ACCESS_CODE_STORAGE_KEY, accessCode.trim()); } catch { /* ignore */ }
+      }
       setSuccess(true);
     } catch (err) {
       console.error(err);
@@ -313,6 +366,31 @@ function ReserveForm() {
 
       <main className="max-w-2xl mx-auto px-4 py-6">
         <form onSubmit={handleSubmit} noValidate className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-8 space-y-5">
+
+          {/* Shared reservation code — only when the church has one set, and never
+              for administrators, whose session already identifies them. */}
+          {codeRequired && !isAdmin && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <label htmlFor="reserve-access-code" className="block text-sm font-medium text-gray-700 mb-1">
+                {t.fieldAccessCode} <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="reserve-access-code"
+                type="text"
+                value={accessCode}
+                onChange={(e) => { setAccessCode(e.target.value); setErrors((p) => ({ ...p, access_code: undefined })); }}
+                placeholder={t.accessCodePlaceholder}
+                autoComplete="off"
+                maxLength={LIMITS.accessCode}
+                className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+                  errors.access_code ? 'border-red-400 bg-red-50' : 'border-amber-300 bg-white'
+                }`}
+              />
+              {errors.access_code
+                ? <p className="mt-1 text-xs text-red-500">{errors.access_code}</p>
+                : <p className="mt-1 text-xs text-gray-500">{t.accessCodeHint}</p>}
+            </div>
+          )}
 
           {/* Title */}
           <div>

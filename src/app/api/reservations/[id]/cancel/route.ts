@@ -4,6 +4,7 @@ import { checkCancelLimit } from '@/lib/ratelimit';
 import { LIMITS } from '@/lib/constants';
 import { sendReservationCancelledEmail, sendReservationCancelledSeriesEmail } from '@/lib/email';
 import { sendSmsNotifications, buildCancellationSmsMessage } from '@/lib/sms';
+import { sendTelegramNotification, buildCancellationTelegramMessage } from '@/lib/telegram';
 
 export async function POST(
   req: NextRequest,
@@ -61,23 +62,34 @@ export async function POST(
       // Mark series as cancelled (calendar visibility is driven by instance rows)
       await setReservationSeriesStatus(seriesId, 'cancelled');
 
-      sendReservationCancelledSeriesEmail({
-        title: reservation.title,
-        room_name: reservation.room_name,
-        from_start_time: reservation.start_time,
-        person_in_charge: reservation.person_in_charge,
-        email: reservation.email,
-        cancelled_count: requested,
-        cancellation_reason: reason,
-      });
+      await Promise.all([
+        sendReservationCancelledSeriesEmail({
+          title: reservation.title,
+          room_name: reservation.room_name,
+          from_start_time: reservation.start_time,
+          person_in_charge: reservation.person_in_charge,
+          email: reservation.email,
+          cancelled_count: requested,
+          cancellation_reason: reason,
+        }).catch((e) => console.error('[email] 시리즈 취소 메일 발송 실패:', e)),
 
-      sendSmsNotifications(buildCancellationSmsMessage({
-        title: reservation.title,
-        room_name: reservation.room_name,
-        start_time: reservation.start_time,
-        end_time: reservation.end_time,
-        person_in_charge: reservation.person_in_charge,
-      })).catch((e) => console.error('[sms] 발송 실패:', e));
+        sendSmsNotifications(buildCancellationSmsMessage({
+          title: reservation.title,
+          room_name: reservation.room_name,
+          start_time: reservation.start_time,
+          end_time: reservation.end_time,
+          person_in_charge: reservation.person_in_charge,
+        })).catch((e) => console.error('[sms] 발송 실패:', e)),
+
+        sendTelegramNotification(buildCancellationTelegramMessage({
+          title: reservation.title,
+          room_name: reservation.room_name,
+          start_time: reservation.start_time,
+          end_time: reservation.end_time,
+          person_in_charge: reservation.person_in_charge,
+          cancellation_reason: reason,
+        })).catch((e) => console.error('[telegram] 발송 실패:', e)),
+      ]);
     } else {
       const reservation = await getReservationById(id);
       if (!reservation) {
@@ -94,23 +106,34 @@ export async function POST(
         );
       }
 
-      sendReservationCancelledEmail({
-        title: reservation.title,
-        room_name: reservation.room_name,
-        start_time: reservation.start_time,
-        end_time: reservation.end_time,
-        person_in_charge: reservation.person_in_charge,
-        email: reservation.email,
-        cancellation_reason: reason,
-      });
+      await Promise.all([
+        sendReservationCancelledEmail({
+          title: reservation.title,
+          room_name: reservation.room_name,
+          start_time: reservation.start_time,
+          end_time: reservation.end_time,
+          person_in_charge: reservation.person_in_charge,
+          email: reservation.email,
+          cancellation_reason: reason,
+        }).catch((e) => console.error('[email] 취소 메일 발송 실패:', e)),
 
-      sendSmsNotifications(buildCancellationSmsMessage({
-        title: reservation.title,
-        room_name: reservation.room_name,
-        start_time: reservation.start_time,
-        end_time: reservation.end_time,
-        person_in_charge: reservation.person_in_charge,
-      })).catch((e) => console.error('[sms] 발송 실패:', e));
+        sendSmsNotifications(buildCancellationSmsMessage({
+          title: reservation.title,
+          room_name: reservation.room_name,
+          start_time: reservation.start_time,
+          end_time: reservation.end_time,
+          person_in_charge: reservation.person_in_charge,
+        })).catch((e) => console.error('[sms] 발송 실패:', e)),
+
+        sendTelegramNotification(buildCancellationTelegramMessage({
+          title: reservation.title,
+          room_name: reservation.room_name,
+          start_time: reservation.start_time,
+          end_time: reservation.end_time,
+          person_in_charge: reservation.person_in_charge,
+          cancellation_reason: reason,
+        })).catch((e) => console.error('[telegram] 발송 실패:', e)),
+      ]);
     }
 
     return NextResponse.json({ success: true });

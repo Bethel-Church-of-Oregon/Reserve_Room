@@ -88,16 +88,44 @@ async function ensureDbReady(): Promise<void> {
       // Columns may already exist; ignore
     }
 
+    // Edit-history columns (idempotent)
+    try {
+      await sql`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ`;
+      await sql`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS previous_start_time TEXT`;
+      await sql`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS previous_end_time TEXT`;
+    } catch {
+      // Columns may already exist; ignore
+    }
+
+    // Key/value settings the administrator can change at runtime, so things like
+    // the shared reservation code can be rotated from the admin page instead of
+    // requiring an environment-variable change and a redeploy.
+    await sql`
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key        TEXT PRIMARY KEY,
+        value      TEXT,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `;
+
     // Notification recipients table
     await sql`
       CREATE TABLE IF NOT EXISTS notification_recipients (
         id       SERIAL PRIMARY KEY,
         name     TEXT NOT NULL,
         phone    TEXT NOT NULL,
-        carrier  TEXT NOT NULL,
+        carrier  TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       )
     `;
+
+    // `carrier` is a leftover from the carrier email-to-SMS gateways that Twilio
+    // replaced; existing rows keep their value but nothing writes or reads it.
+    try {
+      await sql`ALTER TABLE notification_recipients ALTER COLUMN carrier DROP NOT NULL`;
+    } catch {
+      // Already nullable; ignore
+    }
 
     // Seed rooms if empty
     const countRows = (await sql`SELECT COUNT(*)::int as c FROM rooms`) as { c: number }[];
@@ -162,6 +190,9 @@ export interface Reservation {
   cancellation_reason?: string | null;
   cancellation_requested_at?: string | null;
   previous_status?: string | null;
+  updated_at?: string | null;
+  previous_start_time?: string | null;
+  previous_end_time?: string | null;
 }
 
 export interface ReservationWithRoom extends Reservation {
@@ -472,6 +503,39 @@ export async function deleteReservation(id: number): Promise<boolean> {
   return rows.length > 0;
 }
 
+/**
+ * Edit an approved reservation in place. Room and date are never changed — the
+ * caller must validate that the new times fall on the original date. Previous
+ * times are stashed only when the time actually moved, so an edit that only
+ * touches the title keeps the earlier time history intact.
+ */
+export async function updateReservation(
+  id: number,
+  data: {
+    title: string;
+    start_time: string;
+    end_time: string;
+    person_in_charge: string;
+    notes: string | null;
+  }
+): Promise<boolean> {
+  await ensureDbReady();
+  const rows = (await getSql()`
+    UPDATE reservations
+    SET title = ${data.title},
+        start_time = ${data.start_time},
+        end_time = ${data.end_time},
+        person_in_charge = ${data.person_in_charge},
+        notes = ${data.notes},
+        previous_start_time = CASE WHEN start_time <> ${data.start_time} THEN start_time ELSE previous_start_time END,
+        previous_end_time   = CASE WHEN end_time   <> ${data.end_time}   THEN end_time   ELSE previous_end_time   END,
+        updated_at = now()
+    WHERE id = ${id} AND status = 'approved'
+    RETURNING id
+  `) as { id: number }[];
+  return rows.length > 0;
+}
+
 export async function requestCancellation(
   id: number,
   reason: string
@@ -546,11 +610,41 @@ export async function approveCancellationBySeries(seriesId: string): Promise<Res
 
 // ---------- Notification Recipients ----------
 
+/**
+ * Shared reservation code. A church-wide code typed on the reservation form keeps
+ * passers-by from booking rooms without the weight of real accounts. It is an
+ * honour-system speed bump, not authentication: assume it leaks eventually, which
+ * is exactly why it lives here rather than in an environment variable.
+ *
+ * Returns null when no code is set, in which case the gate is simply off.
+ */
+const ACCESS_CODE_KEY = 'reservation_access_code';
+
+export async function getReservationAccessCode(): Promise<string | null> {
+  await ensureDbReady();
+  const rows = (await getSql()`
+    SELECT value FROM app_settings WHERE key = ${ACCESS_CODE_KEY}
+  `) as { value: string | null }[];
+  const value = rows[0]?.value?.trim();
+  return value ? value : null;
+}
+
+/** Pass null or an empty string to turn the gate off. */
+export async function setReservationAccessCode(code: string | null): Promise<void> {
+  await ensureDbReady();
+  const value = code?.trim() ? code.trim() : null;
+  await getSql()`
+    INSERT INTO app_settings (key, value, updated_at)
+    VALUES (${ACCESS_CODE_KEY}, ${value}, now())
+    ON CONFLICT (key) DO UPDATE SET value = ${value}, updated_at = now()
+  `;
+}
+
 export interface NotificationRecipient {
   id: number;
   name: string;
+  /** Stored as entered; normalized to E.164 at send time (`toE164` in lib/sms). */
   phone: string;
-  carrier: string;
   created_at: string;
 }
 
@@ -562,12 +656,11 @@ export async function getNotificationRecipients(): Promise<NotificationRecipient
 export async function createNotificationRecipient(data: {
   name: string;
   phone: string;
-  carrier: string;
 }): Promise<NotificationRecipient> {
   await ensureDbReady();
   const rows = (await getSql()`
-    INSERT INTO notification_recipients (name, phone, carrier)
-    VALUES (${data.name}, ${data.phone}, ${data.carrier})
+    INSERT INTO notification_recipients (name, phone)
+    VALUES (${data.name}, ${data.phone})
     RETURNING *
   `) as NotificationRecipient[];
   return rows[0];

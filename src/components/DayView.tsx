@@ -2,7 +2,8 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
-import ReservationDetailPopover, { CancelRequestModal } from './ReservationDetailPopover';
+import ReservationDetailPopover, { CancelRequestModal, EditRequestModal } from './ReservationDetailPopover';
+import { pacificDateKey, pacificNow, toDateKey } from '@/lib/date';
 
 const HOUR_START = 6;
 const HOUR_END = 23;
@@ -13,25 +14,6 @@ const TOTAL_HEIGHT = TOTAL_HOURS * PX_PER_HOUR;
 
 const DAYS_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
-function getPacificNow(): { totalMinutes: number; dateKey: string } {
-  const now = new Date();
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Los_Angeles',
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: false,
-  }).formatToParts(now);
-  const get = (type: string) => parts.find((p) => p.type === type)!.value;
-  const h = parseInt(get('hour'));
-  const m = parseInt(get('minute'));
-  return {
-    totalMinutes: h * 60 + m,
-    dateKey: `${get('year')}-${get('month')}-${get('day')}`,
-  };
-}
-
-function toLocalDateKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
 
 function getWeekDays(d: Date): Date[] {
   const day = d.getDay();
@@ -115,22 +97,23 @@ export default function DayView({ currentDate, reservations, onDayClick, onRefre
       timeLabelRef.current.style.top = `-${scrollRef.current.scrollTop}px`;
     }
   }, []);
-  const dayKey = toLocalDateKey(currentDate);
+  const dayKey = toDateKey(currentDate);
   const dayReservations = reservations.filter((r) => r.start_time.slice(0, 10) === dayKey);
   const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => HOUR_START + i);
   const grouped = groupOverlapping(dayReservations);
 
-  const isToday = dayKey === toLocalDateKey(new Date());
+  const today = pacificDateKey();
+  const isToday = dayKey === today;
   const weekDays = getWeekDays(currentDate);
-  const today = toLocalDateKey(new Date());
 
   const [hovered, setHovered] = useState<{ reservation: ReservationWithRoom; rect: DOMRect } | null>(null);
   const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
-  const [pacificNow, setPacificNow] = useState(getPacificNow);
+  const [editModalReservation, setEditModalReservation] = useState<ReservationWithRoom | null>(null);
+  const [nowPacific, setNowPacific] = useState(pacificNow);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const id = setInterval(() => setPacificNow(getPacificNow()), 30_000);
+    const id = setInterval(() => setNowPacific(pacificNow()), 30_000);
     return () => clearInterval(id);
   }, []);
 
@@ -176,7 +159,7 @@ export default function DayView({ currentDate, reservations, onDayClick, onRefre
       <div className="flex border-b border-gray-200">
         <div className="w-14 flex-shrink-0" />
         {weekDays.map((day, idx) => {
-          const key = toLocalDateKey(day);
+          const key = toDateKey(day);
           const isSelected = key === dayKey;
           const isTodayDay = key === today;
           const hasDot = reservations.some((r) => r.start_time.slice(0, 10) === key);
@@ -258,10 +241,10 @@ export default function DayView({ currentDate, reservations, onDayClick, onRefre
             ))}
 
             {/* Current time line */}
-            {dayKey === pacificNow.dateKey &&
-              pacificNow.totalMinutes >= HOUR_START * 60 &&
-              pacificNow.totalMinutes <= HOUR_END * 60 && (() => {
-                const top = (pacificNow.totalMinutes - HOUR_START * 60) * PX_PER_MIN;
+            {dayKey === nowPacific.dateKey &&
+              nowPacific.totalMinutes >= HOUR_START * 60 &&
+              nowPacific.totalMinutes <= HOUR_END * 60 && (() => {
+                const top = (nowPacific.totalMinutes - HOUR_START * 60) * PX_PER_MIN;
                 return (
                   <div className="absolute w-full" style={{ top, zIndex: 10, pointerEvents: 'none' }}>
                     <div className="relative flex items-center">
@@ -326,6 +309,7 @@ export default function DayView({ currentDate, reservations, onDayClick, onRefre
           onMouseEnter={cancelHide}
           onMouseLeave={() => hidePopover(80)}
           onRequestCancel={(r) => setCancelModalReservation(r)}
+          onRequestEdit={(r) => setEditModalReservation(r)}
         />
       )}
 
@@ -337,6 +321,17 @@ export default function DayView({ currentDate, reservations, onDayClick, onRefre
             onRefresh?.();
           }}
           onCancel={() => setCancelModalReservation(null)}
+        />
+      )}
+
+      {editModalReservation && (
+        <EditRequestModal
+          reservation={editModalReservation}
+          onConfirm={() => {
+            setEditModalReservation(null);
+            onRefresh?.();
+          }}
+          onCancel={() => setEditModalReservation(null)}
         />
       )}
     </div>

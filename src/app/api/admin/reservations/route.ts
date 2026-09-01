@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 이메일 일괄 발송 (실패해도 승인은 유지)
-    sendBulkApprovalEmail(approved).catch((e) =>
+    await sendBulkApprovalEmail(approved).catch((e) =>
       console.error('[email] 일괄 승인 이메일 발송 실패:', e)
     );
 

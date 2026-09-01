@@ -13,14 +13,20 @@ npm run build && npm start  # 프로덕션 (포트 8000)
 - **Styling**: Tailwind CSS
 - **Database**: Neon Postgres via `@neondatabase/serverless`
 - **Email**: Nodemailer + Gmail SMTP (앱 비밀번호)
+- **SMS**: Twilio (`twilio` SDK) — 통신사 이메일-투-SMS 게이트웨이에서 전환
+- **Telegram**: Bot API (`fetch`) — 담당자 그룹 알림. SMS가 A2P 10DLC 승인 대기 중이어도 즉시 동작
 - **Rate Limiting**: Upstash Redis (선택)
 
 ## 주요 파일
 - `src/lib/db.ts` — Postgres 스키마, 쿼리, TypeScript 타입
 - `src/lib/email.ts` — 이메일 발송 (예약 확인/취소 알림), nodemailer 사용
+- `src/lib/sms.ts` — Twilio 문자 발송 (`sendSmsNotifications`) + 메시지 생성 (`build*SmsMessage`) + `toE164()`
+- `src/lib/telegram.ts` — 텔레그램 발송 (`sendTelegramNotification`) + 메시지 생성 (`build*TelegramMessage`)
 - `src/lib/auth.ts` — HMAC-SHA256 관리자 세션 토큰 생성/검증
 - `src/lib/constants.ts` — 입력값 길이 제한 상수 (`LIMITS`)
-- `src/lib/ratelimit.ts` — Upstash Redis 기반 rate limiting (로그인/예약/취소)
+- `src/lib/ratelimit.ts` — Upstash Redis 기반 rate limiting (로그인/예약/취소/변경)
+- `src/lib/date.ts` — **모든 날짜/시각 판단의 단일 창구.** 서부시간(`America/Los_Angeles`) 기준 `pacificDateKey()` / `pacificTodayDate()` / `pacificNow()` / `toDateKey()`
+- `src/lib/editReservation.ts` — `applyReservationEdit()`: 예약 변경 검증·저장·알림 (공개 라우트와 관리자 라우트가 공유)
 - `src/app/page.tsx` — 메인 캘린더 (day/week/month/list, 클라이언트 컴포넌트)
 - `src/components/DayView.tsx` — 일간 캘린더 (오전 6시~오후 11시, 1.5px/분) + 현재 시간 라인 (Pacific time)
 - `src/components/WeekView.tsx` — 주간 캘린더 (오전 6시~오후 11시, 1.5px/분)
@@ -30,17 +36,21 @@ npm run build && npm start  # 프로덕션 (포트 8000)
 - `src/app/reserve/page.tsx` — 예약 신청 폼 (Suspense로 useSearchParams 감쌈)
 - `src/app/admin/page.tsx` — 관리자 패널 (로그인 → 예약 목록/취소 목록/전체 조회, 삭제)
 - `src/app/api/reservations/route.ts` — GET, POST (단건 + 반복 예약, 즉시 approved 처리)
-- `src/app/api/reservations/[id]/route.ts` — DELETE
+- `src/app/api/reservations/[id]/route.ts` — PATCH (관리자 전용: `edit` 등), DELETE
 - `src/app/api/reservations/[id]/cancel/route.ts` — POST 취소 신청 (즉시 cancelled 처리)
+- `src/app/api/reservations/[id]/edit/route.ts` — POST 예약 변경 (동일 룸·동일 날짜 내 시간/제목/담당자/노트)
 - `src/app/api/admin/auth/route.ts` — GET/POST/DELETE 관리자 세션 쿠키
 - `src/app/api/admin/reservations/route.ts` — GET 전체 목록 (관리자 전용)
 - `src/app/api/admin/series/[id]/route.ts` — PATCH 시리즈 취소 처리
 - `src/app/api/rooms/route.ts` — GET 회의실 목록
+- `src/app/api/access-code/route.ts` — GET 예약 코드 **필요 여부만** (공개, 코드값은 절대 노출 안 함)
+- `src/app/api/admin/access-code/route.ts` — GET/PUT 예약 코드 (관리자 전용)
 
 ## DB 스키마
+- `app_settings`: key(PK), value, updated_at — 런타임 설정 key/value. 현재 키: `reservation_access_code`
 - `rooms`: id, name, color — 비전홀 + 은혜성전 20개 시드 데이터
 - `reservation_series`: id(TEXT/UUID), title, room_id, person_in_charge, email, notes, recurring, recurring_until, status(pending/approved/rejected/cancelled), rejection_reason, created_at
-- `reservations`: id, series_id(→reservation_series), series_index, title, room_id, start_time, end_time, person_in_charge, email, notes, status(pending/approved/rejected/cancellation_requested), rejection_reason, cancellation_reason, cancellation_requested_at, previous_status, created_at
+- `reservations`: id, series_id(→reservation_series), series_index, title, room_id, start_time, end_time, person_in_charge, email, notes, status(pending/approved/rejected/cancellation_requested), rejection_reason, cancellation_reason, cancellation_requested_at, previous_status, created_at, updated_at, previous_start_time, previous_end_time
 - Postgres: Vercel Marketplace에서 Neon 연동 시 `POSTGRES_URL` 또는 `DATABASE_URL` 자동 주입
 - 시드는 rooms 테이블이 비어있을 때만 실행 (`count === 0` 체크)
 - 장소 변경 시 Neon 콘솔에서 `DELETE FROM reservations; DELETE FROM rooms;` 후 앱 재시작
@@ -58,10 +68,17 @@ GMAIL_USER=                       # Gmail 주소 (선택, 미설정 시 bethel.o
 GMAIL_APP_PASSWORD=               # Gmail 앱 비밀번호 16자리 (공백 없이)
 UPSTASH_REDIS_REST_URL=           # Upstash Redis URL (선택, rate limiting용)
 UPSTASH_REDIS_REST_TOKEN=         # Upstash Redis Token (선택, rate limiting용)
+TWILIO_ACCOUNT_SID=               # Twilio Account SID (문자 알림)
+TWILIO_AUTH_TOKEN=                # Twilio Auth Token
+TWILIO_FROM_NUMBER=               # Twilio 구매 번호, E.164 (예: +15035551234)
+TELEGRAM_BOT_TOKEN=               # @BotFather 발급 토큰 (텔레그램 알림)
+TELEGRAM_CHAT_ID=                 # 담당자 그룹 chat_id (그룹은 -100… 음수)
 ```
 - Gmail 앱 비밀번호: Google 계정 → 보안 → 2단계 인증 → 앱 비밀번호
 - `GMAIL_APP_PASSWORD` 미설정 시 이메일 건너뜀, 예약 기능은 정상 동작
 - `UPSTASH_*` 미설정 시 rate limiting 비활성화 (관리자 로그인/예약/취소 제한 없음)
+- `TWILIO_*` 셋 중 하나라도 미설정 시 문자 발송만 건너뜀 (경고 로그 후 예약은 정상 동작)
+- `TELEGRAM_*` 둘 중 하나라도 미설정 시 텔레그램만 건너뜀 (경고 로그 후 예약은 정상 동작)
 
 ## 관리자 인증
 - 쿠키 기반: `admin_auth` 쿠키 (httpOnly, maxAge 없음 = 세션 쿠키)
@@ -78,12 +95,78 @@ approved → cancelled (취소 신청 시 즉시 처리)
 - `checkConflict()`: `status IN ('approved', 'cancelled')` 제외 — `approved`만 충돌 체크 대상
 - `cancelled` 예약: DB에 보존 (캘린더 조회에서 제외, 관리자 취소 목록에서 확인 가능)
 
+## 예약 변경 플로우
+- 캘린더/목록에서 예약 선택 → "변경하기" 버튼 (오늘 이후 + `approved` 예약에만 표시)
+- `EditRequestModal` (`ReservationDetailPopover.tsx`): 이메일 본인 확인 + 시작/종료 시간(15분 단위) + 제목·담당자·노트 수정
+- **장소와 날짜는 변경 불가** — 모달에 읽기 전용으로 표시, 바꾸려면 취소 후 재예약 (안내 문구 노출)
+- `POST /api/reservations/[id]/edit` → `updateReservation()`
+  - 검증: 이메일 일치(403) → `status='approved'`(400) → 지난 예약 차단(Pacific 기준, 400) → 새 시작/종료의 날짜가 원래 날짜와 동일(400) → 시작<종료(400) → `checkConflict(room_id, start, end, excludeId=id)`(409) → 변경 내용 유무(400)
+  - 클라이언트가 보낸 `HH:MM`은 서버에서 `:00`을 붙여 정규화 (DB의 `T09:00:00` 형식과 문자열 비교가 정확해야 함)
+- 이력: `updated_at` 갱신 + 시간이 실제로 바뀐 경우에만 `previous_start_time`/`previous_end_time` 저장 (SQL `CASE WHEN`, 제목만 고쳐도 기존 시간 이력 유지)
+- 알림: `sendReservationUpdatedEmail` (변경된 필드만 `기존 → 신규` 취소선 표기) + `buildUpdateSmsMessage` (`[변경]`)
+- 반복 예약은 **단건만** 변경 가능 (시리즈 일괄 시간 변경 없음)
+- Rate limit: `checkEditLimit` 10회/분
+- **관리자 경로**: `PATCH /api/reservations/[id]` + `{ action: 'edit' }` (관리자 세션 필수)
+  - 같은 `applyReservationEdit()`를 호출하되 **이메일 확인 생략** + **지난 예약도 수정 허용** (`allowPast: true`)
+  - 관리자 목록의 `approved` 행에 "변경" 버튼 → `EditRequestModal admin` (이메일 입력란 숨김)
+  - 알림 이메일·SMS는 관리자 변경에도 동일하게 발송 (신청자가 변경 사실을 알아야 함)
+- 관리자 상세보기 모달에 `변경 전 시간`(취소선)·`변경일시` 표시 — `previous_*`/`updated_at`이 있을 때만
+
 ## 취소 신청 플로우
 - 캘린더에서 예약 블록 클릭 → `ReservationDetailPopover` → "취소 신청하기" 버튼 (오늘 이후 예약에만 표시)
 - `CancelRequestModal`: 단건(`scope=one`) 또는 시리즈 이후 전체(`scope=series`) 선택 + 사유 입력
 - 제출 성공 시 즉시 `status = 'cancelled'`로 UPDATE → 완료 안내 화면 표시 ("취소 완료") → "확인" 클릭 시 닫힘
 - `POST /api/reservations/[id]/cancel` → `requestCancellation()` or `requestCancellationSeries()`
 - 시리즈 취소는 `PATCH /api/admin/series/[id]`로 일괄 처리
+
+## 접근 통제 (중요)
+- **관리자 판정은 서명된 세션 쿠키로만.** `verifyAdminSession(cookies().get('admin_auth')?.value)`
+  - `?admin=true` 쿼리 파라미터는 **클라이언트 UI 힌트일 뿐 서버가 신뢰하지 않음.** 예전에는 이걸 신뢰해서 인증 없이 1달 제한 해제 + 반복예약 500건 + 알림 억제가 전부 가능했음 (2026-09 수정)
+  - 예약 폼도 `GET /api/admin/auth`로 실제 세션을 확인한 뒤에만 관리자 UI를 노출
+- **반복 예약은 서버에서 관리자 전용으로 강제** (403). UI 숨김만으로는 부족했음
+- **공유 예약 코드** — 교인만 쓰게 하는 최소 안전장치 (honor system, 인증이 아님)
+  - `app_settings.reservation_access_code`에 저장 → **관리자 화면 '설정' 탭에서 변경.** 코드는 결국 유출되므로 재배포 없이 바꿀 수 있어야 해서 env가 아니라 DB에 둠
+  - **코드 미설정 시 게이트 OFF** (fail-open). 관리자가 켤 때까지 앱은 그대로 동작
+  - 검증은 `POST /api/reservations`에서, DB를 건드리기 전에. 관리자는 면제
+  - 비교는 `trim()` + 소문자 — 사람이 손으로 입력하는 코드라 대소문자·공백에 관대해야 함. 저장 시엔 공백 포함 코드를 거부
+  - 클라이언트는 성공 시 `localStorage['bethel_reservation_code']`에 기억, 403이면 삭제
+  - `GET /api/access-code`는 **필요 여부(`{required}`)만** 반환. 코드값은 절대 내려보내지 않음
+  - 이 라우트에는 `dynamic = 'force-dynamic'` **과** `fetchCache = 'force-no-store'` 둘 다 필요. Neon 드라이버가 fetch로 통신하므로 fetchCache 없으면 코드를 바꿔도 한동안 옛 값이 응답됨
+
+## 시간대 원칙 (중요)
+- **"오늘"/"지금"에 대한 모든 판단은 서부시간(`America/Los_Angeles`) 기준.** Vercel 서버는 UTC로 돌고 사용자 브라우저는 어느 시간대든 될 수 있어서, `new Date()`를 그대로 쓰면 태평양 오후 5시 이후 "내일"로 넘어가 당일 예약/변경이 막힘
+- 반드시 `src/lib/date.ts`의 헬퍼만 사용 — `America/Los_Angeles` 문자열과 `toISOString().slice(0,10)`을 컴포넌트/라우트에 직접 쓰지 말 것
+  - `pacificDateKey(d?)` — 'YYYY-MM-DD' (오늘 판정, 지난 예약 차단, 상태 비교)
+  - `pacificTodayDate()` — 서부시간 연/월/일을 가진 **로컬 자정** Date (캘린더 네비게이션 state용. 뷰들이 `getFullYear()` 등 로컬 getter로 되읽기 때문)
+  - `pacificNow()` — `{ dateKey, totalMinutes }` (일간 뷰 현재 시간 라인)
+  - `toDateKey(d)` — Date의 **로컬** 성분으로 키 생성 (캘린더 격자 셀. 셀은 서부 달력일을 나타내는 로컬 자정 Date이므로 `pacificDateKey()`와 비교해도 정확)
+- DST는 `Intl.DateTimeFormat`이 처리 → PST/PDT 분기 불필요
+- 날짜/시간 비교는 가능하면 `YYYY-MM-DDTHH:MM:SS` **문자열 비교**로 (DB 저장 형식과 동일, 시간대 파싱 없음). 1달 제한·시작<종료·같은 날짜 검증 모두 이 방식
+- 적용 범위: 캘린더 4개 뷰 + 팝오버 + 예약 폼(`max` 날짜) + 관리자 조회 범위 + 서버의 1달 제한 및 지난 예약 차단
+
+## 문자(SMS) 알림
+- **Twilio 사용.** 예약/취소/변경 시 `notification_recipients`에 등록된 담당자 전원에게 발송
+- **이메일-투-SMS 게이트웨이는 사용 금지** — 2026-08 조사 결과 폐기함:
+  - Gmail이 `250 OK`로 수락하고 통신사 MX도 수락하지만 **반송 없이 조용히 폐기**됨. 한글/영문·제목 유무·SMS/MMS 게이트웨이·통신사 5곳 전부 실패 (총 9통 미도착)
+  - AT&T(`txt.att.net`), Sprint(`messaging.sprintpcs.com`)는 **MX 레코드조차 없음** — 서비스 종료
+  - 실패를 알 방법이 없다는 게 치명적이었음. Twilio는 오류 코드로 반환 (예: `20003 Authenticate`)
+- `notification_recipients.carrier` 컬럼은 그 시절 잔재. **nullable로 변경, 아무도 읽거나 쓰지 않음** (기존 행의 값만 남아 있음). 관리자 UI에서 통신사 선택 제거
+- 전화번호는 입력받은 그대로 저장하고 **발송 시점에 `toE164()`로 정규화** (10자리는 미국 번호로 간주해 `+1` 부착). 변환 실패 시 그 수신자만 건너뛰고 로그
+- 발송 실패는 예약을 실패시키지 않음 — 수신자별 `try/catch`로 로그만 남김
+
+## 텔레그램 알림
+- **담당자 알림의 주 채널.** 미국 SMS는 A2P 10DLC 승인(캠페인 심사 10~15일)이 필요한데 텔레그램은 등록·비용이 없고 **아이폰에서도 동작**해서 먼저 붙였음
+- **개별 DM이 아니라 그룹 하나로 발송.** 담당자 추가·제거가 그룹 초대로 끝나 DB·관리자 UI를 건드릴 필요가 없음. 봇은 자기에게 먼저 말을 건 적 없는 사용자에게 DM을 보낼 수 없다는 제약도 함께 회피
+- `parse_mode: 'HTML'` 사용 → 제목·담당자·노트는 반드시 `esc()`로 이스케이프
+- 날짜 표기는 저장된 문자열에서 성분을 직접 뽑아 만듦 (`formatDateTime`). `new Date(iso)` 파싱을 피해 서버 시간대와 무관하게 동일한 결과 — 요일만 로컬 성분으로 만든 Date에서 가져옴
+- SMS와 **병렬로 함께 발송**되며 서로 독립적. 한쪽이 미설정이거나 실패해도 다른 쪽은 나감
+- 관리자 예약(`?admin=true`)은 SMS와 동일하게 알림 제외
+
+## 알림 발송과 서버리스 (중요)
+- **모든 이메일/문자 발송은 응답 반환 전에 `await` 해야 함.** Vercel은 응답을 보내는 순간 인스턴스를 얼리므로, `await` 없는 발송은 핸드셰이크 도중 죽고 아무것도 나가지 않음 — 로컬 dev에서는 프로세스가 살아있어 정상 동작하므로 발견하기 어려움
+- 이메일과 문자는 `await Promise.all([...])`로 **병렬** 실행해 지연 최소화 (직렬로 하면 2배)
+- 각 발송은 `.catch()`로 감싸 실패해도 예약 자체는 성공하도록 유지
+- 적용 위치: 예약 생성/취소/변경, 관리자 승인·거절·취소승인·취소거절, 시리즈 일괄 처리
 
 ## 핵심 설계 결정
 - 모든 예약은 신청 즉시 `approved`로 확정 (승인 대기 없음)
@@ -92,7 +175,7 @@ approved → cancelled (취소 신청 시 즉시 처리)
 - 반복 예약: 관리자 전용 (`/reserve?admin=true`). daily/weekly/monthly, 최대 500회 (매주 약 9.6년)
   - 충돌 날짜 자동 제외하고 나머지만 bulk INSERT
   - 생성 시 DB 쿼리 2번으로 고정 (범위 내 충돌 SELECT 1번 + 비충돌 건 UNNEST bulk INSERT 1번)
-- 1달 날짜 제한: 일반 사용자는 오늘~1달 이내만 예약. 클라이언트(date input `max`) + 서버(`req.nextUrl.searchParams.get('admin')`) 이중 검증
+- 1달 날짜 제한: 일반 사용자는 오늘~1달 이내만 예약. 클라이언트(date input `max`) + 서버(세션 쿠키 기반 `isAdmin`) 이중 검증
 - 이메일: 예약 신청 시 확인 메일 발송 (`sendReservationCreatedEmail` / `sendReservationCreatedBulkEmail`)
 - 회의실별 색상 20가지 시드 데이터로 정의
 - 일간/주간 뷰: 오전 6시~오후 11시, 1.5px/분, 겹침 감지 컬럼 레이아웃
@@ -100,9 +183,9 @@ approved → cancelled (취소 신청 시 즉시 처리)
   - `checkConflict()`: `status = 'approved'`인 예약과 시간 겹침 확인
   - 충돌 메시지는 예약신청 버튼 바로 위에 표시
 - 시리즈 전체 취소: `PATCH /api/admin/series/[id]`
-- Rate limiting: admin-login 5회/분, reservation 10회/분, cancel 10회/분 (Upstash 미설정 시 무제한)
+- Rate limiting: admin-login 5회/분, reservation 10회/분, cancel 10회/분, edit 10회/분 (Upstash 미설정 시 무제한)
 - Vercel Postgres: 서버리스 환경에서 영구 저장, `data/` 디렉토리 불필요
-- SendGrid/Resend 미사용 — nodemailer + Gmail SMTP만 사용
+- SendGrid/Resend 미사용 — 이메일은 nodemailer + Gmail SMTP, 문자는 Twilio
 
 ## UI 구성
 - 레이아웃: 최대 너비 1280px (`max-w-screen-xl mx-auto`), 초과 시 양쪽 공백 + `border-x border-gray-200` 구분선
@@ -111,14 +194,14 @@ approved → cancelled (취소 신청 시 즉시 처리)
 - 컨트롤 바: 1줄 — 일간/주간/월간/목록 토글 (왼쪽) + 일간 뷰일 때 "오늘" 버튼 (오른쪽 끝), 2줄 — ‹ 날짜/주/월 제목 › (가운데, 목록 뷰에서는 숨김)
 - 기본 뷰: 모든 기기에서 월간.
 - **뷰 전환 버튼 반응형**: 1024px 미만에서는 일간·월간·목록 세 버튼 표시, 1024px 이상에서는 일간·주간·월간·목록 전부 표시
-- **목록 뷰**: 일간/주간/월간 옆 "목록" 버튼으로 전환. 오늘 이후 전체 예약을 주 단위 헤더 + 날짜별 카드로 표시. 네비게이션(‹ 오늘 ›) 숨김. fetch 범위: 오늘~1년 후. 각 카드: 제목 / 시간 / 장소 (3줄 구성, 좌측 5px 방 색상 border-l). 카드 클릭 시 선택(배경 진해짐) + 취소 신청하기 버튼 표시 (장소와 같은 줄 오른쪽). 주 단위 sticky 헤더: `top: -0.2rem`으로 스크롤 시 살짝 올라간 위치에 고정
+- **목록 뷰**: 일간/주간/월간 옆 "목록" 버튼으로 전환. 오늘 이후 전체 예약을 주 단위 헤더 + 날짜별 카드로 표시. 네비게이션(‹ 오늘 ›) 숨김. fetch 범위: 오늘~1년 후. 각 카드: 제목 / 시간 / 장소 (3줄 구성, 좌측 5px 방 색상 border-l). 카드 클릭 시 선택(배경 진해짐) + 변경하기·취소 신청하기 버튼 표시 (장소와 같은 줄 오른쪽). 주 단위 sticky 헤더: `top: -0.2rem`으로 스크롤 시 살짝 올라간 위치에 고정
 - 우측 상단: 장소 예약 신청, 관리자 모드 버튼. 예약 신청 버튼 클릭 시 `RulesModal` 표시 (장소 사용수칙 4개 항목 + 동의 체크박스) → 동의 후 `/reserve`로 이동
 - 공지 배너: 큰 행사는 사용신청서(Google Drive 링크) 제출 안내
 - **장소 필터**: "장소 필터 ▾" 버튼 클릭 시 패널 펼침, 장소 chip 클릭으로 멀티 필터링. 패널 열린 상태에서 선택 시 "선택 취소" 버튼 표시 (토글 버튼 오른쪽), 닫힌 상태에서 선택 시 "전체 보기" 표시. 패널 접힌 상태에서도 선택된 장소 chip은 그대로 표시 (클릭 시 해제 가능). 모바일에서는 패널이 오버레이 드롭다운으로 표시 (캘린더 위에 absolute 포지션, backdrop 클릭 시 닫힘). header row `relative z-50`으로 backdrop(`z-40`) 위에 위치. 같은 줄 오른쪽에 불러오는 중 표시 (범례 없음)
-- **예약 상세 팝오버**: 일간/주간 캘린더 뷰에서 예약 블록 hover → 제목·장소·시간·담당자·노트 표시 + 취소 신청 버튼
+- **예약 상세 팝오버**: 일간/주간 캘린더 뷰에서 예약 블록 hover → 제목·장소·시간·담당자·노트 표시 + 변경하기(파랑)·취소 신청(빨강) 버튼
 - **현재 시간 라인**: 일간 뷰에서 오늘 날짜일 때만 파란 가로선 표시. `Intl.DateTimeFormat` + `America/Los_Angeles` 타임존으로 DST 자동 처리. 30초마다 갱신
 - **일간 뷰 고정 헤더**: 주간 스트립을 단일 `sticky top-0` 래퍼로 묶어 스크롤 시 항상 표시. 날짜 레이블은 page.tsx Row 2 (‹ 날짜 ›)로 이동. 주간 스트립 날짜 셀: 요일·날짜 사이 `gap-1`, 날짜·점 사이 `mt-1`
-- **월간 날짜 셀 클릭**: 셀 전체가 클릭 가능, 클릭 시 해당 날의 모든 예약을 시간순으로 보여주는 모달 표시 (예약 0개이면 안내 메시지). 개별 예약 블록 hover 팝오버 없음. 모달 내 카드 기본 상태에서는 취소 버튼 숨김 — 카드 클릭 시 선택(배경 진해짐) + 취소 신청하기 버튼 표시 (`selectedModalId` state). 오늘 이후 예약에만 취소 버튼 노출. 모달 닫힐 때 `selectedModalId` 초기화
+- **월간 날짜 셀 클릭**: 셀 전체가 클릭 가능, 클릭 시 해당 날의 모든 예약을 시간순으로 보여주는 모달 표시 (예약 0개이면 안내 메시지). 개별 예약 블록 hover 팝오버 없음. 모달 내 카드 기본 상태에서는 버튼 숨김 — 카드 클릭 시 선택(배경 진해짐) + 변경하기·취소 신청하기 버튼 표시 (`selectedModalId` state). 오늘 이후 예약에만 버튼 노출. 모달 닫힐 때 `selectedModalId` 초기화
 - **스와이프 제스처**: 일간/주간/월간 뷰에서 터치 좌우 스와이프로 날짜 이동. `page.tsx`에서 native `touchstart/touchmove/touchend` 이벤트로 처리 (passive: false on move). 수평/수직 축 5px threshold로 판별 후 lock. `swipeX`/`isDragging` state → 각 뷰에 `swipeOffset`/`swipeDragging` props로 전달. 완료 시: 220ms animate off-screen → navigate → 반대 edge 즉시 이동 → `requestAnimationFrame` 이중 호출 후 0으로 animate. 헤더(주간 스트립, 요일 헤더, 시간 레이블)는 transform 외부에 고정, 예약 그리드만 `translateX`
 - **월간 뷰**: 요일 헤더(일월화수목금토)는 고정, 날짜 그리드만 `overflow-y-auto` 스크롤. 그리드 row: `minmax(var(--month-cell-min-h), 1fr)` — CSS 변수로 반응형 처리 (`globals.css`: 640px 미만 100px / 640px 이상 130px). JS state 없이 순수 CSS로 SSR 안전하게 적용. 셀에 `overflow-hidden`으로 콘텐츠 클리핑
 - **월간 뷰 예약 블록**: 셀당 최대 3개 표시, 초과 시 `+N개` 표시. 모바일(`< sm`)에서는 텍스트 숨김(`hidden sm:inline`), 색상 바만 표시 (`h-3 sm:h-auto sm:leading-5`)

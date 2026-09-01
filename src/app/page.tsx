@@ -9,6 +9,7 @@ import ListView from '@/components/ListView';
 import { ReservationWithRoom, Room } from '@/lib/db';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMonthTitle, formatDayTitle, formatWeekTitle } from '@/lib/i18n';
+import { pacificTodayDate, toDateKey } from '@/lib/date';
 
 type ViewMode = 'day' | 'week' | 'month' | 'list';
 
@@ -24,10 +25,6 @@ function startOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
-// Use local date components (avoid timezone shift from toISOString)
-function toLocalDateKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
 
 function RulesModal({ onAgree, onClose }: { onAgree: () => void; onClose: () => void }) {
   const [agreed, setAgreed] = useState(false);
@@ -87,16 +84,9 @@ export default function HomePage() {
 
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
 
-  // Sync to Pacific time (America/Los_Angeles) after SSR hydration
+  // Sync to church-local (Pacific) time after SSR hydration
   useEffect(() => {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/Los_Angeles',
-      year: 'numeric', month: '2-digit', day: '2-digit',
-    }).formatToParts(new Date());
-    const y = Number(parts.find(p => p.type === 'year')!.value);
-    const m = Number(parts.find(p => p.type === 'month')!.value) - 1;
-    const d = Number(parts.find(p => p.type === 'day')!.value);
-    setCurrentDate(new Date(y, m, d));
+    setCurrentDate(pacificTodayDate());
   }, []);
 
   // Swipe gesture animation state
@@ -192,9 +182,9 @@ export default function HomePage() {
   }, []);
 
   // String key for stable effect dependency (avoids Date object reference issues)
-  const dateKey = toLocalDateKey(currentDate);
+  const dateKey = toDateKey(currentDate);
   // Day view fetches the whole week, so only refetch when the week (or view/refresh) changes
-  const fetchPeriodKey = viewMode === 'day' ? toLocalDateKey(weekStart) : viewMode === 'list' ? 'list' : dateKey;
+  const fetchPeriodKey = viewMode === 'day' ? toDateKey(weekStart) : viewMode === 'list' ? 'list' : dateKey;
 
   useEffect(() => {
     setRoomsError(null);
@@ -217,24 +207,25 @@ export default function HomePage() {
     let from: string, to: string;
 
     if (viewMode === 'day') {
-      from = toLocalDateKey(ws);
+      from = toDateKey(ws);
       const weekEnd = new Date(ws);
       weekEnd.setDate(ws.getDate() + 7);
-      to = toLocalDateKey(weekEnd);
+      to = toDateKey(weekEnd);
     } else if (viewMode === 'week') {
-      from = toLocalDateKey(ws);
+      from = toDateKey(ws);
       const weekEnd = new Date(ws);
       weekEnd.setDate(ws.getDate() + 7);
-      to = toLocalDateKey(weekEnd);
+      to = toDateKey(weekEnd);
     } else if (viewMode === 'list') {
-      from = toLocalDateKey(new Date());
-      const farFuture = new Date();
+      const todayPacific = pacificTodayDate();
+      from = toDateKey(todayPacific);
+      const farFuture = new Date(todayPacific);
       farFuture.setFullYear(farFuture.getFullYear() + 1);
-      to = toLocalDateKey(farFuture);
+      to = toDateKey(farFuture);
     } else {
-      from = toLocalDateKey(startOfMonth(currentDate));
+      from = toDateKey(startOfMonth(currentDate));
       const firstOfNext = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
-      to = toLocalDateKey(firstOfNext);
+      to = toDateKey(firstOfNext);
     }
 
     async function load() {
@@ -287,7 +278,7 @@ export default function HomePage() {
   }
 
   function goToday() {
-    setCurrentDate(new Date());
+    setCurrentDate(pacificTodayDate());
   }
 
   const title = viewMode === 'day'
@@ -309,7 +300,7 @@ export default function HomePage() {
     setSelectedRooms(new Set());
   }
 
-  const fetchKey = viewMode === 'day' ? toLocalDateKey(weekStart) : viewMode === 'list' ? 'list' : dateKey;
+  const fetchKey = viewMode === 'day' ? toDateKey(weekStart) : viewMode === 'list' ? 'list' : dateKey;
   const isFetchPending = !fetchedFor || fetchedFor.viewMode !== viewMode || fetchedFor.dateKey !== fetchKey;
   const effectiveReservations = isFetchPending ? [] : reservations;
   const filteredReservations = selectedRooms.size === 0
@@ -320,52 +311,64 @@ export default function HomePage() {
     <div className="flex flex-col h-screen max-w-screen-xl mx-auto w-full border-x border-gray-200 overflow-hidden">
       {/* Top navigation bar */}
       <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
-        <div className="px-3 sm:px-6 py-3 flex flex-wrap items-center gap-2">
+        {/* Single row at every width: never wraps, and the title absorbs whatever
+            space the buttons leave (truncating only if it genuinely runs out). */}
+        <div className="px-3 sm:px-6 py-3 flex flex-nowrap items-center gap-1.5 sm:gap-2">
           {/* Logo / Title */}
-          <div className="flex items-center gap-2 mr-auto min-w-0">
+          <div className="flex items-center min-w-0 flex-1">
             <button
-              onClick={() => { setCurrentDate(new Date()); setViewMode('month'); }}
-              className="text-base sm:text-xl font-bold text-blue-700 truncate hover:text-blue-800 transition-colors"
+              onClick={() => { setCurrentDate(pacificTodayDate()); setViewMode('month'); }}
+              className="min-w-0 max-w-full truncate text-[15px] sm:text-xl font-bold text-blue-700 hover:text-blue-800 transition-colors"
             >
-              <span className="hidden sm:inline"></span>{t.siteTitle}
+              <span className="hidden sm:inline">{t.siteTitle}</span>
+              <span className="sm:hidden">{t.siteTitleShort}</span>
             </button>
           </div>
 
           {/* Right buttons */}
           <button
             onClick={() => setShowRulesModal(true)}
-            className="px-3 py-1.5 sm:px-4 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition whitespace-nowrap"
+            className="flex-shrink-0 px-2.5 py-1.5 sm:px-4 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white text-[13px] sm:text-sm font-medium rounded-lg transition whitespace-nowrap"
           >
             <span className="hidden sm:inline">{t.btnReserve}</span>
             <span className="sm:hidden">{t.btnReserveShort}</span>
           </button>
           <button
             onClick={() => router.push('/admin')}
-            className="px-3 py-1.5 sm:px-4 sm:py-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium rounded-lg transition whitespace-nowrap"
+            className="flex-shrink-0 px-2.5 py-1.5 sm:px-4 sm:py-2 bg-gray-700 hover:bg-gray-800 text-white text-[13px] sm:text-sm font-medium rounded-lg transition whitespace-nowrap"
           >
             <span className="hidden sm:inline">{t.btnAdmin}</span>
             <span className="sm:hidden">{t.btnAdminShort}</span>
           </button>
-          {/* Language toggle */}
+          {/* Language toggle — shows the language it switches to */}
           <button
             onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
-            className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition whitespace-nowrap"
+            className="flex-shrink-0 px-2 py-1.5 sm:px-2.5 text-[11px] sm:text-xs font-semibold border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition whitespace-nowrap"
             aria-label="Switch language"
           >
-            {lang === 'ko' ? 'EN' : '한국어'}
+            {lang === 'ko' ? 'EN' : (
+              <>
+                <span className="hidden sm:inline">한국어</span>
+                <span className="sm:hidden">KO</span>
+              </>
+            )}
           </button>
         </div>
 
       {/* Notice banner */}
       <div className="bg-blue-50 border-b border-blue-100 px-3 sm:px-6 py-2">
-        <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-blue-800">
+        {/* Plain inline flow, not flex: as a flex item the button was laid out on its
+            own flex line, which cut the sentence short and left a word or two
+            stranded. Inline, the text packs each line full and the button sits
+            directly after the last word whenever it fits. */}
+        <div className="text-xs sm:text-sm text-blue-800 leading-relaxed">
           <span className="hidden sm:inline">{t.noticeDesktop}</span>
-          <span className="sm:hidden">{t.noticeMobile}</span>
+          <span className="sm:hidden">{t.noticeMobile}</span>{' '}
           <a
             href="https://drive.google.com/drive/folders/1lz7kaoe8GQf2FZI1Dfb-3hDEEWpFgygj"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition whitespace-nowrap"
+            className="inline-flex items-center align-middle px-1.5 py-0.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition whitespace-nowrap"
           >
             {t.noticeLink}
           </a>
@@ -383,7 +386,7 @@ export default function HomePage() {
               {(['day', 'month', 'list'] as const).map((mode, i) => (
                 <button
                   key={mode}
-                  onClick={() => { if (mode === 'day') setCurrentDate(new Date()); setViewMode(mode); }}
+                  onClick={() => { if (mode === 'day') setCurrentDate(pacificTodayDate()); setViewMode(mode); }}
                   aria-pressed={viewMode === mode}
                   className={`px-2.5 py-1 font-medium transition ${i > 0 ? 'border-l border-gray-200' : ''} ${
                     viewMode === mode ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
@@ -398,7 +401,7 @@ export default function HomePage() {
               {(['day', 'week', 'month', 'list'] as const).map((mode, i) => (
                 <button
                   key={mode}
-                  onClick={() => { if (mode === 'day' || mode === 'week') setCurrentDate(new Date()); setViewMode(mode); }}
+                  onClick={() => { if (mode === 'day' || mode === 'week') setCurrentDate(pacificTodayDate()); setViewMode(mode); }}
                   aria-pressed={viewMode === mode}
                   className={`px-2.5 py-1 font-medium transition ${i > 0 ? 'border-l border-gray-200' : ''} ${
                     viewMode === mode ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'

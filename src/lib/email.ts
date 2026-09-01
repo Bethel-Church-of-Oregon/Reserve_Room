@@ -270,6 +270,107 @@ export async function sendBulkApprovalEmail(reservations: ReservationWithRoom[])
   }
 }
 
+export async function sendReservationUpdatedEmail(data: {
+  title: string;
+  room_name: string;
+  start_time: string;
+  end_time: string;
+  person_in_charge: string;
+  email: string;
+  notes?: string | null;
+  previous_title: string;
+  previous_start_time: string;
+  previous_end_time: string;
+  previous_person_in_charge: string;
+}): Promise<void> {
+  if (!process.env.GMAIL_APP_PASSWORD) return;
+  const transporter = getTransporter();
+
+  const timeChanged =
+    data.previous_start_time !== data.start_time || data.previous_end_time !== data.end_time;
+  const titleChanged = data.previous_title !== data.title;
+  const personChanged = data.previous_person_in_charge !== data.person_in_charge;
+
+  const beforeAfter = (label: string, before: string, after: string, shaded: boolean) => `
+          <tr${shaded ? ' style="background:#f3f4f6;"' : ''}>
+            <td style="padding:8px 12px; font-weight:600; width:30%;">${label}</td>
+            <td style="padding:8px 12px;">
+              <span style="color:#9ca3af; text-decoration:line-through;">${before}</span>
+              <span style="color:#9ca3af;"> &rarr; </span>
+              <strong style="color:#2563eb;">${after}</strong>
+            </td>
+          </tr>`;
+
+  let shaded = true;
+  const rows: string[] = [];
+  if (titleChanged) {
+    rows.push(beforeAfter('제목', escapeHtml(data.previous_title), escapeHtml(data.title), shaded));
+    shaded = !shaded;
+  } else {
+    rows.push(`
+          <tr${shaded ? ' style="background:#f3f4f6;"' : ''}>
+            <td style="padding:8px 12px; font-weight:600; width:30%;">제목</td>
+            <td style="padding:8px 12px;">${escapeHtml(data.title)}</td>
+          </tr>`);
+    shaded = !shaded;
+  }
+  rows.push(`
+          <tr${shaded ? ' style="background:#f3f4f6;"' : ''}>
+            <td style="padding:8px 12px; font-weight:600;">장소</td>
+            <td style="padding:8px 12px;">${escapeHtml(data.room_name)}</td>
+          </tr>`);
+  shaded = !shaded;
+  if (timeChanged) {
+    rows.push(beforeAfter('시작', formatTime(data.previous_start_time), formatTime(data.start_time), shaded));
+    shaded = !shaded;
+    rows.push(beforeAfter('종료', formatTime(data.previous_end_time), formatTime(data.end_time), shaded));
+    shaded = !shaded;
+  } else {
+    rows.push(`
+          <tr${shaded ? ' style="background:#f3f4f6;"' : ''}>
+            <td style="padding:8px 12px; font-weight:600;">시간</td>
+            <td style="padding:8px 12px;">${formatTime(data.start_time)} ~ ${formatTime(data.end_time)}</td>
+          </tr>`);
+    shaded = !shaded;
+  }
+  if (personChanged) {
+    rows.push(beforeAfter('담당자', escapeHtml(data.previous_person_in_charge), escapeHtml(data.person_in_charge), shaded));
+    shaded = !shaded;
+  } else {
+    rows.push(`
+          <tr${shaded ? ' style="background:#f3f4f6;"' : ''}>
+            <td style="padding:8px 12px; font-weight:600;">담당자</td>
+            <td style="padding:8px 12px;">${escapeHtml(data.person_in_charge)}</td>
+          </tr>`);
+    shaded = !shaded;
+  }
+  if (data.notes) {
+    rows.push(`
+          <tr${shaded ? ' style="background:#f3f4f6;"' : ''}>
+            <td style="padding:8px 12px; font-weight:600;">기타 노트</td>
+            <td style="padding:8px 12px;">${escapeHtml(data.notes)}</td>
+          </tr>`);
+  }
+
+  await transporter.sendMail({
+    from: `"오레곤벧엘교회 장소예약시스템" <${getEmailSender()}>`,
+    to: data.email,
+    subject: `[오레곤벧엘교회] 예약이 변경되었습니다 — ${data.title}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #333;">
+        <h2 style="color: #2563eb;">예약 변경 안내</h2>
+        <p>안녕하세요, <strong>${escapeHtml(data.person_in_charge)}</strong>성도님.</p>
+        <p>아래와 같이 예약이 <strong style="color: #2563eb;">변경</strong>되었습니다.</p>
+        <table style="width:100%; border-collapse:collapse; margin: 16px 0;">${rows.join('')}
+        </table>
+        <p style="color:#6b7280; font-size:13px;">장소 또는 날짜를 바꾸시려면 예약을 취소하신 후 다시 신청해 주세요.</p>
+        <hr style="border:none; border-top:1px solid #e5e7eb; margin:24px 0;" />
+        <p style="font-size:12px; color:#9ca3af;">오레곤벧엘교회 장소예약시스템</p>
+      </div>
+    `,
+  }).catch((e) => console.error('[email] 발송 실패:', e));
+}
+
 export async function sendReservationCancelledEmail(data: {
   title: string;
   room_name: string;

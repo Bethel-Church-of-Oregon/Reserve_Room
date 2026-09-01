@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import { ReservationWithRoom } from '@/lib/db';
-import { CancelRequestModal } from './ReservationDetailPopover';
+import { CancelRequestModal, EditRequestModal } from './ReservationDetailPopover';
+import { pacificDateKey } from '@/lib/date';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatModalDayTitle } from '@/lib/i18n';
 
@@ -56,18 +57,9 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const calDays = getCalendarDays(year, month);
-  const getPacificToday = () => {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/Los_Angeles',
-      year: 'numeric', month: '2-digit', day: '2-digit',
-    }).formatToParts(new Date());
-    const y = parts.find(p => p.type === 'year')!.value;
-    const m = parts.find(p => p.type === 'month')!.value;
-    const d = parts.find(p => p.type === 'day')!.value;
-    return `${y}-${m}-${d}`;
-  };
-  const today = getPacificToday();
+  const today = pacificDateKey();
   const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
+  const [editModalReservation, setEditModalReservation] = useState<ReservationWithRoom | null>(null);
   const [expandedDay, setExpandedDay] = useState<{ date: Date; reservations: ReservationWithRoom[] } | null>(null);
   const [selectedModalId, setSelectedModalId] = useState<number | null>(null);
   const reservationsByDay = new Map<string, ReservationWithRoom[]>();
@@ -189,6 +181,7 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
                 .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
                 .map((r) => {
                   const canRequestCancel = (r.status === 'approved' || r.status === 'pending') && r.end_time.slice(0, 10) >= today;
+                  const canEdit = r.status === 'approved' && r.start_time.slice(0, 10) >= today;
                   const isSelected = selectedModalId === r.id;
                   return (
                     <div
@@ -208,19 +201,37 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
                         <div className="text-xs text-gray-500">{formatTime(r.start_time)} – {formatTime(r.end_time)}</div>
                         <div className="flex items-center justify-between">
                           <div className="text-xs text-gray-500">{t.personLabel} {r.person_in_charge}</div>
-                          {isSelected && canRequestCancel && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setExpandedDay(null);
-                                setSelectedModalId(null);
-                                setCancelModalReservation(r);
-                              }}
-                              className="text-[10px] font-medium px-1.5 py-0.5 text-red-600 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition"
-                            >
-                              {t.btnRequestCancel}
-                            </button>
+                          {isSelected && (canEdit || canRequestCancel) && (
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {canEdit && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExpandedDay(null);
+                                    setSelectedModalId(null);
+                                    setEditModalReservation(r);
+                                  }}
+                                  className="text-[10px] font-medium px-1.5 py-0.5 text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition whitespace-nowrap"
+                                >
+                                  {t.btnRequestEdit}
+                                </button>
+                              )}
+                              {canRequestCancel && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExpandedDay(null);
+                                    setSelectedModalId(null);
+                                    setCancelModalReservation(r);
+                                  }}
+                                  className="text-[10px] font-medium px-1.5 py-0.5 text-red-600 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition whitespace-nowrap"
+                                >
+                                  {t.btnRequestCancel}
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -240,6 +251,17 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
             onRefresh?.();
           }}
           onCancel={() => setCancelModalReservation(null)}
+        />
+      )}
+
+      {editModalReservation && (
+        <EditRequestModal
+          reservation={editModalReservation}
+          onConfirm={() => {
+            setEditModalReservation(null);
+            onRefresh?.();
+          }}
+          onCancel={() => setEditModalReservation(null)}
         />
       )}
     </div>

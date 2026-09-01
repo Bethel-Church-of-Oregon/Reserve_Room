@@ -4,6 +4,7 @@ import { sendApprovalEmail, sendRejectionEmail, sendCancellationApprovedEmail, s
 import { cookies } from 'next/headers';
 import { verifyAdminSession } from '@/lib/auth';
 import { LIMITS } from '@/lib/constants';
+import { applyReservationEdit } from '@/lib/editReservation';
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   if (!verifyAdminSession(cookies().get('admin_auth')?.value)) {
@@ -27,7 +28,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
       // 이메일 발송 (실패해도 승인은 유지)
       if (reservation) {
-        sendApprovalEmail(reservation).catch((e) =>
+        await sendApprovalEmail(reservation).catch((e) =>
           console.error('[email] 승인 이메일 발송 실패:', e)
         );
       }
@@ -51,7 +52,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
       // 이메일 발송 (실패해도 거절은 유지)
       if (reservation) {
-        sendRejectionEmail(reservation, reasonTrimmed).catch((e) =>
+        await sendRejectionEmail(reservation, reasonTrimmed).catch((e) =>
           console.error('[email] 거절 이메일 발송 실패:', e)
         );
       }
@@ -65,7 +66,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       if (!ok) return NextResponse.json({ error: '취소 승인할 수 없습니다.' }, { status: 400 });
 
       if (reservation) {
-        sendCancellationApprovedEmail(reservation).catch((e) =>
+        await sendCancellationApprovedEmail(reservation).catch((e) =>
           console.error('[email] 취소 승인 이메일 발송 실패:', e)
         );
       }
@@ -84,11 +85,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       if (!ok) return NextResponse.json({ error: '취소 거절할 수 없습니다.' }, { status: 400 });
 
       if (reservation) {
-        sendCancellationRejectedEmail(reservation, cancelReasonTrimmed || undefined).catch((e) =>
+        await sendCancellationRejectedEmail(reservation, cancelReasonTrimmed || undefined).catch((e) =>
           console.error('[email] 취소 거절 이메일 발송 실패:', e)
         );
       }
 
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === 'edit') {
+      // Admin edits skip the requester-email check and may correct past events.
+      const result = await applyReservationEdit(id, body, { requesterEmail: null, allowPast: true });
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error }, { status: result.status });
+      }
       return NextResponse.json({ success: true });
     }
 
