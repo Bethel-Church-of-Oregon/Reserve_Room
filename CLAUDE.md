@@ -55,6 +55,12 @@ npm run build && npm start  # 프로덕션 (포트 8000)
 - 시드는 rooms 테이블이 비어있을 때만 실행 (`count === 0` 체크)
 - 장소 변경 시 Neon 콘솔에서 `DELETE FROM reservations; DELETE FROM rooms;` 후 앱 재시작
 - 스키마 마이그레이션: `ensureDbReady()`에서 `ADD COLUMN IF NOT EXISTS`로 idempotent 처리
+- **`SCHEMA_VERSION` 버전 게이트.** `app_settings.schema_version`이 현재 값과 같으면 DDL 전체를 건너뜀
+  - 예전에는 콜드스타트마다 27회 왕복(약 2.7초)을 냈음. Vercel은 **인스턴스가 새로 뜰 때마다** 이걸 다시 하므로 트래픽이 몰릴 때 가장 비쌌음 → 현재 **2회** (버전 확인 + ROOM_ORDER) (2026-09 수정)
+  - **DDL을 바꾸면 `SCHEMA_VERSION`도 반드시 올릴 것.** 안 올리면 기존 DB에 새 마이그레이션이 영영 적용되지 않음
+  - **실패하면 버전을 기록하지 않음** → 다음 콜드스타트에서 재시도. 없는 스키마를 있다고 도장 찍으면 실패가 영구히 가려짐 (예: 새 DB가 중복예약 제약 없이 서비스되는데 로그 한 줄만 남음)
+  - `isConcurrentCatalogRace()`: 동시 콜드스타트가 같은 카탈로그 행에서 부딪히는 경우(`tuple concurrently updated`, `42710`, `42P07`)를 **성공으로 처리.** 이긴 쪽이 동일한 작업을 이미 했기 때문
+    - 이게 실제 버그였음. 8개 동시 콜드스타트를 실측하면 1개가 `CREATE OR REPLACE FUNCTION`에서 이 오류를 냈고, 그 오류가 같은 try 블록 안의 **제약 존재 확인까지 통째로 건너뛰게** 만들었음
 
 ## 장소 숨김 (은퇴 처리)
 - `rooms.hidden = true` 인 장소는 **일반 사용자 선택 목록에서 사라지지만 DB에는 남음.** 기존 예약은 그대로 캘린더에 표시됨 (예약 조회는 join으로 room_name/color를 가져오므로 영향 없음)
@@ -68,6 +74,7 @@ npm run build && npm start  # 프로덕션 (포트 8000)
 - **`ORDER BY sort_order, id`.** id 순이 아님 — 나중에 추가한 장소가 물리적 위치와 무관하게 맨 끝에 붙는 문제 때문에 도입 (2026-09)
 - 순서의 단일 출처는 `ensureDbReady()`의 **`ROOM_ORDER` 배열.** 여기 적힌 순서대로 `sort_order`가 매겨짐
 - **매 콜드스타트마다 단일 UPDATE로 적용 (멱등).** `sort_order <> t.ord` 조건이 있어 실제로 다를 때만 씀. 순서 변경 UI가 없으므로 코드가 곧 정답이고, 재시작해도 항상 이 순서로 수렴
+- **`applyRoomOrder()`는 일부러 `SCHEMA_VERSION` 게이트 밖에 있음.** 게이트 안에 넣으면 ROOM_ORDER를 고쳐도 버전을 올리기 전까지 반영이 안 됨 — 위의 "재시작하면 수렴" 성질이 깨짐
 - 장소를 추가·이름 변경할 때는 **`ROOM_ORDER`에도 반영**해야 함 (누락되면 `sort_order = 0`으로 맨 앞에 옴)
 - 은퇴(숨김) 장소는 원래 자리를 유지
 - `은혜성전 교실 5`는 실재하지 않는 곳이라 **완전 삭제됨** (2026-09). 삭제문은 참조가 없을 때만 실행되도록 자기방어형이라 멱등하고, 예약이 붙어 있으면 스스로 건너뜀

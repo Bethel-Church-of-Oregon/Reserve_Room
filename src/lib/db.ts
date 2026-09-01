@@ -15,13 +15,51 @@ function getSql() {
   return _sql;
 }
 
-let _initPromise: Promise<void> | null = null;
+/**
+ * Bumped whenever the DDL in `runSchemaMigrations` changes. A cold start that
+ * finds this value already recorded skips the entire migration block — 36 round
+ * trips to Neon, about 2.6 seconds, paid by every new serverless instance.
+ */
+const SCHEMA_VERSION = '2026-09-01';
+const SCHEMA_VERSION_KEY = 'schema_version';
 
-async function ensureDbReady(): Promise<void> {
-  if (_initPromise) return _initPromise;
+type Sql = ReturnType<typeof getSql>;
 
-  _initPromise = (async () => {
-    const sql = getSql();
+/**
+ * Two cold starts racing on the same catalog row. Postgres fails one of them,
+ * but the winner performed the identical work, so the loser can carry on.
+ *
+ * This matters more than it looks: eight simultaneous cold starts reliably
+ * produce one `tuple concurrently updated` from `CREATE OR REPLACE FUNCTION`,
+ * and that error used to abort the surrounding block before it could check
+ * whether the overlap constraint existed.
+ */
+function isConcurrentCatalogRace(e: unknown): boolean {
+  const err = e as { code?: string; message?: string } | null;
+  if (!err) return false;
+  return (
+    err.code === '42710' || // duplicate_object
+    err.code === '42P07' || // duplicate_table
+    Boolean(err.message?.includes('tuple concurrently updated'))
+  );
+}
+
+/** Has this database already been migrated to `SCHEMA_VERSION`? One round trip. */
+async function schemaIsCurrent(sql: Sql): Promise<boolean> {
+  try {
+    const rows = (await sql`
+      SELECT value FROM app_settings WHERE key = ${SCHEMA_VERSION_KEY}
+    `) as { value: string | null }[];
+    return rows[0]?.value === SCHEMA_VERSION;
+  } catch {
+    // `app_settings` is itself created below, so a missing table simply means
+    // this database has never been migrated.
+    return false;
+  }
+}
+
+async function runSchemaMigrations(sql: Sql): Promise<void> {
+    let complete = true;
     await sql`
       CREATE TABLE IF NOT EXISTS rooms (
         id   SERIAL PRIMARY KEY,
@@ -99,7 +137,8 @@ async function ensureDbReady(): Promise<void> {
       // Times are stored as TEXT, and `text::timestamp` cannot go in an index
       // expression because parsing depends on the DateStyle setting. Building the
       // value from its parts with make_timestamp is genuinely immutable, so it can.
-      await sql`
+      try {
+        await sql`
         CREATE OR REPLACE FUNCTION reservation_ts(s text) RETURNS timestamp
         LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $fn$
           SELECT make_timestamp(
@@ -112,25 +151,37 @@ async function ensureDbReady(): Promise<void> {
           )
         $fn$
       `;
+      } catch (e) {
+        // A concurrent cold start won the race and created the identical
+        // function. Anything else is a real failure.
+        if (!isConcurrentCatalogRace(e)) throw e;
+      }
 
       const existing = (await sql`
         SELECT 1 FROM pg_constraint WHERE conname = 'reservations_no_overlap'
       `) as unknown[];
       if (existing.length === 0) {
-        await sql`
-          ALTER TABLE reservations
-            ADD CONSTRAINT reservations_no_overlap
-            EXCLUDE USING gist (
-              room_id WITH =,
-              tsrange(reservation_ts(start_time), reservation_ts(end_time)) WITH &&
-            ) WHERE (status IN ('pending', 'approved', 'cancellation_requested'))
-        `;
-        console.log('[db] 중복 예약 방지 제약 추가됨');
+        try {
+          await sql`
+            ALTER TABLE reservations
+              ADD CONSTRAINT reservations_no_overlap
+              EXCLUDE USING gist (
+                room_id WITH =,
+                tsrange(reservation_ts(start_time), reservation_ts(end_time)) WITH &&
+              ) WHERE (status IN ('pending', 'approved', 'cancellation_requested'))
+          `;
+          console.log('[db] 중복 예약 방지 제약 추가됨');
+        } catch (e) {
+          // Same race, one statement later: another instance added it first.
+          if (!isConcurrentCatalogRace(e)) throw e;
+        }
       }
     } catch (e) {
       // Pre-existing overlapping rows would make this fail. Log and carry on: the
-      // application-level `checkConflict` still applies either way.
+      // application-level `checkConflict` still applies either way. The schema
+      // version is not stamped, so the next cold start tries again.
       console.error('[db] 중복 예약 방지 제약 적용 실패:', e);
+      complete = false;
     }
 
     // Edit-history columns (idempotent)
@@ -282,6 +333,22 @@ async function ensureDbReady(): Promise<void> {
       console.error('[db] 은혜성전 교실 5 삭제 실패:', e);
     }
 
+    if (!complete) {
+      // Leaving the version unrecorded means the next cold start retries. That is
+      // the whole point: stamping a schema that is not actually in place would
+      // mask the failure permanently — a fresh database could end up serving
+      // traffic with no double-booking constraint and only one log line to say so.
+      console.warn('[db] 스키마가 완전하지 않아 버전을 기록하지 않음 — 다음 시작 때 재시도');
+      return;
+    }
+
+    await sql`
+      INSERT INTO app_settings (key, value) VALUES (${SCHEMA_VERSION_KEY}, ${SCHEMA_VERSION})
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+    `;
+}
+
+async function applyRoomOrder(sql: Sql): Promise<void> {
     // Canonical display order, applied every start in one statement. Idempotent by
     // design: there is no UI for reordering, so this list is the single source of
     // truth. Retired (hidden) rooms keep their place in the list.
@@ -316,6 +383,25 @@ async function ensureDbReady(): Promise<void> {
     } catch (e) {
       console.error('[db] 장소 정렬 적용 실패:', e);
     }
+}
+
+let _initPromise: Promise<void> | null = null;
+
+async function ensureDbReady(): Promise<void> {
+  if (_initPromise) return _initPromise;
+
+  _initPromise = (async () => {
+    const sql = getSql();
+
+    if (!(await schemaIsCurrent(sql))) {
+      await runSchemaMigrations(sql);
+    }
+
+    // Deliberately outside the version gate. ROOM_ORDER is the only source of
+    // truth for display order — there is no UI for reordering — so the list has
+    // to converge on every start, not just when the schema version changes.
+    // It is one conditional UPDATE, so the warm path costs two round trips total.
+    await applyRoomOrder(sql);
   })();
 
   return _initPromise;
