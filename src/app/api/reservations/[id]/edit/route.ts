@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkEditLimit } from '@/lib/ratelimit';
+import { checkEditLimit, checkEditEmailLimit } from '@/lib/ratelimit';
 import { applyReservationEdit } from '@/lib/editReservation';
 
 export async function POST(
@@ -24,6 +24,16 @@ export async function POST(
     const email = body?.email?.trim();
     if (!email) {
       return NextResponse.json({ error: '이메일을 입력해주세요.' }, { status: 400 });
+    }
+
+    // Tight per-person limit; the per-IP limit above is only a ceiling, because
+    // everyone on the church network shares a single public address.
+    const { limited: emailLimited } = await checkEditEmailLimit(email);
+    if (emailLimited) {
+      return NextResponse.json(
+        { error: '같은 이메일로 변경 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.' },
+        { status: 429 }
+      );
     }
 
     const result = await applyReservationEdit(id, body, { requesterEmail: email });

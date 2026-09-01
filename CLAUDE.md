@@ -24,7 +24,7 @@ npm run build && npm start  # 프로덕션 (포트 8000)
 - `src/lib/telegram.ts` — 텔레그램 발송 (`sendTelegramNotification`) + 메시지 생성 (`build*TelegramMessage`)
 - `src/lib/auth.ts` — HMAC-SHA256 관리자 세션 토큰 생성/검증
 - `src/lib/constants.ts` — 입력값 길이 제한 상수 (`LIMITS`)
-- `src/lib/ratelimit.ts` — Upstash Redis 기반 rate limiting (로그인/예약/취소/변경)
+- `src/lib/ratelimit.ts` — Upstash Redis 기반 rate limiting. **IP 계층(느슨한 상한) + 이메일 계층(엄격)** 2단
 - `src/lib/date.ts` — **모든 날짜/시각 판단의 단일 창구.** 서부시간(`America/Los_Angeles`) 기준 `pacificDateKey()` / `pacificTodayDate()` / `pacificNow()` / `toDateKey()`
 - `src/lib/editReservation.ts` — `applyReservationEdit()`: 예약 변경 검증·저장·알림 (공개 라우트와 관리자 라우트가 공유)
 - `src/app/page.tsx` — 메인 캘린더 (day/week/month/list, 클라이언트 컴포넌트)
@@ -128,7 +128,7 @@ approved → cancelled (취소 신청 시 즉시 처리)
 - 이력: `updated_at` 갱신 + 시간이 실제로 바뀐 경우에만 `previous_start_time`/`previous_end_time` 저장 (SQL `CASE WHEN`, 제목만 고쳐도 기존 시간 이력 유지)
 - 알림: `sendReservationUpdatedEmail` (변경된 필드만 `기존 → 신규` 취소선 표기) + `buildUpdateSmsMessage` (`[변경]`)
 - 반복 예약은 **단건만** 변경 가능 (시리즈 일괄 시간 변경 없음)
-- Rate limit: `checkEditLimit` 10회/분
+- Rate limit: `checkEditLimit` IP 60회/분 + `checkEditEmailLimit` 이메일 10회/분
 - **관리자 경로**: `PATCH /api/reservations/[id]` + `{ action: 'edit' }` (관리자 세션 필수)
   - 같은 `applyReservationEdit()`를 호출하되 **이메일 확인 생략** + **지난 예약도 수정 허용** (`allowPast: true`)
   - 관리자 목록의 `approved` 행에 "변경" 버튼 → `EditRequestModal admin` (이메일 입력란 숨김)
@@ -143,6 +143,12 @@ approved → cancelled (취소 신청 시 즉시 처리)
 - 시리즈 취소는 `PATCH /api/admin/series/[id]`로 일괄 처리
 
 ## 접근 통제 (중요)
+- **공개 캘린더 응답은 컬럼 화이트리스트.** `getReservations()`는 `PublicReservation`에 있는 컬럼만 SELECT
+  - 예전에는 `SELECT r.*`라서 **인증 없는 `GET /api/reservations`가 모든 예약자의 이메일을 내려보냈음.** 이메일은 취소·변경의 유일한 자격증명이라, 긁어서 남의 예약을 취소·변경할 수 있었음 (2026-09 수정)
+  - 라우트에서 지우지 않고 **쿼리에서 화이트리스트**하는 이유: 나중에 `ADD COLUMN` 해도 기본이 비공개가 됨
+  - 공개: `id, series_id, title, room_id, start_time, end_time, person_in_charge, notes, status, room_name, room_color` / 비공개: `email`, 취소 사유, 변경 이력(`previous_*`, `updated_at`), `created_at`
+  - `getReservationById()`는 **서버 전용**이라 `email` 유지 (소유권 검증에 필요). 단건 공개 GET 라우트는 없음
+  - 관리자는 별도 쿼리 `getAllReservationsForAdmin()`로 전체 컬럼을 받음
 - **관리자 판정은 서명된 세션 쿠키로만.** `verifyAdminSession(cookies().get('admin_auth')?.value)`
   - `?admin=true` 쿼리 파라미터는 **클라이언트 UI 힌트일 뿐 서버가 신뢰하지 않음.** 예전에는 이걸 신뢰해서 인증 없이 1달 제한 해제 + 반복예약 500건 + 알림 억제가 전부 가능했음 (2026-09 수정)
   - 예약 폼도 `GET /api/admin/auth`로 실제 세션을 확인한 뒤에만 관리자 UI를 노출
@@ -213,7 +219,11 @@ approved → cancelled (취소 신청 시 즉시 처리)
   - 기존 겹침 행이 있으면 제약 추가가 실패하므로 `ensureDbReady()`에서 오류를 로그만 남기고 진행 (앱 레벨 검사는 유지)
   - 충돌 메시지는 예약신청 버튼 바로 위에 표시
 - 시리즈 전체 취소: `PATCH /api/admin/series/[id]`
-- Rate limiting: admin-login 5회/분, reservation 10회/분, cancel 10회/분, edit 10회/분 (Upstash 미설정 시 무제한)
+- Rate limiting: **IP + 이메일 2계층** (Upstash 미설정 시 **전부 무제한** — Vercel 환경변수 확인 필수)
+  - IP: admin-login 5회/분, reservation·cancel·edit 각 60회/분
+  - 이메일: reservation 5회/분, cancel 5회/분, edit 10회/분. 관리자는 이메일 계층 면제
+  - **IP 단독 제한은 교회 WiFi에서 위험함.** 교인 전원이 공인 IP 하나를 공유하므로 예전 10회/분에서는 예배 후 공지 직후 11번째 사람부터 429였음 (2026-09 수정). 그래서 IP는 상한으로 완화하고 엄격한 제한을 이메일로 옮김
+  - 이메일 계층은 단독 보안 경계가 아님 (주소를 바꾸면 우회) → IP 상한과 예약 코드가 함께 남아 있어야 함
 - Vercel Postgres: 서버리스 환경에서 영구 저장, `data/` 디렉토리 불필요
 - SendGrid/Resend 미사용 — 이메일은 nodemailer + Gmail SMTP, 문자는 Twilio
 

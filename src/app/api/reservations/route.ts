@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { addMonths, addDays, format } from 'date-fns';
 import { getReservations, createReservation, createReservationSeries, checkConflict, getRooms, getConflictingReservationsForRange, createReservationsBulk, getReservationAccessCode, isOverlapViolation } from '@/lib/db';
-import { checkReservationLimit } from '@/lib/ratelimit';
+import { checkReservationLimit, checkReservationEmailLimit } from '@/lib/ratelimit';
 import { LIMITS } from '@/lib/constants';
 import { sendReservationCreatedEmail, sendReservationCreatedBulkEmail } from '@/lib/email';
 import { sendSmsNotifications, buildReservationSmsMessage } from '@/lib/sms';
@@ -140,6 +140,21 @@ export async function POST(req: NextRequest) {
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailStr)) {
       return NextResponse.json({ error: '올바른 이메일 형식이 아닙니다.' }, { status: 400 });
+    }
+
+    // Per-person limit, checked only once the address is known to be well-formed
+    // so malformed input cannot create counter keys. The per-IP limit above is a
+    // loose ceiling because the whole congregation shares one church IP; this is
+    // the tight one. Administrators are exempt — they are authenticated, and
+    // entering several bookings in a row is ordinary work for them.
+    if (!isAdmin) {
+      const { limited: emailLimited } = await checkReservationEmailLimit(emailStr);
+      if (emailLimited) {
+        return NextResponse.json(
+          { error: '같은 이메일로 예약 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.' },
+          { status: 429 }
+        );
+      }
     }
 
     if (new Date(start_time) >= new Date(end_time)) {

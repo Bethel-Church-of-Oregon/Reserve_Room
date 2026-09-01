@@ -6,7 +6,7 @@ import WeekView from '@/components/WeekView';
 import MonthView from '@/components/MonthView';
 import DayView from '@/components/DayView';
 import ListView from '@/components/ListView';
-import { ReservationWithRoom, Room } from '@/lib/db';
+import { PublicReservation, Room } from '@/lib/db';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatMonthTitle, formatDayTitle, formatWeekTitle } from '@/lib/i18n';
 import { pacificTodayDate, toDateKey } from '@/lib/date';
@@ -92,7 +92,7 @@ export default function HomePage() {
   // Swipe gesture animation state
   const [swipeX, setSwipeX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const [reservations, setReservations] = useState<ReservationWithRoom[]>([]);
+  const [reservations, setReservations] = useState<PublicReservation[]>([]);
   const [fetchedFor, setFetchedFor] = useState<{ viewMode: ViewMode; dateKey: string } | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [roomsError, setRoomsError] = useState<string | null>(null);

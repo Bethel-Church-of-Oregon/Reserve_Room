@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ReservationWithRoom } from '@/lib/db';
+import { PublicReservation } from '@/lib/db';
 import { CancelRequestModal, EditRequestModal } from './ReservationDetailPopover';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatTimeAmPm, formatListWeekLabel } from '@/lib/i18n';
@@ -16,7 +16,7 @@ function startOfWeek(d: Date): Date {
 }
 
 interface Props {
-  reservations: ReservationWithRoom[];
+  reservations: PublicReservation[];
   loading: boolean;
   onRefresh?: () => void;
 }
@@ -25,15 +25,15 @@ export default function ListView({ reservations, loading, onRefresh }: Props) {
   const { t, tRoom, lang } = useLanguage();
   const today = pacificDateKey();
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
-  const [editModalReservation, setEditModalReservation] = useState<ReservationWithRoom | null>(null);
+  const [cancelModalReservation, setCancelModalReservation] = useState<PublicReservation | null>(null);
+  const [editModalReservation, setEditModalReservation] = useState<PublicReservation | null>(null);
 
   const upcoming = [...reservations]
     .filter((r) => r.start_time.slice(0, 10) >= today && r.status !== 'rejected')
     .sort((a, b) => a.start_time.localeCompare(b.start_time));
 
   // Group by date
-  const byDate = new Map<string, ReservationWithRoom[]>();
+  const byDate = new Map<string, PublicReservation[]>();
   for (const r of upcoming) {
     const key = r.start_time.slice(0, 10);
     if (!byDate.has(key)) byDate.set(key, []);

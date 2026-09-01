@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { ReservationWithRoom } from '@/lib/db';
+import { PublicReservation } from '@/lib/db';
 import ReservationDetailPopover, { CancelRequestModal, EditRequestModal } from './ReservationDetailPopover';
 import { pacificDateKey, toDateKey } from '@/lib/date';
 
@@ -17,7 +17,7 @@ const DAYS_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
 interface Props {
   weekStart: Date;
-  reservations: ReservationWithRoom[];
+  reservations: PublicReservation[];
   onRefresh?: () => void;
   swipeOffset?: number;
   swipeDragging?: boolean;
@@ -42,7 +42,7 @@ function formatTime(dateStr: string): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-function getReservationsForDay(reservations: ReservationWithRoom[], day: Date): ReservationWithRoom[] {
+function getReservationsForDay(reservations: PublicReservation[], day: Date): PublicReservation[] {
   const key = toDateKey(day);
   return reservations.filter((r) => {
     const startDate = r.start_time.slice(0, 10);
@@ -51,11 +51,11 @@ function getReservationsForDay(reservations: ReservationWithRoom[], day: Date): 
 }
 
 // Simple overlap grouping to position side-by-side
-function groupOverlapping(items: ReservationWithRoom[]): Array<{ item: ReservationWithRoom; col: number; totalCols: number }> {
+function groupOverlapping(items: PublicReservation[]): Array<{ item: PublicReservation; col: number; totalCols: number }> {
   if (items.length === 0) return [];
 
   const sorted = [...items].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-  const result: Array<{ item: ReservationWithRoom; col: number; totalCols: number }> = [];
+  const result: Array<{ item: PublicReservation; col: number; totalCols: number }> = [];
   const cols: number[] = []; // end time (in minutes) of last item in each column
 
   for (const item of sorted) {
@@ -105,12 +105,12 @@ export default function WeekView({ weekStart, reservations, onRefresh, swipeOffs
   }, []);
   const days = getWeekDays(weekStart);
   const today = pacificDateKey();
-  const [hovered, setHovered] = useState<{ reservation: ReservationWithRoom; rect: DOMRect } | null>(null);
-  const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
-  const [editModalReservation, setEditModalReservation] = useState<ReservationWithRoom | null>(null);
+  const [hovered, setHovered] = useState<{ reservation: PublicReservation; rect: DOMRect } | null>(null);
+  const [cancelModalReservation, setCancelModalReservation] = useState<PublicReservation | null>(null);
+  const [editModalReservation, setEditModalReservation] = useState<PublicReservation | null>(null);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showPopover = (reservation: ReservationWithRoom, el: HTMLElement) => {
+  const showPopover = (reservation: PublicReservation, el: HTMLElement) => {
     if (hideTimeoutRef.current) {
       clearTimeout(hideTimeoutRef.current);
       hideTimeoutRef.current = null;

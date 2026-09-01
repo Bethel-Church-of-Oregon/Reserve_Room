@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ReservationWithRoom } from '@/lib/db';
+import { PublicReservation } from '@/lib/db';
 import { CancelRequestModal, EditRequestModal } from './ReservationDetailPopover';
 import { pacificDateKey } from '@/lib/date';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -9,7 +9,7 @@ import { formatModalDayTitle } from '@/lib/i18n';
 
 interface Props {
   currentDate: Date;
-  reservations: ReservationWithRoom[];
+  reservations: PublicReservation[];
   onRefresh?: () => void;
   swipeOffset?: number;
   swipeDragging?: boolean;
@@ -58,11 +58,11 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
   const month = currentDate.getMonth();
   const calDays = getCalendarDays(year, month);
   const today = pacificDateKey();
-  const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
-  const [editModalReservation, setEditModalReservation] = useState<ReservationWithRoom | null>(null);
-  const [expandedDay, setExpandedDay] = useState<{ date: Date; reservations: ReservationWithRoom[] } | null>(null);
+  const [cancelModalReservation, setCancelModalReservation] = useState<PublicReservation | null>(null);
+  const [editModalReservation, setEditModalReservation] = useState<PublicReservation | null>(null);
+  const [expandedDay, setExpandedDay] = useState<{ date: Date; reservations: PublicReservation[] } | null>(null);
   const [selectedModalId, setSelectedModalId] = useState<number | null>(null);
-  const reservationsByDay = new Map<string, ReservationWithRoom[]>();
+  const reservationsByDay = new Map<string, PublicReservation[]>();
   for (const r of reservations) {
     const key = r.start_time.slice(0, 10);
     if (!reservationsByDay.has(key)) reservationsByDay.set(key, []);

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ReservationWithRoom } from '@/lib/db';
+import { PublicReservation } from '@/lib/db';
 import { LIMITS } from '@/lib/constants';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatModalDayTitle } from '@/lib/i18n';
@@ -13,16 +13,16 @@ function formatTime(dateStr: string): string {
 }
 
 interface Props {
-  reservation: ReservationWithRoom;
+  reservation: PublicReservation;
   /** Screen coordinates from getBoundingClientRect() */
   position: { top: number; left: number };
   /** Keep popover visible while hovering over it */
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
   /** Called when user clicks 취소 신청; parent should show modal and handle submit */
-  onRequestCancel?: (reservation: ReservationWithRoom) => void;
+  onRequestCancel?: (reservation: PublicReservation) => void;
   /** Called when user clicks 변경하기; parent should show modal and handle submit */
-  onRequestEdit?: (reservation: ReservationWithRoom) => void;
+  onRequestEdit?: (reservation: PublicReservation) => void;
 }
 
 function generateTimeOptions(): string[] {
@@ -53,7 +53,7 @@ export function EditRequestModal({
   onCancel,
   admin = false,
 }: {
-  reservation: ReservationWithRoom;
+  reservation: PublicReservation;
   onConfirm: () => void;
   onCancel: () => void;
   /** Admin edits go through the admin PATCH route and skip the email check. */
@@ -304,7 +304,7 @@ export function CancelRequestModal({
   onConfirm,
   onCancel,
 }: {
-  reservation: ReservationWithRoom;
+  reservation: PublicReservation;
   onConfirm: (reason: string) => void;
   onCancel: () => void;
 }) {

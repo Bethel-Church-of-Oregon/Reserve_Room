@@ -362,6 +362,31 @@ export interface ReservationWithRoom extends Reservation {
   room_color: string;
 }
 
+/**
+ * What the public calendar is allowed to see.
+ *
+ * `getReservations` used to `SELECT r.*`, so `GET /api/reservations` — a route
+ * with no authentication — handed out every reserver's email address. The email
+ * is the only credential the cancel and edit routes check, so publishing it let
+ * anyone harvest an address and then cancel or move that person's booking.
+ *
+ * Columns are whitelisted here rather than stripped in the route, so a column
+ * added later is private by default instead of leaking the moment it exists.
+ */
+export interface PublicReservation {
+  id: number;
+  series_id?: string | null;
+  title: string;
+  room_id: number;
+  start_time: string;
+  end_time: string;
+  person_in_charge: string;
+  notes: string | null;
+  status: ReservationStatus;
+  room_name: string;
+  room_color: string;
+}
+
 export type ReservationSeriesStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
 
 export interface ReservationSeries {
@@ -394,49 +419,24 @@ export async function getRooms(includeHidden = false): Promise<Room[]> {
 export async function getReservations(
   from?: string,
   to?: string
-): Promise<ReservationWithRoom[]> {
+): Promise<PublicReservation[]> {
   await ensureDbReady();
 
-  if (from && to) {
-    const rows = (await getSql()`
-      SELECT r.*, rm.name as room_name, rm.color as room_color
-      FROM reservations r
-      JOIN rooms rm ON r.room_id = rm.id
-      WHERE r.status NOT IN ('rejected', 'cancelled') AND r.end_time >= ${from} AND r.start_time <= ${to}
-      ORDER BY r.start_time
-    `) as ReservationWithRoom[];
-    return rows;
-  }
-
-  if (from) {
-    const rows = (await getSql()`
-      SELECT r.*, rm.name as room_name, rm.color as room_color
-      FROM reservations r
-      JOIN rooms rm ON r.room_id = rm.id
-      WHERE r.status NOT IN ('rejected', 'cancelled') AND r.end_time >= ${from}
-      ORDER BY r.start_time
-    `) as ReservationWithRoom[];
-    return rows;
-  }
-
-  if (to) {
-    const rows = (await getSql()`
-      SELECT r.*, rm.name as room_name, rm.color as room_color
-      FROM reservations r
-      JOIN rooms rm ON r.room_id = rm.id
-      WHERE r.status NOT IN ('rejected', 'cancelled') AND r.start_time <= ${to}
-      ORDER BY r.start_time
-    `) as ReservationWithRoom[];
-    return rows;
-  }
-
+  // One statement covers all four from/to combinations: a null bound drops its
+  // own condition. `person_in_charge` and `notes` stay because the calendar
+  // popover displays them; `email`, the cancellation fields and the edit-history
+  // columns are deliberately absent — see PublicReservation.
   const rows = (await getSql()`
-    SELECT r.*, rm.name as room_name, rm.color as room_color
+    SELECT r.id, r.series_id, r.title, r.room_id, r.start_time, r.end_time,
+           r.person_in_charge, r.notes, r.status,
+           rm.name AS room_name, rm.color AS room_color
     FROM reservations r
     JOIN rooms rm ON r.room_id = rm.id
     WHERE r.status NOT IN ('rejected', 'cancelled')
+      AND (${from ?? null}::text IS NULL OR r.end_time >= ${from ?? null})
+      AND (${to ?? null}::text IS NULL OR r.start_time <= ${to ?? null})
     ORDER BY r.start_time
-  `) as ReservationWithRoom[];
+  `) as PublicReservation[];
   return rows;
 }
 

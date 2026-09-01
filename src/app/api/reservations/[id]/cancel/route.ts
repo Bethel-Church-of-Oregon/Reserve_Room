@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getReservationById, requestCancellation, requestCancellationSeries, setReservationSeriesStatus } from '@/lib/db';
-import { checkCancelLimit } from '@/lib/ratelimit';
+import { checkCancelLimit, checkCancelEmailLimit } from '@/lib/ratelimit';
 import { LIMITS } from '@/lib/constants';
 import { sendReservationCancelledEmail, sendReservationCancelledSeriesEmail } from '@/lib/email';
 import { sendSmsNotifications, buildCancellationSmsMessage } from '@/lib/sms';
@@ -36,6 +36,16 @@ export async function POST(
     }
     if (reason.length > LIMITS.reason) {
       return NextResponse.json({ error: `취소 사유는 ${LIMITS.reason}자 이하여야 합니다.` }, { status: 400 });
+    }
+
+    // Tight per-person limit; the per-IP limit above is only a ceiling, because
+    // everyone on the church network shares a single public address.
+    const { limited: emailLimited } = await checkCancelEmailLimit(email);
+    if (emailLimited) {
+      return NextResponse.json(
+        { error: '같은 이메일로 취소 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.' },
+        { status: 429 }
+      );
     }
 
     if (scope === 'series') {

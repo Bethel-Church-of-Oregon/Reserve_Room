@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { ReservationWithRoom } from '@/lib/db';
+import { PublicReservation } from '@/lib/db';
 import ReservationDetailPopover, { CancelRequestModal, EditRequestModal } from './ReservationDetailPopover';
 import { pacificDateKey, pacificNow, toDateKey } from '@/lib/date';
 
@@ -29,7 +29,7 @@ function getWeekDays(d: Date): Date[] {
 
 interface Props {
   currentDate: Date;
-  reservations: ReservationWithRoom[];
+  reservations: PublicReservation[];
   onDayClick?: (date: Date) => void;
   onRefresh?: () => void;
   swipeOffset?: number;
@@ -46,11 +46,11 @@ function formatTime(dateStr: string): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-function groupOverlapping(items: ReservationWithRoom[]): Array<{ item: ReservationWithRoom; col: number; totalCols: number }> {
+function groupOverlapping(items: PublicReservation[]): Array<{ item: PublicReservation; col: number; totalCols: number }> {
   if (items.length === 0) return [];
 
   const sorted = [...items].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-  const result: Array<{ item: ReservationWithRoom; col: number; totalCols: number }> = [];
+  const result: Array<{ item: PublicReservation; col: number; totalCols: number }> = [];
   const cols: number[] = [];
 
   for (const item of sorted) {
@@ -106,9 +106,9 @@ export default function DayView({ currentDate, reservations, onDayClick, onRefre
   const isToday = dayKey === today;
   const weekDays = getWeekDays(currentDate);
 
-  const [hovered, setHovered] = useState<{ reservation: ReservationWithRoom; rect: DOMRect } | null>(null);
-  const [cancelModalReservation, setCancelModalReservation] = useState<ReservationWithRoom | null>(null);
-  const [editModalReservation, setEditModalReservation] = useState<ReservationWithRoom | null>(null);
+  const [hovered, setHovered] = useState<{ reservation: PublicReservation; rect: DOMRect } | null>(null);
+  const [cancelModalReservation, setCancelModalReservation] = useState<PublicReservation | null>(null);
+  const [editModalReservation, setEditModalReservation] = useState<PublicReservation | null>(null);
   const [nowPacific, setNowPacific] = useState(pacificNow);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -117,7 +117,7 @@ export default function DayView({ currentDate, reservations, onDayClick, onRefre
     return () => clearInterval(id);
   }, []);
 
-  const showPopover = (reservation: ReservationWithRoom, el: HTMLElement) => {
+  const showPopover = (reservation: PublicReservation, el: HTMLElement) => {
     if (hideTimeoutRef.current) {
       clearTimeout(hideTimeoutRef.current);
       hideTimeoutRef.current = null;
