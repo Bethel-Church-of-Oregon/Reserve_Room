@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { addMonths, addDays, format } from 'date-fns';
-import { getReservations, createReservation, createReservationSeries, checkConflict, getRooms, getConflictingReservationsForRange, createReservationsBulk, getReservationAccessCode } from '@/lib/db';
+import { getReservations, createReservation, createReservationSeries, checkConflict, getRooms, getConflictingReservationsForRange, createReservationsBulk, getReservationAccessCode, isOverlapViolation } from '@/lib/db';
 import { checkReservationLimit } from '@/lib/ratelimit';
 import { LIMITS } from '@/lib/constants';
 import { sendReservationCreatedEmail, sendReservationCreatedBulkEmail } from '@/lib/email';
@@ -202,15 +202,28 @@ export async function POST(req: NextRequest) {
 
       // Bulk INSERT all non-conflicting occurrences in a single query
       if (toInsert.length > 0) {
-        await createReservationsBulk({
-          series_id: seriesId,
-          title: titleStr,
-          room_id: roomIdNum,
-          person_in_charge: personStr,
-          email: emailStr,
-          notes: notesStr || undefined,
-          occurrences: toInsert,
-        });
+        try {
+          await createReservationsBulk({
+            series_id: seriesId,
+            title: titleStr,
+            room_id: roomIdNum,
+            person_in_charge: personStr,
+            email: emailStr,
+            notes: notesStr || undefined,
+            occurrences: toInsert,
+          });
+        } catch (e) {
+          // The bulk insert is one statement, so a single late-arriving conflict
+          // rolls back the whole series. Ask for a retry rather than reporting a
+          // partial success that did not happen.
+          if (isOverlapViolation(e)) {
+            return NextResponse.json(
+              { error: 'conflict', message: '방금 다른 예약이 등록되어 일정이 겹칩니다. 다시 시도해 주세요.' },
+              { status: 409 }
+            );
+          }
+          throw e;
+        }
       }
       const created = toInsert.length;
 
@@ -247,7 +260,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const reservation = await createReservation({ title: titleStr, room_id: roomIdNum, start_time, end_time, person_in_charge: personStr, email: emailStr, notes: notesStr || undefined });
+    let reservation;
+    try {
+      reservation = await createReservation({ title: titleStr, room_id: roomIdNum, start_time, end_time, person_in_charge: personStr, email: emailStr, notes: notesStr || undefined });
+    } catch (e) {
+      // Someone booked the slot between the check above and this insert.
+      if (isOverlapViolation(e)) {
+        return NextResponse.json(
+          { error: 'conflict', message: '해당 시간에 이미 예약이 있습니다.' },
+          { status: 409 }
+        );
+      }
+      throw e;
+    }
 
     const roomName = rooms.find((r) => r.id === roomIdNum)?.name ?? '';
 

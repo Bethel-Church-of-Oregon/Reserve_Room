@@ -88,6 +88,51 @@ async function ensureDbReady(): Promise<void> {
       // Columns may already exist; ignore
     }
 
+    // Backstop against double-booking. `checkConflict` runs before every write, but
+    // SELECT-then-INSERT leaves a window where two concurrent requests both pass;
+    // this makes the database itself refuse the overlap. The status set matches
+    // `checkConflict` exactly so the two can never disagree, and tsrange's default
+    // `[)` bounds give the same "touching is not overlapping" rule the app uses.
+    try {
+      await sql`CREATE EXTENSION IF NOT EXISTS btree_gist`;
+
+      // Times are stored as TEXT, and `text::timestamp` cannot go in an index
+      // expression because parsing depends on the DateStyle setting. Building the
+      // value from its parts with make_timestamp is genuinely immutable, so it can.
+      await sql`
+        CREATE OR REPLACE FUNCTION reservation_ts(s text) RETURNS timestamp
+        LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $fn$
+          SELECT make_timestamp(
+            substring(s from 1 for 4)::int,
+            substring(s from 6 for 2)::int,
+            substring(s from 9 for 2)::int,
+            substring(s from 12 for 2)::int,
+            substring(s from 15 for 2)::int,
+            coalesce(nullif(substring(s from 18 for 2), '')::float8, 0)
+          )
+        $fn$
+      `;
+
+      const existing = (await sql`
+        SELECT 1 FROM pg_constraint WHERE conname = 'reservations_no_overlap'
+      `) as unknown[];
+      if (existing.length === 0) {
+        await sql`
+          ALTER TABLE reservations
+            ADD CONSTRAINT reservations_no_overlap
+            EXCLUDE USING gist (
+              room_id WITH =,
+              tsrange(reservation_ts(start_time), reservation_ts(end_time)) WITH &&
+            ) WHERE (status IN ('pending', 'approved', 'cancellation_requested'))
+        `;
+        console.log('[db] 중복 예약 방지 제약 추가됨');
+      }
+    } catch (e) {
+      // Pre-existing overlapping rows would make this fail. Log and carry on: the
+      // application-level `checkConflict` still applies either way.
+      console.error('[db] 중복 예약 방지 제약 적용 실패:', e);
+    }
+
     // Edit-history columns (idempotent)
     try {
       await sql`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ`;
@@ -506,6 +551,21 @@ export async function createReservationsBulk(data: {
     RETURNING *
   `) as Reservation[];
   return rows;
+}
+
+/**
+ * True when a write was rejected by the `reservations_no_overlap` exclusion
+ * constraint — i.e. another request booked the slot in between our check and our
+ * write. Callers should surface this as a normal booking conflict, not an error.
+ */
+export function isOverlapViolation(e: unknown): boolean {
+  const err = e as { code?: string; constraint?: string; message?: string } | null;
+  if (!err) return false;
+  return (
+    err.code === '23P01' ||
+    err.constraint === 'reservations_no_overlap' ||
+    Boolean(err.message?.includes('reservations_no_overlap'))
+  );
 }
 
 export async function checkConflict(

@@ -202,8 +202,15 @@ approved → cancelled (취소 신청 시 즉시 처리)
 - 이메일: 예약 신청 시 확인 메일 발송 (`sendReservationCreatedEmail` / `sendReservationCreatedBulkEmail`)
 - 회의실별 색상 20가지 시드 데이터로 정의
 - 일간/주간 뷰: 오전 6시~오후 11시, 1.5px/분, 겹침 감지 컬럼 레이아웃
-- 충돌 감지: 같은 회의실 + 같은 시간대 이중 예약 방지
-  - `checkConflict()`: `status = 'approved'`인 예약과 시간 겹침 확인
+- 충돌 감지: 같은 회의실 + 같은 시간대 이중 예약 방지 — **애플리케이션 + DB 2중 방어**
+  - `checkConflict()`: `status IN ('pending','approved','cancellation_requested')` 와 시간 겹침 확인. 변경 시에는 `excludeId`로 자기 자신 제외
+  - **DB 배타 제약 `reservations_no_overlap`** (2026-09 추가): `EXCLUDE USING gist (room_id WITH =, tsrange(...) WITH &&)`. `checkConflict`와 **동일한 상태 집합**을 조건으로 걸어 둘이 어긋날 수 없음
+    - SELECT 후 INSERT/UPDATE 사이의 경합을 DB가 물리적으로 거부. 20개 동시 요청 → 정확히 1건만 저장됨을 실측
+    - `tsrange` 기본 경계 `[)` → **맞닿음은 겹침 아님** (10~11시 다음 11시 시작 허용). 앱 로직과 동일
+    - `start_time`이 TEXT라 `text::timestamp`는 인덱스 식에 못 씀 (DateStyle 의존 → IMMUTABLE 아님). `make_timestamp`로 조립하는 **`reservation_ts(text)` IMMUTABLE 함수**를 만들어 사용
+    - 제약 위반은 `isOverlapViolation(e)` (SQLSTATE `23P01`)로 판별해 **409로 변환**. 적용 위치: 단건 생성, 반복예약 bulk, 예약 변경
+    - 반복예약 bulk는 단일 statement라 한 건만 충돌해도 전체 롤백 → "다시 시도해 주세요" 안내
+  - 기존 겹침 행이 있으면 제약 추가가 실패하므로 `ensureDbReady()`에서 오류를 로그만 남기고 진행 (앱 레벨 검사는 유지)
   - 충돌 메시지는 예약신청 버튼 바로 위에 표시
 - 시리즈 전체 취소: `PATCH /api/admin/series/[id]`
 - Rate limiting: admin-login 5회/분, reservation 10회/분, cancel 10회/분, edit 10회/분 (Upstash 미설정 시 무제한)

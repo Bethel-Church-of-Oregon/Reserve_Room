@@ -2,6 +2,7 @@ import {
   getReservationById,
   updateReservation,
   checkConflict,
+  isOverlapViolation,
 } from '@/lib/db';
 import { LIMITS } from '@/lib/constants';
 import { pacificDateKey } from '@/lib/date';
@@ -95,7 +96,16 @@ export async function applyReservationEdit(
     end_time === reservation.end_time;
   if (nothingChanged) return fail('변경된 내용이 없습니다.', 400);
 
-  const updated = await updateReservation(id, { title, start_time, end_time, person_in_charge, notes });
+  let updated: boolean;
+  try {
+    updated = await updateReservation(id, { title, start_time, end_time, person_in_charge, notes });
+  } catch (e) {
+    // Someone booked the slot between checkConflict above and this update.
+    if (isOverlapViolation(e)) {
+      return fail('변경하려는 시간에 이미 해당 장소 예약이 있습니다. 다른 시간을 선택해주세요.', 409);
+    }
+    throw e;
+  }
   if (!updated) return fail('변경할 수 없습니다.', 400);
 
   // Awaited before returning: serverless kills un-awaited sends when the route responds.
