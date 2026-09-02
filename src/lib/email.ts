@@ -69,9 +69,9 @@ export async function sendReservationCreatedEmail(data: {
             <td style="padding:8px 12px;">${escapeHtml(data.notes)}</td>
           </tr>` : '';
   await transporter.sendMail({
-    from: `"오레곤벧엘교회 장소예약시스템" <${getEmailSender()}>`,
+    from: `"오레곤벧엘장로교회 장소예약시스템" <${getEmailSender()}>`,
     to: data.email,
-    subject: `[오레곤벧엘교회] 장소 예약이 완료되었습니다 — ${data.title}`,
+    subject: `[오레곤벧엘장로교회] 장소 예약이 완료되었습니다 — ${data.title}`,
     html: `
       <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #333;">
         <h2 style="color: #2563eb;">예약 완료 안내</h2>
@@ -97,7 +97,7 @@ export async function sendReservationCreatedEmail(data: {
         </table>
         <p style="color:#6b7280; font-size:13px;">문의사항이 있으시면 교회 사무실로 연락해 주세요.</p>
         <hr style="border:none; border-top:1px solid #e5e7eb; margin:24px 0;" />
-        <p style="font-size:12px; color:#9ca3af;">오레곤벧엘교회 장소예약시스템</p>
+        <p style="font-size:12px; color:#9ca3af;">오레곤벧엘장로교회 장소예약시스템</p>
       </div>
     `,
   }).catch((e) => console.error('[email] 발송 실패:', e));
@@ -126,9 +126,9 @@ export async function sendReservationCreatedBulkEmail(data: {
           <td style="padding:8px 12px;">${escapeHtml(data.notes)}</td>
         </tr>` : '';
   await transporter.sendMail({
-    from: `"오레곤벧엘교회 장소예약시스템" <${getEmailSender()}>`,
+    from: `"오레곤벧엘장로교회 장소예약시스템" <${getEmailSender()}>`,
     to: data.email,
-    subject: `[오레곤벧엘교회] ${data.created}건 반복 예약이 완료되었습니다 — ${data.title}`,
+    subject: `[오레곤벧엘장로교회] ${data.created}건 반복 예약이 완료되었습니다 — ${data.title}`,
     html: `
       <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #333;">
         <h2 style="color: #2563eb;">반복 예약 완료 안내</h2>
@@ -146,7 +146,7 @@ export async function sendReservationCreatedBulkEmail(data: {
         </table>
         <p style="color:#6b7280; font-size:13px;">문의사항이 있으시면 교회 사무실로 연락해 주세요.</p>
         <hr style="border:none; border-top:1px solid #e5e7eb; margin:24px 0;" />
-        <p style="font-size:12px; color:#9ca3af;">오레곤벧엘교회 장소예약시스템</p>
+        <p style="font-size:12px; color:#9ca3af;">오레곤벧엘장로교회 장소예약시스템</p>
       </div>
     `,
   }).catch((e) => console.error('[email] 발송 실패:', e));
@@ -161,9 +161,9 @@ export async function sendApprovalEmail(reservation: ReservationWithRoom): Promi
   const transporter = getTransporter();
 
   await transporter.sendMail({
-    from: `"오레곤벧엘교회 장소예약시스템" <${getEmailSender()}>`,
+    from: `"오레곤벧엘장로교회 장소예약시스템" <${getEmailSender()}>`,
     to: reservation.email,
-    subject: `[오레곤벧엘교회] 장소 예약이 확정되었습니다 — ${reservation.title}`,
+    subject: `[오레곤벧엘장로교회] 장소 예약이 확정되었습니다 — ${reservation.title}`,
     html: `
       <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #333;">
         <h2 style="color: #2563eb;">예약 확정 안내</h2>
@@ -189,7 +189,7 @@ export async function sendApprovalEmail(reservation: ReservationWithRoom): Promi
         </table>
         <p style="color:#6b7280; font-size:13px;">문의사항이 있으시면 교회 사무실로 연락해 주세요.</p>
         <hr style="border:none; border-top:1px solid #e5e7eb; margin:24px 0;" />
-        <p style="font-size:12px; color:#9ca3af;">오레곤벧엘교회 장소예약시스템</p>
+        <p style="font-size:12px; color:#9ca3af;">오레곤벧엘장로교회 장소예약시스템</p>
       </div>
     `,
   });
@@ -218,9 +218,9 @@ export async function sendBulkApprovalEmail(reservations: ReservationWithRoom[])
     if (rsvs.length === 1) {
       // 1건이면 단건 이메일 형식 사용
       await transporter.sendMail({
-        from: `"오레곤벧엘교회 장소예약시스템" <${getEmailSender()}>`,
+        from: `"오레곤벧엘장로교회 장소예약시스템" <${getEmailSender()}>`,
         to: email,
-        subject: `[오레곤벧엘교회] 장소 예약이 확정되었습니다 — ${rsvs[0].title}`,
+        subject: `[오레곤벧엘장로교회] 장소 예약이 확정되었습니다 — ${rsvs[0].title}`,
         html: `
           <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #333;">
             <h2 style="color: #2563eb;">예약 확정 안내</h2>
@@ -246,7 +246,7 @@ export async function sendBulkApprovalEmail(reservations: ReservationWithRoom[])
             </table>
             <p style="color:#6b7280; font-size:13px;">문의사항이 있으시면 교회 사무실로 연락해 주세요.</p>
             <hr style="border:none; border-top:1px solid #e5e7eb; margin:24px 0;" />
-            <p style="font-size:12px; color:#9ca3af;">오레곤벧엘교회 장소예약시스템</p>
+            <p style="font-size:12px; color:#9ca3af;">오레곤벧엘장로교회 장소예약시스템</p>
           </div>
         `,
       }).catch((e) => console.error('[email] 발송 실패:', e));
@@ -262,9 +262,9 @@ export async function sendBulkApprovalEmail(reservations: ReservationWithRoom[])
       `).join('');
 
       await transporter.sendMail({
-        from: `"오레곤벧엘교회 장소예약시스템" <${getEmailSender()}>`,
+        from: `"오레곤벧엘장로교회 장소예약시스템" <${getEmailSender()}>`,
         to: email,
-        subject: `[오레곤벧엘교회] ${rsvs.length}건 장소 예약이 확정되었습니다`,
+        subject: `[오레곤벧엘장로교회] ${rsvs.length}건 장소 예약이 확정되었습니다`,
         html: `
           <div style="font-family: sans-serif; max-width: 640px; margin: 0 auto; color: #333;">
             <h2 style="color: #2563eb;">예약 확정 안내</h2>
@@ -283,7 +283,7 @@ export async function sendBulkApprovalEmail(reservations: ReservationWithRoom[])
             </table>
             <p style="color:#6b7280; font-size:13px;">문의사항이 있으시면 교회 사무실로 연락해 주세요.</p>
             <hr style="border:none; border-top:1px solid #e5e7eb; margin:24px 0;" />
-            <p style="font-size:12px; color:#9ca3af;">오레곤벧엘교회 장소예약시스템</p>
+            <p style="font-size:12px; color:#9ca3af;">오레곤벧엘장로교회 장소예약시스템</p>
           </div>
         `,
       }).catch((e) => console.error('[email] 발송 실패:', e));
@@ -374,9 +374,9 @@ export async function sendReservationUpdatedEmail(data: {
   }
 
   await transporter.sendMail({
-    from: `"오레곤벧엘교회 장소예약시스템" <${getEmailSender()}>`,
+    from: `"오레곤벧엘장로교회 장소예약시스템" <${getEmailSender()}>`,
     to: data.email,
-    subject: `[오레곤벧엘교회] 예약이 변경되었습니다 — ${data.title}`,
+    subject: `[오레곤벧엘장로교회] 예약이 변경되었습니다 — ${data.title}`,
     html: `
       <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #333;">
         <h2 style="color: #2563eb;">예약 변경 안내</h2>
@@ -386,7 +386,7 @@ export async function sendReservationUpdatedEmail(data: {
         </table>
         <p style="color:#6b7280; font-size:13px;">장소 또는 날짜를 바꾸시려면 예약을 취소하신 후 다시 신청해 주세요.</p>
         <hr style="border:none; border-top:1px solid #e5e7eb; margin:24px 0;" />
-        <p style="font-size:12px; color:#9ca3af;">오레곤벧엘교회 장소예약시스템</p>
+        <p style="font-size:12px; color:#9ca3af;">오레곤벧엘장로교회 장소예약시스템</p>
       </div>
     `,
   }).catch((e) => console.error('[email] 발송 실패:', e));
@@ -404,9 +404,9 @@ export async function sendReservationCancelledEmail(data: {
   if (!process.env.GMAIL_APP_PASSWORD) return;
   const transporter = getTransporter();
   await transporter.sendMail({
-    from: `"오레곤벧엘교회 장소예약시스템" <${getEmailSender()}>`,
+    from: `"오레곤벧엘장로교회 장소예약시스템" <${getEmailSender()}>`,
     to: data.email,
-    subject: `[오레곤벧엘교회] 예약이 취소되었습니다 — ${data.title}`,
+    subject: `[오레곤벧엘장로교회] 예약이 취소되었습니다 — ${data.title}`,
     html: `
       <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #333;">
         <h2 style="color: #dc2626;">예약 취소 안내</h2>
@@ -436,7 +436,7 @@ export async function sendReservationCancelledEmail(data: {
         </table>
         <p style="color:#6b7280; font-size:13px;">문의사항이 있으시면 교회 사무실로 연락해 주세요.</p>
         <hr style="border:none; border-top:1px solid #e5e7eb; margin:24px 0;" />
-        <p style="font-size:12px; color:#9ca3af;">오레곤벧엘교회 장소예약시스템</p>
+        <p style="font-size:12px; color:#9ca3af;">오레곤벧엘장로교회 장소예약시스템</p>
       </div>
     `,
   }).catch((e) => console.error('[email] 발송 실패:', e));
@@ -454,9 +454,9 @@ export async function sendReservationCancelledSeriesEmail(data: {
   if (!process.env.GMAIL_APP_PASSWORD) return;
   const transporter = getTransporter();
   await transporter.sendMail({
-    from: `"오레곤벧엘교회 장소예약시스템" <${getEmailSender()}>`,
+    from: `"오레곤벧엘장로교회 장소예약시스템" <${getEmailSender()}>`,
     to: data.email,
-    subject: `[오레곤벧엘교회] 반복 예약 ${data.cancelled_count}건이 취소되었습니다 — ${data.title}`,
+    subject: `[오레곤벧엘장로교회] 반복 예약 ${data.cancelled_count}건이 취소되었습니다 — ${data.title}`,
     html: `
       <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #333;">
         <h2 style="color: #dc2626;">반복 예약 취소 안내</h2>
@@ -470,7 +470,7 @@ export async function sendReservationCancelledSeriesEmail(data: {
         </table>
         <p style="color:#6b7280; font-size:13px;">문의사항이 있으시면 교회 사무실로 연락해 주세요.</p>
         <hr style="border:none; border-top:1px solid #e5e7eb; margin:24px 0;" />
-        <p style="font-size:12px; color:#9ca3af;">오레곤벧엘교회 장소예약시스템</p>
+        <p style="font-size:12px; color:#9ca3af;">오레곤벧엘장로교회 장소예약시스템</p>
       </div>
     `,
   }).catch((e) => console.error('[email] 발송 실패:', e));
@@ -485,9 +485,9 @@ export async function sendCancellationApprovedEmail(reservation: ReservationWith
   const transporter = getTransporter();
 
   await transporter.sendMail({
-    from: `"오레곤벧엘교회 장소예약시스템" <${getEmailSender()}>`,
+    from: `"오레곤벧엘장로교회 장소예약시스템" <${getEmailSender()}>`,
     to: reservation.email,
-    subject: `[오레곤벧엘교회] 예약 취소가 승인되었습니다 — ${reservation.title}`,
+    subject: `[오레곤벧엘장로교회] 예약 취소가 승인되었습니다 — ${reservation.title}`,
     html: `
       <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #333;">
         <h2 style="color: #16a34a;">예약 취소 승인 안내</h2>
@@ -514,7 +514,7 @@ export async function sendCancellationApprovedEmail(reservation: ReservationWith
         <p>해당 일정은 캘린더에서 제거되었습니다.</p>
         <p style="color:#6b7280; font-size:13px;">문의사항이 있으시면 교회 사무실로 연락해 주세요.</p>
         <hr style="border:none; border-top:1px solid #e5e7eb; margin:24px 0;" />
-        <p style="font-size:12px; color:#9ca3af;">오레곤벧엘교회 장소예약시스템</p>
+        <p style="font-size:12px; color:#9ca3af;">오레곤벧엘장로교회 장소예약시스템</p>
       </div>
     `,
   });
@@ -535,9 +535,9 @@ export async function sendCancellationRejectedEmail(reservation: ReservationWith
   ` : '';
 
   await transporter.sendMail({
-    from: `"오레곤벧엘교회 장소예약시스템" <${getEmailSender()}>`,
+    from: `"오레곤벧엘장로교회 장소예약시스템" <${getEmailSender()}>`,
     to: reservation.email,
-    subject: `[오레곤벧엘교회] 예약 취소 요청이 거절되었습니다 — ${reservation.title}`,
+    subject: `[오레곤벧엘장로교회] 예약 취소 요청이 거절되었습니다 — ${reservation.title}`,
     html: `
       <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #333;">
         <h2 style="color: #dc2626;">예약 취소 거절 안내</h2>
@@ -565,7 +565,7 @@ export async function sendCancellationRejectedEmail(reservation: ReservationWith
         </table>
         <p style="color:#6b7280; font-size:13px;">문의사항이 있으시면 교회 사무실로 연락해 주세요.</p>
         <hr style="border:none; border-top:1px solid #e5e7eb; margin:24px 0;" />
-        <p style="font-size:12px; color:#9ca3af;">오레곤벧엘교회 장소예약시스템</p>
+        <p style="font-size:12px; color:#9ca3af;">오레곤벧엘장로교회 장소예약시스템</p>
       </div>
     `,
   });
@@ -580,9 +580,9 @@ export async function sendRejectionEmail(reservation: ReservationWithRoom, reaso
   const transporter = getTransporter();
 
   await transporter.sendMail({
-    from: `"오레곤벧엘교회 장소예약시스템" <${getEmailSender()}>`,
+    from: `"오레곤벧엘장로교회 장소예약시스템" <${getEmailSender()}>`,
     to: reservation.email,
-    subject: `[오레곤벧엘교회] 장소 예약 신청이 거절되었습니다 — ${reservation.title}`,
+    subject: `[오레곤벧엘장로교회] 장소 예약 신청이 거절되었습니다 — ${reservation.title}`,
     html: `
       <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #333;">
         <h2 style="color: #dc2626;">예약 거절 안내</h2>
@@ -613,7 +613,7 @@ export async function sendRejectionEmail(reservation: ReservationWithRoom, reaso
         <p>다른 시간이나 장소로 다시 신청하시려면 예약 시스템을 이용해 주세요.</p>
         <p style="color:#6b7280; font-size:13px;">문의사항이 있으시면 교회 사무실로 연락해 주세요.</p>
         <hr style="border:none; border-top:1px solid #e5e7eb; margin:24px 0;" />
-        <p style="font-size:12px; color:#9ca3af;">오레곤벧엘교회 장소예약시스템</p>
+        <p style="font-size:12px; color:#9ca3af;">오레곤벧엘장로교회 장소예약시스템</p>
       </div>
     `,
   });

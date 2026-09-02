@@ -189,7 +189,7 @@ const ko = {
 
   // Reserve form
   reservePageTitle: '장소 예약 신청',
-  reservePageSubtitle: '오레곤벧엘교회 회의실 및 장소 예약',
+  reservePageSubtitle: '오레곤벧엘장로교회 회의실 및 장소 예약',
   backLabel: '뒤로가기',
 
   // Form fields
@@ -322,9 +322,9 @@ const ko = {
 
   // Admin
   adminTitle: '관리자 모드',
-  adminSubtitle: '오레곤벧엘교회 예약 관리',
+  adminSubtitle: '오레곤벧엘장로교회 예약 관리',
   adminLoginTitle: '관리자 로그인',
-  adminLoginSubtitle: '오레곤벧엘교회 예약관리시스템',
+  adminLoginSubtitle: '오레곤벧엘장로교회 예약관리시스템',
   adminPasswordLabel: '비밀번호',
   adminPasswordPlaceholder: '관리자 비밀번호를 입력하세요',
   adminLoginBtn: '로그인',
@@ -505,7 +505,7 @@ const en: typeof ko = {
   noUpcoming: 'No upcoming reservations.',
 
   reservePageTitle: 'Room Reservation Request',
-  reservePageSubtitle: 'Oregon Bethel Church Room Reservation',
+  reservePageSubtitle: 'Oregon Bethel Presbyterian Church Room Reservation',
   backLabel: 'Back',
 
   fieldTitle: 'Title',
@@ -625,9 +625,9 @@ const en: typeof ko = {
   personLabel: 'Contact:',
 
   adminTitle: 'Admin',
-  adminSubtitle: 'Oregon Bethel Church Reservations',
+  adminSubtitle: 'Oregon Bethel Presbyterian Church Reservations',
   adminLoginTitle: 'Admin Login',
-  adminLoginSubtitle: 'Oregon Bethel Church Reservation System',
+  adminLoginSubtitle: 'Oregon Bethel Presbyterian Church Reservation System',
   adminPasswordLabel: 'Password',
   adminPasswordPlaceholder: 'Enter admin password',
   adminLoginBtn: 'Login',

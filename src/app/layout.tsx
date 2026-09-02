@@ -3,7 +3,7 @@ import './globals.css';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
-  title: '오레곤벧엘교회 장소 예약 시스템',
+  title: '오레곤벧엘장로교회 장소 예약 시스템',
   description: '회의실 등 교회 장소 예약 시스템',
 };
 
