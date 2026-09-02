@@ -38,15 +38,6 @@ export function toE164(phone: string): string | null {
   return null;
 }
 
-function formatSmsTime(iso: string): string {
-  const d = new Date(iso);
-  const m = d.getMonth() + 1;
-  const day = d.getDate();
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  return `${m}/${day} ${hh}:${mm}`;
-}
-
 export async function sendSmsNotifications(message: string): Promise<void> {
   const twilioConfig = getTwilioClient();
   if (!twilioConfig) {
@@ -80,6 +71,72 @@ export async function sendSmsNotifications(message: string): Promise<void> {
   );
 }
 
+/**
+ * One segment of Korean SMS. Korean is sent as UCS-2, which holds 70 characters
+ * in a single segment — and only 67 per segment once a message spills into two,
+ * where it also costs twice as much. Every message below is built to fit in one.
+ */
+const SMS_SEGMENT_LIMIT = 70;
+
+/** 담당자 is free text — a name or a phone number — so it is capped as well. */
+const PERSON_MAX = 10;
+
+/** Under this a clipped title says nothing useful, so the edit diff is dropped instead. */
+const TITLE_MIN = 6;
+
+function clip(s: string, max: number): string {
+  if (max <= 0) return '';
+  return s.length <= max ? s : `${s.slice(0, max - 1)}…`;
+}
+
+/**
+ * Read straight out of the stored 'YYYY-MM-DDTHH:MM:SS' string rather than
+ * parsing it into a Date, so the output cannot shift with the server's timezone.
+ */
+const hhmm = (iso: string) => iso.slice(11, 16);
+const monthDay = (iso: string) => `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}`;
+
+/**
+ * Three lines: when, where, then what and who. The time leads because that is
+ * what a recipient checks first, and the room gets its own line so it can be
+ * scanned without reading the rest.
+ *
+ * The title is the only field that absorbs trimming. Room, date and time are
+ * useless when truncated, and the full detail — including the complete title —
+ * is already in the email and the Telegram message, neither of which has a
+ * length limit.
+ */
+function buildSms(
+  tag: '예약' | '취소' | '변경',
+  data: {
+    title: string;
+    room_name: string;
+    start_time: string;
+    end_time: string;
+    person_in_charge: string;
+  },
+  previous?: { start_time: string; end_time: string }
+): string {
+  const person = clip(data.person_in_charge.trim(), PERSON_MAX);
+  const when = `${monthDay(data.start_time)} ${hhmm(data.start_time)}-${hhmm(data.end_time)}`;
+
+  // A reservation can only be moved within its own day, so the previous time
+  // never has to repeat the date.
+  const moved =
+    previous &&
+    (previous.start_time !== data.start_time || previous.end_time !== data.end_time);
+  const diff = moved ? ` (기존 ${hhmm(previous!.start_time)}-${hhmm(previous!.end_time)})` : '';
+
+  const compose = (head: string, title: string) =>
+    `[${tag}] ${head}\n${data.room_name}\n${person ? `${title} / ${person}` : title}`;
+
+  // Show the old time only while the title still has room to say what this is.
+  let head = when + diff;
+  if (SMS_SEGMENT_LIMIT - compose(head, '').length < TITLE_MIN) head = when;
+
+  return compose(head, clip(data.title.trim(), SMS_SEGMENT_LIMIT - compose(head, '').length));
+}
+
 export function buildReservationSmsMessage(data: {
   title: string;
   room_name: string;
@@ -87,9 +144,7 @@ export function buildReservationSmsMessage(data: {
   end_time: string;
   person_in_charge: string;
 }): string {
-  const start = formatSmsTime(data.start_time);
-  const endTime = data.end_time.slice(11, 16);
-  return `[예약] ${data.title} | ${data.room_name} | ${start}-${endTime} | ${data.person_in_charge}`;
+  return buildSms('예약', data);
 }
 
 export function buildCancellationSmsMessage(data: {
@@ -99,9 +154,7 @@ export function buildCancellationSmsMessage(data: {
   end_time: string;
   person_in_charge: string;
 }): string {
-  const start = formatSmsTime(data.start_time);
-  const endTime = data.end_time.slice(11, 16);
-  return `[취소] ${data.title} | ${data.room_name} | ${start}-${endTime} | ${data.person_in_charge}`;
+  return buildSms('취소', data);
 }
 
 export function buildUpdateSmsMessage(data: {
@@ -113,12 +166,8 @@ export function buildUpdateSmsMessage(data: {
   previous_start_time: string;
   previous_end_time: string;
 }): string {
-  const start = formatSmsTime(data.start_time);
-  const endTime = data.end_time.slice(11, 16);
-  const timeChanged =
-    data.previous_start_time !== data.start_time || data.previous_end_time !== data.end_time;
-  const before = timeChanged
-    ? `${formatSmsTime(data.previous_start_time)}-${data.previous_end_time.slice(11, 16)} → `
-    : '';
-  return `[변경] ${data.title} | ${data.room_name} | ${before}${start}-${endTime} | ${data.person_in_charge}`;
+  return buildSms('변경', data, {
+    start_time: data.previous_start_time,
+    end_time: data.previous_end_time,
+  });
 }
