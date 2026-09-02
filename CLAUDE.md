@@ -13,12 +13,21 @@ npm run build && npm start  # 프로덕션 (포트 8000)
 npm run backup                          # backups/<타임스탬프>/ 로 내보내기
 npm run restore -- backups/<폴더>        # 미리보기 (쓰지 않음)
 npm run restore -- backups/<폴더> --yes  # 실제 복원
+npm run restore -- ~/받은파일/backup-2026-09-01.json --yes   # 메일 첨부에서 바로
 ```
+- **월 1회 자동 백업: `GET /api/cron/backup`** (`vercel.json` 크론, 매월 1일 10:00 UTC — Hobby 는 ±59분 오차)
+  - Vercel 함수에는 영구 저장소가 없어서 **Gmail 첨부로 내보냄.** 이미 연결된 유일한 채널이고, 받은편지함은 Vercel·Neon 이 통째로 사라져도 남는 오프사이트 사본
+  - **`CRON_SECRET` 필수.** Vercel 이 `Authorization: Bearer` 로 보내며, 미설정 시 라우트가 **503 으로 스스로 비활성화** — 안 그러면 누구나 호출해 전 교인 이메일이 담긴 메일을 유발할 수 있음
+  - 첨부 2개: `backup-<날짜>.json`(복원용, 약 580 KB) + `reservations-<날짜>.csv`(엑셀용). 총 0.8 MB로 Gmail 25 MB 한도의 3%
+  - **예약이 0행이면 메일을 보내지 않고 500.** 빈 백업은 보호받는 착각만 주므로 조용히 성공시키지 않음
+  - 크론은 **프로덕션 배포에만** 적용됨. `vercel.json` 을 배포해야 활성화
 - **Neon Free 는 시점 복구가 6시간뿐**이고 수동 스냅샷 1개가 전부. 월 1회 + 파괴적 작업 직전에 실행할 것
 - 출력: 테이블별 JSON + `reservations.csv`(엑셀용) + `restore.sql`(psql·Neon 콘솔용) + `manifest.json`(행 수·schema_version)
+- **GitHub Actions 는 쓰면 안 됨** — 저장소가 공개라 워크플로 아티팩트를 누구나 내려받을 수 있음. 예약자 이메일 유출
 - **`backups/` 는 gitignore 대상.** 예약자 이메일이 들어 있고, 그 이메일이 취소·변경의 자격증명이라 절대 커밋하면 안 됨
 - 복원은 **JSON 을 파라미터 바인딩으로 INSERT** — SQL 텍스트 파싱이나 `psql` 설치에 의존하지 않음. `restore.sql` 은 psql 쓰는 사람을 위한 부산물
 - 전부 `ON CONFLICT DO NOTHING` → **없는 행만 추가, 기존 행은 절대 덮어쓰지 않음.** 부분 유실 복구에 안전
+- 백업 로직은 `src/lib/backup.mjs` 단일 출처 — CLI 와 크론 라우트가 같은 모듈을 씀 (plain ESM 이라 bare Node 로도 import 가능, TS 러너 의존성 불필요)
 - 스키마는 복사해 두지 않음. `ensureDbReady()` 가 단일 출처이므로 **빈 DB 에는 앱을 한 번 띄워 스키마를 만든 뒤** 복원
 - id 를 보존하므로 복원 후 **시퀀스를 최대 id 로 setval** (안 하면 앱의 다음 INSERT 가 충돌)
 - 예약이 0행이면 **exit 1 로 실패** — 조용히 빈 백업을 남기면 보호받는 줄 알고 방치하게 됨
