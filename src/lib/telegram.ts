@@ -39,6 +39,12 @@ const DAYS_KO = ['일', '월', '화', '수', '목', '금', '토'];
  * a Date, so the result never shifts with the server's timezone. Only the
  * weekday needs a Date, and it is built from those same local components.
  */
+/** Date without the time — the series message carries the shared time separately. */
+function dateOnly(iso: string): string {
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  return `${m}월 ${d}일(${DAYS_KO[new Date(y, m - 1, d).getDay()]})`;
+}
+
 function formatDateTime(iso: string): string {
   const [datePart, timePart = ''] = iso.split('T');
   const [y, m, d] = datePart.split('-').map(Number);
@@ -96,6 +102,34 @@ export function buildReservationTelegramMessage(data: {
     `<b>${esc(data.title)}</b>\n\n` +
     `장소 · ${esc(data.room_name)}\n` +
     `일시 · ${formatDateTime(data.start_time)}–${timeOnly(data.end_time)}\n` +
+    `담당 · ${esc(data.person_in_charge)}` +
+    notesLine(data.notes)
+  );
+}
+
+/**
+ * One message for a whole recurring series. Telegram has no length limit, so
+ * unlike the SMS this carries the full picture: the span, the shared time of
+ * day, and how many dates were skipped because they were already taken.
+ */
+export function buildBulkReservationTelegramMessage(data: {
+  title: string;
+  room_name: string;
+  first_start: string;
+  last_start: string;
+  end_time: string;
+  count: number;
+  conflicts: number;
+  person_in_charge: string;
+  notes?: string | null;
+}): string {
+  return (
+    `🟢 <b>반복 예약</b>\n` +
+    `<b>${esc(data.title)}</b>\n\n` +
+    `장소 · ${esc(data.room_name)}\n` +
+    `기간 · ${dateOnly(data.first_start)} ~ ${dateOnly(data.last_start)}\n` +
+    `시간 · ${timeOnly(data.first_start)}–${timeOnly(data.end_time)} (총 ${data.count}회)\n` +
+    (data.conflicts > 0 ? `제외 · 기존 예약과 겹쳐 ${data.conflicts}일 제외됨\n` : '') +
     `담당 · ${esc(data.person_in_charge)}` +
     notesLine(data.notes)
   );

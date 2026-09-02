@@ -106,6 +106,24 @@ const monthDay = (iso: string) => `${Number(iso.slice(5, 7))}/${Number(iso.slice
  * is already in the email and the Telegram message, neither of which has a
  * length limit.
  */
+/**
+ * Compose the three-line skeleton and spend whatever room is left on the title.
+ * Returns the budget too, so a caller can decide whether an optional extra in
+ * the head is worth the characters it costs.
+ */
+function composeSms(
+  tag: '예약' | '취소' | '변경',
+  head: string,
+  room: string,
+  title: string,
+  person: string
+): { text: string; budget: number } {
+  const p = clip(person.trim(), PERSON_MAX);
+  const render = (t: string) => `[${tag}] ${head}\n${room}\n${p ? `${t} / ${p}` : t}`;
+  const budget = SMS_SEGMENT_LIMIT - render('').length;
+  return { text: render(clip(title.trim(), budget)), budget };
+}
+
 function buildSms(
   tag: '예약' | '취소' | '변경',
   data: {
@@ -117,24 +135,26 @@ function buildSms(
   },
   previous?: { start_time: string; end_time: string }
 ): string {
-  const person = clip(data.person_in_charge.trim(), PERSON_MAX);
   const when = `${monthDay(data.start_time)} ${hhmm(data.start_time)}-${hhmm(data.end_time)}`;
 
   // A reservation can only be moved within its own day, so the previous time
-  // never has to repeat the date.
+  // never has to repeat the date. Show it only while the title still has room
+  // left to say what the booking actually is.
   const moved =
     previous &&
     (previous.start_time !== data.start_time || previous.end_time !== data.end_time);
-  const diff = moved ? ` (기존 ${hhmm(previous!.start_time)}-${hhmm(previous!.end_time)})` : '';
+  if (moved) {
+    const withDiff = composeSms(
+      tag,
+      `${when} (기존 ${hhmm(previous!.start_time)}-${hhmm(previous!.end_time)})`,
+      data.room_name,
+      data.title,
+      data.person_in_charge
+    );
+    if (withDiff.budget >= TITLE_MIN) return withDiff.text;
+  }
 
-  const compose = (head: string, title: string) =>
-    `[${tag}] ${head}\n${data.room_name}\n${person ? `${title} / ${person}` : title}`;
-
-  // Show the old time only while the title still has room to say what this is.
-  let head = when + diff;
-  if (SMS_SEGMENT_LIMIT - compose(head, '').length < TITLE_MIN) head = when;
-
-  return compose(head, clip(data.title.trim(), SMS_SEGMENT_LIMIT - compose(head, '').length));
+  return composeSms(tag, when, data.room_name, data.title, data.person_in_charge).text;
 }
 
 export function buildReservationSmsMessage(data: {
@@ -170,4 +190,24 @@ export function buildUpdateSmsMessage(data: {
     start_time: data.previous_start_time,
     end_time: data.previous_end_time,
   });
+}
+
+/**
+ * One message for a whole recurring series, rather than one per occurrence —
+ * a weekly booking for a year would otherwise be 52 texts.
+ *
+ * Every occurrence shares the same time of day, so only the start time is
+ * carried; the end time and the full list of dates are in the confirmation
+ * email and the Telegram message, neither of which is limited to 70 characters.
+ */
+export function buildBulkReservationSmsMessage(data: {
+  title: string;
+  room_name: string;
+  first_start: string;
+  last_start: string;
+  count: number;
+  person_in_charge: string;
+}): string {
+  const head = `${data.count}회 ${monthDay(data.first_start)}~${monthDay(data.last_start)} ${hhmm(data.first_start)}`;
+  return composeSms('예약', head, data.room_name, data.title, data.person_in_charge).text;
 }

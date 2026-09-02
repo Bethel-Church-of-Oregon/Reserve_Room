@@ -4,8 +4,8 @@ import { getReservations, createReservation, createReservationSeries, checkConfl
 import { checkReservationLimit, checkReservationEmailLimit } from '@/lib/ratelimit';
 import { LIMITS } from '@/lib/constants';
 import { sendReservationCreatedEmail, sendReservationCreatedBulkEmail } from '@/lib/email';
-import { sendSmsNotifications, buildReservationSmsMessage } from '@/lib/sms';
-import { sendTelegramNotification, buildReservationTelegramMessage } from '@/lib/telegram';
+import { sendSmsNotifications, buildReservationSmsMessage, buildBulkReservationSmsMessage } from '@/lib/sms';
+import { sendTelegramNotification, buildReservationTelegramMessage, buildBulkReservationTelegramMessage } from '@/lib/telegram';
 import { pacificTodayDate, pacificDateKey, normalizeDateTime, DATE_RE } from '@/lib/date';
 import { cookies } from 'next/headers';
 import { verifyAdminSession } from '@/lib/auth';
@@ -309,15 +309,43 @@ export async function POST(req: NextRequest) {
       const created = toInsert.length;
 
       const roomName = rooms.find((r) => r.id === roomIdNum)?.name ?? '';
-      await sendReservationCreatedBulkEmail({
-        title: titleStr,
-        room_name: roomName,
-        person_in_charge: personStr,
-        email: emailStr,
-        occurrences: toInsert,
-        created,
-        notes: notesStr || undefined,
-      }).catch((e) => console.error('[email] 반복예약 확인 메일 발송 실패:', e));
+
+      // One notification for the whole series, not one per occurrence: a weekly
+      // booking for a year would otherwise be 52 texts to every coordinator.
+      // Awaited in parallel before responding — serverless freezes the instance
+      // as soon as the response goes out.
+      await Promise.all([
+        sendReservationCreatedBulkEmail({
+          title: titleStr,
+          room_name: roomName,
+          person_in_charge: personStr,
+          email: emailStr,
+          occurrences: toInsert,
+          created,
+          notes: notesStr || undefined,
+        }).catch((e) => console.error('[email] 반복예약 확인 메일 발송 실패:', e)),
+
+        sendSmsNotifications(buildBulkReservationSmsMessage({
+          title: titleStr,
+          room_name: roomName,
+          first_start: toInsert[0].start_time,
+          last_start: toInsert[toInsert.length - 1].start_time,
+          count: created,
+          person_in_charge: personStr,
+        })).catch((e) => console.error('[sms] 발송 실패:', e)),
+
+        sendTelegramNotification(buildBulkReservationTelegramMessage({
+          title: titleStr,
+          room_name: roomName,
+          first_start: toInsert[0].start_time,
+          last_start: toInsert[toInsert.length - 1].start_time,
+          end_time: toInsert[0].end_time,
+          count: created,
+          conflicts: conflictDates.length,
+          person_in_charge: personStr,
+          notes: notesStr || undefined,
+        })).catch((e) => console.error('[telegram] 발송 실패:', e)),
+      ]);
 
       return NextResponse.json(
         { created, conflicts: conflictDates.length, conflictDates, seriesId },
@@ -363,27 +391,27 @@ export async function POST(req: NextRequest) {
         notes: notesStr || undefined,
       }).catch((e) => console.error('[email] 예약 확인 메일 발송 실패:', e)),
 
-      // 담당자 알림: 일반 사용자 예약만 (관리자 예약 제외)
-      isAdmin
-        ? Promise.resolve()
-        : sendSmsNotifications(buildReservationSmsMessage({
-            title: titleStr,
-            room_name: roomName,
-            start_time: startStr,
-            end_time: endStr,
-            person_in_charge: personStr,
-          })).catch((e) => console.error('[sms] 발송 실패:', e)),
+      // Sent for administrator bookings too. Suppressing them keyed off the
+      // session cookie, not off any intent to book "as an admin", so merely
+      // having signed into the admin panel in that browser silently dropped the
+      // notification for an ordinary reservation made from the normal form —
+      // exactly the case where a coordinator most wants the group to be told.
+      sendSmsNotifications(buildReservationSmsMessage({
+        title: titleStr,
+        room_name: roomName,
+        start_time: startStr,
+        end_time: endStr,
+        person_in_charge: personStr,
+      })).catch((e) => console.error('[sms] 발송 실패:', e)),
 
-      isAdmin
-        ? Promise.resolve()
-        : sendTelegramNotification(buildReservationTelegramMessage({
-            title: titleStr,
-            room_name: roomName,
-            start_time: startStr,
-            end_time: endStr,
-            person_in_charge: personStr,
-            notes: notesStr || undefined,
-          })).catch((e) => console.error('[telegram] 발송 실패:', e)),
+      sendTelegramNotification(buildReservationTelegramMessage({
+        title: titleStr,
+        room_name: roomName,
+        start_time: startStr,
+        end_time: endStr,
+        person_in_charge: personStr,
+        notes: notesStr || undefined,
+      })).catch((e) => console.error('[telegram] 발송 실패:', e)),
     ]);
 
     return NextResponse.json(reservation, { status: 201 });
