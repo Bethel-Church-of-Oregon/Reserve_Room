@@ -6,6 +6,8 @@
     "dev": "next dev -p 8000",
     "build": "next build",
     "start": "next start -p 8000",
+    "backup": "node scripts/backup.mjs",
+    "restore": "node scripts/restore.mjs",
     "lint": "next lint"
   },
   "dependencies": {

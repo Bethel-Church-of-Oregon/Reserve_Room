@@ -8,6 +8,22 @@ npm run dev      # 개발 (포트 8000, 빌드 불필요)
 npm run build && npm start  # 프로덕션 (포트 8000)
 ```
 
+## 백업
+```bash
+npm run backup                          # backups/<타임스탬프>/ 로 내보내기
+npm run restore -- backups/<폴더>        # 미리보기 (쓰지 않음)
+npm run restore -- backups/<폴더> --yes  # 실제 복원
+```
+- **Neon Free 는 시점 복구가 6시간뿐**이고 수동 스냅샷 1개가 전부. 월 1회 + 파괴적 작업 직전에 실행할 것
+- 출력: 테이블별 JSON + `reservations.csv`(엑셀용) + `restore.sql`(psql·Neon 콘솔용) + `manifest.json`(행 수·schema_version)
+- **`backups/` 는 gitignore 대상.** 예약자 이메일이 들어 있고, 그 이메일이 취소·변경의 자격증명이라 절대 커밋하면 안 됨
+- 복원은 **JSON 을 파라미터 바인딩으로 INSERT** — SQL 텍스트 파싱이나 `psql` 설치에 의존하지 않음. `restore.sql` 은 psql 쓰는 사람을 위한 부산물
+- 전부 `ON CONFLICT DO NOTHING` → **없는 행만 추가, 기존 행은 절대 덮어쓰지 않음.** 부분 유실 복구에 안전
+- 스키마는 복사해 두지 않음. `ensureDbReady()` 가 단일 출처이므로 **빈 DB 에는 앱을 한 번 띄워 스키마를 만든 뒤** 복원
+- id 를 보존하므로 복원 후 **시퀀스를 최대 id 로 setval** (안 하면 앱의 다음 INSERT 가 충돌)
+- 예약이 0행이면 **exit 1 로 실패** — 조용히 빈 백업을 남기면 보호받는 줄 알고 방치하게 됨
+- 실측: 합성 3건 → 백업 → 삭제 → 복원에서 전 컬럼 일치, 따옴표·줄바꿈 보존, 시퀀스 정상
+
 ## Tech Stack
 - **Framework**: Next.js 14.2.3 (App Router), TypeScript — `viewport` export는 `metadata`와 분리 (`src/app/layout.tsx`)
 - **Styling**: Tailwind CSS
@@ -55,7 +71,13 @@ npm run build && npm start  # 프로덕션 (포트 8000)
 - `reservations`: id, series_id(→reservation_series), series_index, title, room_id, start_time, end_time, person_in_charge, email, notes, status(pending/approved/rejected/cancellation_requested), rejection_reason, cancellation_reason, cancellation_requested_at, previous_status, created_at, updated_at, previous_start_time, previous_end_time
 - Postgres: Vercel Marketplace에서 Neon 연동 시 `POSTGRES_URL` 또는 `DATABASE_URL` 자동 주입
 - 시드는 rooms 테이블이 비어있을 때만 실행 (`count === 0` 체크)
-- 장소 변경 시 Neon 콘솔에서 `DELETE FROM reservations; DELETE FROM rooms;` 후 앱 재시작
+- **장소를 바꿀 때 DELETE 는 거의 필요 없음.** 이름 변경·순서 변경·은퇴(숨김)는 전부 `ensureDbReady()`에서 처리됨
+  - 이름 변경 → 마커 가드 마이그레이션 (`rooms_grace_rename_v1` 방식). 기존 예약이 그대로 붙어 있음
+  - 순서 변경 → `ROOM_ORDER` 배열 수정. 재시작하면 수렴
+  - 은퇴 → `UPDATE rooms SET hidden = true`. 예약은 캘린더에 그대로 남음
+  - 완전 삭제 → 참조가 없을 때만 지우는 자기방어형 DELETE (`은혜성전 교실 5` 방식)
+- **정말로 전체 초기화가 필요하면 반드시 백업 먼저.** `npm run backup` → 그 다음 `DELETE FROM reservations; DELETE FROM rooms;`
+  - Neon Free 는 **시점 복구 6시간**뿐. WHERE 없는 DELETE 를 하루 뒤에 알아차리면 복구 불가
 - 스키마 마이그레이션: `ensureDbReady()`에서 `ADD COLUMN IF NOT EXISTS`로 idempotent 처리
 - **`SCHEMA_VERSION` 버전 게이트.** `app_settings.schema_version`이 현재 값과 같으면 DDL 전체를 건너뜀
   - 예전에는 콜드스타트마다 27회 왕복(약 2.7초)을 냈음. Vercel은 **인스턴스가 새로 뜰 때마다** 이걸 다시 하므로 트래픽이 몰릴 때 가장 비쌌음 → 현재 **2회** (버전 확인 + ROOM_ORDER) (2026-09 수정)
