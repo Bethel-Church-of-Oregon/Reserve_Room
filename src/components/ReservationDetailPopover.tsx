@@ -444,7 +444,8 @@ export default function ReservationDetailPopover({
   // create one, so only an administrator can clear one. Enforced server-side too.
   const canRequestCancel =
     !reservation.series_id && reservation.status === 'approved' && reservation.end_time.slice(0, 10) >= today;
-  const canEdit = reservation.status === 'approved' && reservation.start_time.slice(0, 10) >= today;
+  const canEdit =
+    !reservation.series_id && reservation.status === 'approved' && reservation.start_time.slice(0, 10) >= today;
 
   return (
     <div

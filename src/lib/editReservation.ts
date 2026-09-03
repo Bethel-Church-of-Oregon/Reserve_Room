@@ -38,6 +38,18 @@ export async function applyReservationEdit(
     if (reservation.email.toLowerCase() !== requesterEmail.toLowerCase()) {
       return fail('이메일이 일치하지 않습니다.', 403);
     }
+
+    // Recurring bookings are administrator-only in both directions: only an
+    // administrator creates a series, so only an administrator changes or clears
+    // one. Guarded here rather than in the route because this is where the
+    // requester-versus-administrator distinction already lives, and the
+    // reservation has been loaded once.
+    if (reservation.series_id) {
+      return fail(
+        '반복 예약은 이 화면에서 변경할 수 없습니다. 교회 사무실이나 장소예약 담당자에게 문의해 주세요.',
+        403
+      );
+    }
   }
 
   if (reservation.status !== 'approved') {

@@ -364,10 +364,15 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   //
   // The cancellation list stays one row per occurrence on purpose: what matters
   // there is which specific dates were dropped, and why.
+  // Grouped in the reservation list only. The cancellation list and the "all"
+  // tab stay one row per occurrence: cancellations are about which specific
+  // dates were dropped, and the all-tab is where an administrator reaches a
+  // single occurrence of a series — to edit or delete just that one — now that
+  // members cannot touch series bookings at all.
   const displayRows: DisplayRow[] =
-    filter === 'cancelled'
-      ? filtered.map((r) => ({ type: 'single' as const, reservation: r }))
-      : buildGroupedRows();
+    filter === 'approved'
+      ? buildGroupedRows()
+      : filtered.map((r) => ({ type: 'single' as const, reservation: r }));
 
   async function handleCancelSeries(seriesId: string, reason: string) {
     setSeriesActionLoading(seriesId);
