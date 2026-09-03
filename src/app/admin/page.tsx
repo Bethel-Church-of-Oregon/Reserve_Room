@@ -31,6 +31,41 @@ function formatSeriesRangeLines(reservations: ReservationWithRoom[]): { firstSta
   return { firstStart, lastEnd, count: reservations.length };
 }
 
+/**
+ * The one string a search term is matched against.
+ *
+ * Includes `email`, which the public calendar query deliberately withholds: the
+ * admin list is the only place it exists, and it is how a caller is identified
+ * when they phone the office about a booking they made months ago.
+ *
+ * Room names go in twice — as stored and as displayed — because the list shows
+ * the translated name, so searching for what is on screen has to hit even
+ * though the database only ever holds Korean.
+ *
+ * Dates go in as `2026-09-06`, `09/06` and `9/6` so the term can be typed the
+ * way a person says it rather than the way it is stored.
+ */
+function searchHaystack(r: ReservationWithRoom, tRoom: (name: string) => string): string {
+  const date = r.start_time.slice(0, 10);
+  const mm = date.slice(5, 7);
+  const dd = date.slice(8, 10);
+  return [
+    r.title,
+    r.person_in_charge,
+    r.email,
+    r.room_name,
+    tRoom(r.room_name),
+    r.notes ?? '',
+    r.cancellation_reason ?? '',
+    date,
+    `${mm}/${dd}`,
+    `${Number(mm)}/${Number(dd)}`,
+    r.start_time.slice(11, 16),
+  ]
+    .join('\n')
+    .toLowerCase();
+}
+
 // ── Login Screen ──────────────────────────────────────────────────────────────
 function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
   const [password, setPassword] = useState('');
@@ -238,6 +273,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const [filter, setFilter] = useState<FilterStatus>('approved');
   const [selectedRooms, setSelectedRooms] = useState<Set<number>>(new Set());
   const [roomFilterOpen, setRoomFilterOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const [allRooms, setAllRooms] = useState<{ id: number; name: string; color: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<ReservationWithRoom | null>(null);
@@ -324,11 +360,20 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
     new Map(reservations.map(r => [r.room_id, { id: r.room_id, name: r.room_name, color: r.room_color }])).values()
   ).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
 
+  // Every term has to match, so terms narrow instead of widen: `고형석 청년부`
+  // finds that person's 청년부 bookings rather than everything touching either.
+  const searchTerms = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const searching = searchTerms.length > 0;
+
   const filtered = reservations.filter((r) => {
     if (filter === 'approved' && r.status !== 'approved') return false;
     if (filter === 'cancelled' && r.status !== 'cancelled') return false;
     if (filter === 'all' && r.status === 'rejected') return false;
     if (selectedRooms.size > 0 && !selectedRooms.has(r.room_id)) return false;
+    if (searching) {
+      const hay = searchHaystack(r, tRoom);
+      if (!searchTerms.every((term) => hay.includes(term))) return false;
+    }
     return true;
   });
 
@@ -690,23 +735,57 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           </div>
         )}
 
-        {/* Room filter */}
-        {adminView === 'reservations' && uniqueRooms.length > 0 && (
+        {/* Search + room filter */}
+        {adminView === 'reservations' && (
           <div className="relative border-b border-gray-100 -mx-4 sm:-mx-6 px-4 sm:px-6 mb-4">
             <div className="relative z-50 flex items-center gap-2 py-2">
-              <button
-                onClick={() => setRoomFilterOpen(v => !v)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition whitespace-nowrap flex-shrink-0 ${roomFilterOpen ? 'bg-gray-100 border-gray-300 text-gray-800' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-              >
-                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+              {uniqueRooms.length > 0 && (
+                <button
+                  onClick={() => setRoomFilterOpen(v => !v)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition whitespace-nowrap flex-shrink-0 ${roomFilterOpen ? 'bg-gray-100 border-gray-300 text-gray-800' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                >
+                  <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+                  </svg>
+                  <span className={selectedRooms.size > 0 ? 'hidden sm:inline' : ''}>{t.roomFilter}</span>
+                  {selectedRooms.size > 0 && (
+                    <span className="ml-0.5 px-1.5 py-0.5 bg-blue-600 text-white rounded-full text-xs leading-none">{selectedRooms.size}</span>
+                  )}
+                  <span className="text-gray-400">{roomFilterOpen ? t.filterCollapse : t.filterExpand}</span>
+                </button>
+              )}
+
+              {/* Search box. Filters whichever tab is open, so the term carries
+                  over when switching between 예약 목록 / 취소 목록 / 전체 — the
+                  same person's bookings and cancellations are usually looked up
+                  together. `text-base` keeps iOS Safari from zooming on focus. */}
+              <div className="relative flex-1 min-w-0">
+                <svg className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
                 </svg>
-                <span className={selectedRooms.size > 0 ? 'hidden sm:inline' : ''}>{t.roomFilter}</span>
-                {selectedRooms.size > 0 && (
-                  <span className="ml-0.5 px-1.5 py-0.5 bg-blue-600 text-white rounded-full text-xs leading-none">{selectedRooms.size}</span>
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={t.adminSearchPlaceholder}
+                  className="w-full pl-7 pr-7 py-1 rounded-lg border border-gray-200 bg-white text-base leading-tight text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-gray-400 transition"
+                />
+                {search !== '' && (
+                  <button
+                    onClick={() => setSearch('')}
+                    aria-label={t.adminSearchClear}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 px-1.5 text-gray-400 hover:text-gray-600 leading-none transition"
+                  >
+                    ×
+                  </button>
                 )}
-                <span className="text-gray-400">{roomFilterOpen ? t.filterCollapse : t.filterExpand}</span>
-              </button>
+              </div>
+              {searching && (
+                <span className="hidden sm:inline text-xs text-gray-400 whitespace-nowrap flex-shrink-0 tabular-nums">
+                  {t.adminSearchHits(filtered.length)}
+                </span>
+              )}
+
               {selectedRooms.size > 0 && !roomFilterOpen && (
                 <button
                   onClick={() => setSelectedRooms(new Set())}
@@ -774,7 +853,11 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
             <div className="text-center py-16 text-gray-400 text-sm">{t.loading}</div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-16 text-gray-400 text-sm">
-              {selectedRooms.size > 0 ? t.adminNoRoomFilter : t.adminNoReservations}
+              {searching
+                ? t.adminNoSearchResult
+                : selectedRooms.size > 0
+                  ? t.adminNoRoomFilter
+                  : t.adminNoReservations}
             </div>
           ) : (
             <>

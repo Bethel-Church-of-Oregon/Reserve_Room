@@ -344,6 +344,10 @@ const ko = {
   adminTabAll: '전체',
   adminNoReservations: '예약 내역이 없습니다.',
   adminNoRoomFilter: '선택한 장소의 예약 내역이 없습니다.',
+  adminNoSearchResult: '검색 결과가 없습니다.',
+  adminSearchPlaceholder: '제목 · 담당자 · 이메일 · 날짜',
+  adminSearchClear: '검색어 지우기',
+  adminSearchHits: (n: number) => `${n}건`,
   adminDataError: '데이터를 불러오지 못했습니다.',
   adminChecking: '확인 중...',
 
@@ -623,6 +627,10 @@ const en: typeof ko = {
   adminTabAll: 'All',
   adminNoReservations: 'No reservations found.',
   adminNoRoomFilter: 'No reservations for the selected room.',
+  adminNoSearchResult: 'No matching reservations.',
+  adminSearchPlaceholder: 'Title · contact · email · date',
+  adminSearchClear: 'Clear search',
+  adminSearchHits: (n: number) => `${n} found`,
   adminDataError: 'Failed to load data.',
   adminChecking: 'Verifying...',
 
