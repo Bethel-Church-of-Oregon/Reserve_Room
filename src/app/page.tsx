@@ -318,7 +318,7 @@ export default function HomePage() {
           <div className="flex items-center min-w-0 flex-1">
             <button
               onClick={() => { setCurrentDate(pacificTodayDate()); setViewMode('month'); }}
-              className="min-w-0 max-w-full truncate text-[15px] sm:text-xl font-bold text-blue-700 hover:text-blue-800 transition-colors"
+              className="min-w-0 max-w-full truncate text-[18px] sm:text-xl font-bold text-blue-700 hover:text-blue-800 transition-colors"
             >
               <span className="hidden sm:inline">{t.siteTitle}</span>
               <span className="sm:hidden">{t.siteTitleShort}</span>

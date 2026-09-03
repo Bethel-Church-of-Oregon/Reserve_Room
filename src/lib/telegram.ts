@@ -142,6 +142,8 @@ export function buildCancellationTelegramMessage(data: {
   end_time: string;
   person_in_charge: string;
   cancellation_reason?: string | null;
+  /** One date out of a recurring series, rather than a standalone booking. */
+  series_occurrence?: boolean;
 }): string {
   return (
     `🔴 <b>예약 취소</b>\n` +
@@ -149,7 +151,12 @@ export function buildCancellationTelegramMessage(data: {
     `장소 · ${esc(data.room_name)}\n` +
     `일시 · ${formatDateTime(data.start_time)}–${timeOnly(data.end_time)}\n` +
     `담당 · ${esc(data.person_in_charge)}` +
-    (data.cancellation_reason ? `\n사유 · ${esc(data.cancellation_reason)}` : '')
+    (data.cancellation_reason ? `\n사유 · ${esc(data.cancellation_reason)}` : '') +
+    // Spelled out because the alarming reading is the wrong one: a coordinator
+    // seeing a standing meeting in a cancellation notice will assume the whole
+    // series is gone. It is also the signal that catches a run of one-at-a-time
+    // cancellations while it is still running.
+    (data.series_occurrence ? `\n\n🔁 <b>반복 예약 중 이 1회만 취소</b>되었습니다. 나머지 일정은 그대로입니다.` : '')
   );
 }
 

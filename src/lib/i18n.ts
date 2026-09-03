@@ -294,7 +294,7 @@ const ko = {
 
   // Cancel button
   btnRequestCancel: '취소 신청하기',
-  seriesCancelNotice: '반복 예약 취소는 담당자에게 문의해 주세요',
+  cancelSeriesOneOnly: '반복 예약입니다. 선택한 이 1회만 취소되고 나머지 일정은 그대로 유지됩니다.',
 
   // Admin: cancel a whole recurring series
   seriesPerOccurrenceHint: '회차별 수정·삭제는 전체 탭에서',
@@ -580,7 +580,7 @@ const en: typeof ko = {
   errReasonLength: (n: number) => `Reason must be ${n} characters or fewer.`,
 
   btnRequestCancel: 'Request Cancellation',
-  seriesCancelNotice: 'To cancel a recurring booking, contact the coordinator',
+  cancelSeriesOneOnly: 'This is a recurring booking. Only this date is cancelled — the rest of the series stays.',
 
   // Admin: cancel a whole recurring series
   seriesPerOccurrenceHint: 'Edit or delete single dates in the All tab',

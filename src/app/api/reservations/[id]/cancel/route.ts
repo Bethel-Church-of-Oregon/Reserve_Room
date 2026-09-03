@@ -35,20 +35,24 @@ export async function POST(
       return NextResponse.json({ error: '이메일이 일치하지 않습니다.' }, { status: 403 });
     }
 
-    // A recurring booking is never cancelled from here. Only an administrator can
-    // create one, and this route used to let anyone holding the reserver's email
-    // cancel the whole series in a single request — 226 future occurrences of
-    // 새가족 교육 went that way. Series cancellation now lives only in
-    // `PATCH /api/admin/series/[id]`, behind the admin session.
+    // One date out of a recurring series can be cancelled here; the series as a
+    // whole cannot. There is no `scope` parameter to ask for more — it was
+    // removed, so this route is structurally single-occurrence. Cancelling a
+    // whole series lives in `PATCH /api/admin/series/[id]`, behind the admin
+    // session, which is also where creating one lives.
     //
-    // Enforced on the server, not just hidden in the UI: hiding alone is what
-    // made the `?admin=true` hole possible.
-    if (reservation.series_id) {
-      return NextResponse.json(
-        { error: '반복 예약은 이 화면에서 취소할 수 없습니다. 교회 사무실이나 장소예약 담당자에게 문의해 주세요.' },
-        { status: 403 }
-      );
-    }
+    // That split is deliberate. Skipping one week of a standing meeting is an
+    // everyday request and routing it through a coordinator makes the
+    // coordinator the bottleneck — and a booking nobody can conveniently
+    // release is a room that sits empty while showing as taken. Losing the
+    // whole series is a different order of mistake, so it stays behind the
+    // session.
+    //
+    // The residual risk is that the reserver's email is the only credential and
+    // every occurrence shares it, so someone holding it could still cancel 52
+    // dates one at a time. That is what the notification below is for: the
+    // coordinator hears about the first one, not the fifty-second.
+    const seriesOccurrence = Boolean(reservation.series_id);
 
     const ok = await requestCancellation(id, reason);
     if (!ok) {
@@ -67,6 +71,7 @@ export async function POST(
         person_in_charge: reservation.person_in_charge,
         email: reservation.email,
         cancellation_reason: reason,
+        series_occurrence: seriesOccurrence,
       }).catch((e) => console.error('[email] 취소 메일 발송 실패:', e)),
 
       sendSmsNotifications(buildCancellationSmsMessage({
@@ -75,6 +80,7 @@ export async function POST(
         start_time: reservation.start_time,
         end_time: reservation.end_time,
         person_in_charge: reservation.person_in_charge,
+        series_occurrence: seriesOccurrence,
       })).catch((e) => console.error('[sms] 발송 실패:', e)),
 
       sendTelegramNotification(buildCancellationTelegramMessage({
@@ -84,6 +90,7 @@ export async function POST(
         end_time: reservation.end_time,
         person_in_charge: reservation.person_in_charge,
         cancellation_reason: reason,
+        series_occurrence: seriesOccurrence,
       })).catch((e) => console.error('[telegram] 발송 실패:', e)),
     ]);
 

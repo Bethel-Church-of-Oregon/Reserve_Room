@@ -111,8 +111,15 @@ const monthDay = (iso: string) => `${Number(iso.slice(5, 7))}/${Number(iso.slice
  * Returns the budget too, so a caller can decide whether an optional extra in
  * the head is worth the characters it costs.
  */
+/**
+ * `취소·반복` marks one date cancelled out of a recurring series. It costs two
+ * characters of title budget, which is worth it: without it the coordinator
+ * cannot tell a single cancellation from the loss of a standing meeting.
+ */
+type SmsTag = '예약' | '취소' | '변경' | '취소·반복';
+
 function composeSms(
-  tag: '예약' | '취소' | '변경',
+  tag: SmsTag,
   head: string,
   room: string,
   title: string,
@@ -125,7 +132,7 @@ function composeSms(
 }
 
 function buildSms(
-  tag: '예약' | '취소' | '변경',
+  tag: SmsTag,
   data: {
     title: string;
     room_name: string;
@@ -173,8 +180,10 @@ export function buildCancellationSmsMessage(data: {
   start_time: string;
   end_time: string;
   person_in_charge: string;
+  /** One date out of a recurring series, rather than a standalone booking. */
+  series_occurrence?: boolean;
 }): string {
-  return buildSms('취소', data);
+  return buildSms(data.series_occurrence ? '취소·반복' : '취소', data);
 }
 
 export function buildUpdateSmsMessage(data: {

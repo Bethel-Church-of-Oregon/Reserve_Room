@@ -109,9 +109,9 @@ export default function ListView({ reservations, loading, onRefresh }: Props) {
                   <div className="flex-1 flex flex-col gap-2 min-w-0 py-3 pr-4 pl-1">
                     {items.map((item) => {
                       const isSelected = selectedId === item.id;
-                      // Recurring bookings are cleared by an administrator only.
+                      // A single occurrence of a series can be cancelled here; the
+                      // series as a whole is admin-only.
                       const canRequestCancel =
-                        !item.series_id &&
                         item.status === 'approved' &&
                         item.end_time.slice(0, 10) >= today;
                       const canEdit =

@@ -322,6 +322,8 @@ export async function sendReservationCancelledEmail(data: {
   person_in_charge: string;
   email: string;
   cancellation_reason: string;
+  /** One date out of a recurring series, rather than a standalone booking. */
+  series_occurrence?: boolean;
 }): Promise<void> {
   if (!process.env.GMAIL_APP_PASSWORD) return;
   const transporter = getTransporter();
@@ -356,6 +358,13 @@ export async function sendReservationCancelledEmail(data: {
             <td style="padding:8px 12px;">${escapeHtml(data.cancellation_reason)}</td>
           </tr>
         </table>
+        ${
+          data.series_occurrence
+            ? `<p style="background:#eff6ff; border-left:3px solid #3b82f6; padding:10px 14px; font-size:13px; color:#1e40af; margin:16px 0;">
+                 반복 예약 중 <strong>위 1회만</strong> 취소되었습니다. 나머지 일정은 그대로 유지됩니다.
+               </p>`
+            : ''
+        }
         <p style="color:#6b7280; font-size:13px;">문의사항이 있으시면 교회 사무실로 연락해 주세요.</p>
         <hr style="border:none; border-top:1px solid #e5e7eb; margin:24px 0;" />
         <p style="font-size:12px; color:#9ca3af;">오레곤벧엘장로교회 장소예약시스템</p>

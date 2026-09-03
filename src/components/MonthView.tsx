@@ -180,8 +180,9 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
                 .slice()
                 .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
                 .map((r) => {
-                  // Recurring bookings are cleared by an administrator only.
-                  const canRequestCancel = !r.series_id && r.status === 'approved' && r.end_time.slice(0, 10) >= today;
+                  // A single occurrence of a series can be cancelled here; the series
+                  // as a whole is admin-only.
+                  const canRequestCancel = r.status === 'approved' && r.end_time.slice(0, 10) >= today;
                   const canEdit = r.status === 'approved' && r.start_time.slice(0, 10) >= today;
                   const isSelected = selectedModalId === r.id;
                   return (

@@ -352,6 +352,14 @@ export function CancelRequestModal({
         <h3 className="text-lg font-bold text-gray-800 mb-1">{t.cancelModalTitle}</h3>
         <p className="text-sm text-gray-500 mb-4">{t.cancelDesc(reservation.title)}</p>
 
+        {/* Said before the button is pressed, not after: "취소" on a weekly
+            meeting is ambiguous, and the frightening reading is the wrong one. */}
+        {Boolean(reservation.series_id) && (
+          <p className="mb-4 rounded-lg bg-blue-50 border-l-[3px] border-blue-400 px-3 py-2 text-xs text-blue-800">
+            {t.cancelSeriesOneOnly}
+          </p>
+        )}
+
         <div className="mb-4">
           <label htmlFor="cancel-email" className="block text-sm font-medium text-gray-700 mb-1">{t.cancelEmailLabel} <span className="text-red-500">*</span></label>
           <input
@@ -440,10 +448,11 @@ export default function ReservationDetailPopover({
 }: Props) {
   const { t, tRoom } = useLanguage();
   const today = pacificDateKey();
-  // Recurring bookings are not cancellable here — only an administrator can
-  // create one, so only an administrator can clear one. Enforced server-side too.
+  // A single occurrence of a series can be cancelled here — skipping one week
+  // of a standing meeting is an everyday request. Cancelling the whole series
+  // stays admin-only, and the route has no parameter that could ask for it.
   const canRequestCancel =
-    !reservation.series_id && reservation.status === 'approved' && reservation.end_time.slice(0, 10) >= today;
+    reservation.status === 'approved' && reservation.end_time.slice(0, 10) >= today;
   const canEdit = reservation.status === 'approved' && reservation.start_time.slice(0, 10) >= today;
 
   return (
@@ -494,9 +503,6 @@ export default function ReservationDetailPopover({
       {/* Edit / cancel buttons */}
       {/* A recurring booking shows why its cancel button is absent, rather than
           just not having one. */}
-      {Boolean(reservation.series_id) && reservation.end_time.slice(0, 10) >= today && (
-        <div className="mt-2 text-right text-[10px] text-gray-400">{t.seriesCancelNotice}</div>
-      )}
       {((canEdit && onRequestEdit) || (canRequestCancel && onRequestCancel)) && (
         <div className="mt-2 flex justify-end gap-1">
           {canEdit && onRequestEdit && (
