@@ -143,7 +143,7 @@ export default function ListView({ reservations, loading, onRefresh }: Props) {
                             </div>
                             {/* Room + cancel */}
                             <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                              <div className="flex min-w-0 items-center gap-1.5 text-xs text-gray-500">
                                 <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: item.room_color }} />
                                 <span className="truncate">{tRoom(item.room_name)}</span>
                               </div>

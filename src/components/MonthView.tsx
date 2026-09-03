@@ -199,43 +199,48 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
                       />
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-sm text-gray-800 truncate">{r.title}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">{tRoom(r.room_name)}</div>
+                        <div className="text-xs text-gray-500 mt-0.5 truncate">{tRoom(r.room_name)}</div>
                         <div className="text-xs text-gray-500">{formatTime(r.start_time)} – {formatTime(r.end_time)}</div>
-                        <div className="flex items-center justify-between">
-                          <div className="text-xs text-gray-500">{t.personLabel} {r.person_in_charge}</div>
-                          {isSelected && (canEdit || canRequestCancel) && (
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                              {canEdit && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setExpandedDay(null);
-                                    setSelectedModalId(null);
-                                    setEditModalReservation(r);
-                                  }}
-                                  className="text-[10px] font-medium px-1.5 py-0.5 text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition whitespace-nowrap"
-                                >
-                                  {t.btnRequestEdit}
-                                </button>
-                              )}
-                              {canRequestCancel && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setExpandedDay(null);
-                                    setSelectedModalId(null);
-                                    setCancelModalReservation(r);
-                                  }}
-                                  className="text-[10px] font-medium px-1.5 py-0.5 text-red-600 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition whitespace-nowrap"
-                                >
-                                  {t.btnRequestCancel}
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                        {/* 담당자 keeps the full row. It holds two names often
+                            enough — `이광은 목사, 김영준 장로` — that sharing the
+                            line with the buttons wrapped it to two lines, and
+                            this modal is the only place month view shows the
+                            field at all, so truncating it is no better. The
+                            buttons take their own row instead; `truncate` stays
+                            as a floor for a single absurdly long name. */}
+                        <div className="truncate text-xs text-gray-500">{t.personLabel} {r.person_in_charge}</div>
+                        {isSelected && (canEdit || canRequestCancel) && (
+                          <div className="mt-1.5 flex items-center justify-end gap-1">
+                            {canEdit && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedDay(null);
+                                  setSelectedModalId(null);
+                                  setEditModalReservation(r);
+                                }}
+                                className="text-[10px] font-medium px-1.5 py-0.5 text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition whitespace-nowrap"
+                              >
+                                {t.btnRequestEdit}
+                              </button>
+                            )}
+                            {canRequestCancel && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedDay(null);
+                                  setSelectedModalId(null);
+                                  setCancelModalReservation(r);
+                                }}
+                                className="text-[10px] font-medium px-1.5 py-0.5 text-red-600 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition whitespace-nowrap"
+                              >
+                                {t.btnRequestCancel}
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

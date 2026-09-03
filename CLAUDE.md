@@ -325,7 +325,10 @@ approved → cancelled (취소 신청 시 즉시 처리)
 - **예약 상세 팝오버**: 일간/주간 캘린더 뷰에서 예약 블록 hover → 제목·장소·시간·담당자·노트 표시 + 변경하기(파랑)·취소 신청(빨강) 버튼
 - **현재 시간 라인**: 일간 뷰에서 오늘 날짜일 때만 파란 가로선 표시. `Intl.DateTimeFormat` + `America/Los_Angeles` 타임존으로 DST 자동 처리. 30초마다 갱신
 - **일간 뷰 고정 헤더**: 주간 스트립을 단일 `sticky top-0` 래퍼로 묶어 스크롤 시 항상 표시. 날짜 레이블은 page.tsx Row 2 (‹ 날짜 ›)로 이동. 주간 스트립 날짜 셀: 요일·날짜 사이 `gap-1`, 날짜·점 사이 `mt-1`
-- **월간 날짜 셀 클릭**: 셀 전체가 클릭 가능, 클릭 시 해당 날의 모든 예약을 시간순으로 보여주는 모달 표시 (예약 0개이면 안내 메시지). 개별 예약 블록 hover 팝오버 없음. 모달 내 카드 기본 상태에서는 버튼 숨김 — 카드 클릭 시 선택(배경 진해짐) + 변경하기·취소 신청하기 버튼 표시 (`selectedModalId` state). 오늘 이후 예약에만 버튼 노출. 모달 닫힐 때 `selectedModalId` 초기화
+- **월간 날짜 셀 클릭**: 셀 전체가 클릭 가능, 클릭 시 해당 날의 모든 예약을 시간순으로 보여주는 모달 표시 (예약 0개이면 안내 메시지). 개별 예약 블록 hover 팝오버 없음. 모달 내 카드 기본 상태에서는 버튼 숨김 — 카드 클릭 시 선택(배경 진해짐) + 변경하기·취소 신청하기 버튼 표시 (`selectedModalId` state).
+  - **버튼은 담당자 줄이 아니라 그 아래 자기 줄에 우측 정렬.** 담당자가 두 명인 경우가 흔해서(`이광은 목사, 김영준 장로`) 같은 줄에 두면 담당자가 두 줄로 접혔음 (2026-09 수정). 이 모달이 월간 뷰에서 담당자를 보여주는 유일한 곳이라 잘라내는 것도 답이 아님
+  - 제목·장소·담당자 전부 `truncate` — 담당자는 이름 하나가 비정상적으로 긴 경우의 하한선
+  - **`min-w-0` 없이는 `truncate`가 동작하지 않음.** flex 자식의 기본값이 `min-width: auto`라서 줄어들기를 거부하고 대신 줄바꿈됨 (목록 뷰의 장소 줄도 같은 이유로 보강) 오늘 이후 예약에만 버튼 노출. 모달 닫힐 때 `selectedModalId` 초기화
 - **스와이프 제스처**: 일간/주간/월간 뷰에서 터치 좌우 스와이프로 날짜 이동. `page.tsx`에서 native `touchstart/touchmove/touchend` 이벤트로 처리 (passive: false on move). 수평/수직 축 5px threshold로 판별 후 lock. `swipeX`/`isDragging` state → 각 뷰에 `swipeOffset`/`swipeDragging` props로 전달. 완료 시: 220ms animate off-screen → navigate → 반대 edge 즉시 이동 → `requestAnimationFrame` 이중 호출 후 0으로 animate. 헤더(주간 스트립, 요일 헤더, 시간 레이블)는 transform 외부에 고정, 예약 그리드만 `translateX`
 - **월간 뷰**: 요일 헤더(일월화수목금토)는 고정, 날짜 그리드만 `overflow-y-auto` 스크롤. 그리드 row: `minmax(var(--month-cell-min-h), 1fr)` — CSS 변수로 반응형 처리 (`globals.css`: 640px 미만 100px / 640px 이상 130px). JS state 없이 순수 CSS로 SSR 안전하게 적용. 셀에 `overflow-hidden`으로 콘텐츠 클리핑
 - **월간 뷰 예약 블록**: 셀당 최대 3개 표시, 초과 시 `+N개` 표시. 모바일(`< sm`)에서는 텍스트 숨김(`hidden sm:inline`), 색상 바만 표시 (`h-3 sm:h-auto sm:leading-5`)
