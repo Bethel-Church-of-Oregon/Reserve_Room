@@ -141,33 +141,34 @@ export default function ListView({ reservations, loading, onRefresh }: Props) {
                             <div className="text-xs text-gray-400 mb-0.5">
                               {formatTimeAmPm(lang, item.start_time)} – {formatTimeAmPm(lang, item.end_time)}
                             </div>
-                            {/* Room + cancel */}
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex min-w-0 items-center gap-1.5 text-xs text-gray-500">
-                                <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: item.room_color }} />
-                                <span className="truncate">{tRoom(item.room_name)}</span>
-                              </div>
-                              {isSelected && (canEdit || canRequestCancel) && (
-                                <div className="flex items-center gap-1 flex-shrink-0">
-                                  {canEdit && (
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); setEditModalReservation(item); }}
-                                      className="text-[10px] text-blue-500 hover:text-blue-700 border border-blue-300 hover:border-blue-400 rounded px-1.5 py-0.5 bg-blue-50 transition whitespace-nowrap"
-                                    >
-                                      {t.btnRequestEdit}
-                                    </button>
-                                  )}
-                                  {canRequestCancel && (
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); setCancelModalReservation(item); }}
-                                      className="text-[10px] text-red-500 hover:text-red-700 border border-red-300 hover:border-red-400 rounded px-1.5 py-0.5 bg-red-50 transition whitespace-nowrap"
-                                    >
-                                      {t.btnRequestCancel}
-                                    </button>
-                                  )}
-                                </div>
-                              )}
+                            {/* Room */}
+                            <div className="flex min-w-0 items-center gap-1.5 text-xs text-gray-500">
+                              <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: item.room_color }} />
+                              <span className="truncate">{tRoom(item.room_name)}</span>
                             </div>
+                            {/* Own row, as in the month-view day modal: sharing a
+                                line with the room name squeezed both, and the two
+                                views should not behave differently. */}
+                            {isSelected && (canEdit || canRequestCancel) && (
+                              <div className="mt-1.5 flex items-center justify-end gap-1">
+                                {canEdit && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setEditModalReservation(item); }}
+                                    className="text-[10px] text-blue-500 hover:text-blue-700 border border-blue-300 hover:border-blue-400 rounded px-1.5 py-0.5 bg-blue-50 transition whitespace-nowrap"
+                                  >
+                                    {t.btnRequestEdit}
+                                  </button>
+                                )}
+                                {canRequestCancel && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setCancelModalReservation(item); }}
+                                    className="text-[10px] text-red-500 hover:text-red-700 border border-red-300 hover:border-red-400 rounded px-1.5 py-0.5 bg-red-50 transition whitespace-nowrap"
+                                  >
+                                    {t.btnRequestCancel}
+                                  </button>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
