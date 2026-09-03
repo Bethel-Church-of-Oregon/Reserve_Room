@@ -40,3 +40,33 @@
     --month-cell-min-h: 130px;
   }
 }
+
+/*
+ * Admin search field.
+ *
+ * 13px for the typed value and 12px for the hint, so the field reads as part of
+ * the 12px filter row it sits in rather than looming over it.
+ *
+ * Touch devices keep the value at 16px: iOS Safari zooms the entire page when a
+ * focused input is smaller than that, and the administrator would have to pinch
+ * back out every single time they tap the box. Keyed on pointer type rather
+ * than a width breakpoint so an iPad in landscape — wide, but still touch — is
+ * not caught by it.
+ *
+ * `line-height` is pinned rather than inherited from the font size, so the
+ * field is exactly the same height in both cases and the filter row never
+ * shifts. Both sizes are set here rather than as Tailwind classes to keep one
+ * utility from overriding half of the pair.
+ */
+.admin-search-input {
+  font-size: 16px;
+  line-height: 18px;
+}
+.admin-search-input::placeholder {
+  font-size: 12px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .admin-search-input {
+    font-size: 13px;
+  }
+}
