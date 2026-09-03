@@ -294,9 +294,10 @@ const ko = {
 
   // Cancel button
   btnRequestCancel: '취소 신청하기',
-  seriesCancelNotice: '반복 예약은 담당자에게 문의해 주세요',
+  seriesCancelNotice: '반복 예약 취소는 담당자에게 문의해 주세요',
 
   // Admin: cancel a whole recurring series
+  seriesPerOccurrenceHint: '회차별 수정·삭제는 전체 탭에서',
   cancelSeriesTitle: '반복 예약 전체 취소',
   cancelSeriesCount: (n: number) => `오늘 이후 ${n}건이 취소됩니다`,
   cancelSeriesNote: '지난 일정은 기록으로 남고, 오늘 이후 일정만 취소됩니다. 신청자에게 안내 메일이 발송됩니다.',
@@ -574,9 +575,10 @@ const en: typeof ko = {
   errReasonLength: (n: number) => `Reason must be ${n} characters or fewer.`,
 
   btnRequestCancel: 'Request Cancellation',
-  seriesCancelNotice: 'For recurring bookings, please contact the coordinator',
+  seriesCancelNotice: 'To cancel a recurring booking, contact the coordinator',
 
   // Admin: cancel a whole recurring series
+  seriesPerOccurrenceHint: 'Edit or delete single dates in the All tab',
   cancelSeriesTitle: 'Cancel Entire Series',
   cancelSeriesCount: (n: number) => `${n} future booking${n === 1 ? '' : 's'} will be cancelled`,
   cancelSeriesNote: 'Past dates are kept as a record; only today onward is cancelled. The requester is notified by email.',

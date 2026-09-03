@@ -115,9 +115,7 @@ export default function ListView({ reservations, loading, onRefresh }: Props) {
                         item.status === 'approved' &&
                         item.end_time.slice(0, 10) >= today;
                       const canEdit =
-                        !item.series_id &&
-                        item.status === 'approved' &&
-                        item.start_time.slice(0, 10) >= today;
+                        item.status === 'approved' && item.start_time.slice(0, 10) >= today;
 
                       return (
                         <div

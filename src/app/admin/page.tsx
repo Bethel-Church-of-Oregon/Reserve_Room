@@ -800,6 +800,10 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                           <td className="px-3 py-2 font-medium text-gray-800 w-[120px] max-w-[120px]">
                             <div className="truncate">{row.reservations[0].title}</div>
                             <div className="text-xs text-gray-500 mt-0.5">{t.seriesCount(row.reservations.length)}</div>
+                            {/* Says where per-occurrence actions live: a grouped row has no
+                                space for them, and their absence otherwise reads as "the
+                                administrator cannot do this". */}
+                            <div className="text-xs text-gray-400 mt-0.5">{t.seriesPerOccurrenceHint}</div>
                             {row.reservations[0].notes && (
                               <div className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{row.reservations[0].notes}</div>
                             )}
@@ -904,6 +908,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                       </div>
                       <p className="font-semibold text-gray-800 mb-1 truncate">{row.reservations[0].title}</p>
                       <p className="text-xs text-gray-500 mb-1">{t.seriesCount(row.reservations.length)}</p>
+                      <p className="text-xs text-gray-400 mb-1">{t.seriesPerOccurrenceHint}</p>
                       <div className="flex items-center gap-1.5 mb-1">
                         <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: row.reservations[0].room_color }} />
                         <span className="text-sm text-gray-600">{tRoom(row.reservations[0].room_name)}</span>
