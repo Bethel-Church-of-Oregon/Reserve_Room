@@ -313,13 +313,10 @@ export function CancelRequestModal({
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [scope, setScope] = useState<'one' | 'series'>('one');
   const [submitted, setSubmitted] = useState(false);
-  const hasSeries = Boolean(reservation.series_id);
 
-  // Reset to "one instance" whenever the modal is opened with a different reservation
+  // Clear the form whenever the modal is opened for a different reservation
   useEffect(() => {
-    setScope('one');
     setEmail('');
     setReason('');
     setError('');
@@ -354,36 +351,6 @@ export function CancelRequestModal({
       <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
         <h3 className="text-lg font-bold text-gray-800 mb-1">{t.cancelModalTitle}</h3>
         <p className="text-sm text-gray-500 mb-4">{t.cancelDesc(reservation.title)}</p>
-
-        {hasSeries && (
-          <div className="mb-4">
-            <div className="block text-sm font-medium text-gray-700 mb-1">{t.cancelScope}</div>
-            <div className="flex flex-col gap-2 text-sm">
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="cancel-scope"
-                  value="one"
-                  checked={scope === 'one'}
-                  onChange={() => setScope('one')}
-                  disabled={loading}
-                />
-                <span>{t.cancelScopeOne}</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="cancel-scope"
-                  value="series"
-                  checked={scope === 'series'}
-                  onChange={() => setScope('series')}
-                  disabled={loading}
-                />
-                <span>{t.cancelScopeAll}</span>
-              </label>
-            </div>
-          </div>
-        )}
 
         <div className="mb-4">
           <label htmlFor="cancel-email" className="block text-sm font-medium text-gray-700 mb-1">{t.cancelEmailLabel} <span className="text-red-500">*</span></label>
@@ -438,7 +405,7 @@ export function CancelRequestModal({
                 const res = await fetch(`/api/reservations/${reservation.id}/cancel`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ email: email.trim(), reason: reason.trim(), scope }),
+                  body: JSON.stringify({ email: email.trim(), reason: reason.trim() }),
                 });
                 const data = await res.json();
                 if (res.ok) {
@@ -473,7 +440,10 @@ export default function ReservationDetailPopover({
 }: Props) {
   const { t, tRoom } = useLanguage();
   const today = pacificDateKey();
-  const canRequestCancel = (reservation.status === 'approved' || reservation.status === 'pending') && reservation.end_time.slice(0, 10) >= today;
+  // Recurring bookings are not cancellable here — only an administrator can
+  // create one, so only an administrator can clear one. Enforced server-side too.
+  const canRequestCancel =
+    !reservation.series_id && reservation.status === 'approved' && reservation.end_time.slice(0, 10) >= today;
   const canEdit = reservation.status === 'approved' && reservation.start_time.slice(0, 10) >= today;
 
   return (
@@ -522,6 +492,11 @@ export default function ReservationDetailPopover({
       )}
 
       {/* Edit / cancel buttons */}
+      {/* A recurring booking shows why its cancel button is absent, rather than
+          just not having one. */}
+      {Boolean(reservation.series_id) && reservation.end_time.slice(0, 10) >= today && (
+        <div className="mt-2 text-right text-[10px] text-gray-400">{t.seriesCancelNotice}</div>
+      )}
       {((canEdit && onRequestEdit) || (canRequestCancel && onRequestCancel)) && (
         <div className="mt-2 flex justify-end gap-1">
           {canEdit && onRequestEdit && (

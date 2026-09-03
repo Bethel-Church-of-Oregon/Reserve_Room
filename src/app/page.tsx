@@ -60,7 +60,7 @@ function RulesModal({ onAgree, onClose }: { onAgree: () => void; onClose: () => 
               onClick={onClose}
               className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition"
             >
-              {t.btnCancel}
+              {t.btnClose}
             </button>
             <button
               onClick={onAgree}

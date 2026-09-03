@@ -175,7 +175,7 @@ function CancelSeriesModal({
             disabled={saving}
             className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 text-sm transition"
           >
-            {t.btnCancel}
+            {t.btnClose}
           </button>
           <button
             onClick={() => { setSaving(true); onConfirm(reason.trim()); }}
@@ -216,7 +216,7 @@ function DeleteModal({
             onClick={onCancel}
             className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm transition"
           >
-            {t.btnCancel}
+            {t.btnClose}
           </button>
           <button
             onClick={onConfirm}

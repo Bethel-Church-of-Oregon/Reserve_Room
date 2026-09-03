@@ -280,9 +280,6 @@ const ko = {
   // Cancel request modal
   cancelModalTitle: '예약 취소 신청',
   cancelDesc: (title: string) => `"${title}" 예약의 취소를 신청합니다.`,
-  cancelScope: '취소 범위',
-  cancelScopeOne: '이 일정만 취소',
-  cancelScopeAll: '이 일정부터 이후 반복 일정 모두 취소',
   cancelEmailLabel: '예약 시 입력한 이메일',
   cancelEmailPlaceholder: '예약에 사용한 이메일을 입력해주세요.',
   cancelReasonLabel: '취소 사유',
@@ -297,6 +294,7 @@ const ko = {
 
   // Cancel button
   btnRequestCancel: '취소 신청하기',
+  seriesCancelNotice: '반복 예약은 담당자에게 문의해 주세요',
 
   // Admin: cancel a whole recurring series
   cancelSeriesTitle: '반복 예약 전체 취소',
@@ -563,9 +561,6 @@ const en: typeof ko = {
 
   cancelModalTitle: 'Request Cancellation',
   cancelDesc: (title: string) => `You are requesting cancellation of "${title}".`,
-  cancelScope: 'Cancellation Scope',
-  cancelScopeOne: 'Cancel this event only',
-  cancelScopeAll: 'Cancel this and all future recurring events',
   cancelEmailLabel: 'Email used for reservation',
   cancelEmailPlaceholder: 'Enter the email used when making the reservation.',
   cancelReasonLabel: 'Reason for cancellation',
@@ -579,6 +574,7 @@ const en: typeof ko = {
   errReasonLength: (n: number) => `Reason must be ${n} characters or fewer.`,
 
   btnRequestCancel: 'Request Cancellation',
+  seriesCancelNotice: 'For recurring bookings, please contact the coordinator',
 
   // Admin: cancel a whole recurring series
   cancelSeriesTitle: 'Cancel Entire Series',

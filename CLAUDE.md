@@ -64,7 +64,7 @@ npm run restore -- ~/받은파일/backup-2026-09-01.json --yes   # 메일 첨부
 - `src/app/admin/page.tsx` — 관리자 패널 (로그인 → 예약 목록/취소 목록/전체 조회, 삭제)
 - `src/app/api/reservations/route.ts` — GET(최대 400일 범위), POST (단건 + 반복 예약, 즉시 approved 처리)
 - `src/app/api/reservations/[id]/route.ts` — PATCH (관리자 전용: `edit` 등), DELETE
-- `src/app/api/reservations/[id]/cancel/route.ts` — POST 취소 신청 (즉시 cancelled 처리)
+- `src/app/api/reservations/[id]/cancel/route.ts` — POST 취소 (단건만, 즉시 cancelled 처리). **반복 예약은 403**
 - `src/app/api/reservations/[id]/edit/route.ts` — POST 예약 변경 (동일 룸·동일 날짜 내 시간/제목/담당자/노트)
 - `src/app/api/admin/auth/route.ts` — GET/POST/DELETE 관리자 세션 쿠키
 - `src/app/api/admin/reservations/route.ts` — GET 전체 목록 (관리자 전용)
@@ -281,7 +281,12 @@ approved → cancelled (취소 신청 시 즉시 처리)
     - 반복예약 bulk는 단일 statement라 한 건만 충돌해도 전체 롤백 → "다시 시도해 주세요" 안내
   - 기존 겹침 행이 있으면 제약 추가가 실패하므로 `ensureDbReady()`에서 오류를 로그만 남기고 진행 (앱 레벨 검사는 유지)
   - 충돌 메시지는 예약신청 버튼 바로 위에 표시
-- **시리즈 일괄 취소**: 공개 경로(예약 클릭 → 취소 신청 → "이 일정부터 이후 전체") + 관리자 경로(`PATCH /api/admin/series/[id]`, `action: 'cancel'`)
+- **반복 예약 취소는 관리자 전용** (2026-09). 공개 경로는 `reservation.series_id`가 있으면 **403**
+  - 만드는 것이 관리자 전용이니 지우는 것도 관리자 전용 — 권한이 대칭이 됨
+  - 예전에는 예약자 이메일만 알면 공개 폼에서 **시리즈 전체를 한 번에** 취소할 수 있었음. 실제로 새가족 교육 226건이 그 경로로 사라짐
+  - **서버에서 강제.** UI 숨김만으로는 부족 (`?admin=true` 때의 교훈). `scope` 파라미터 자체를 제거해 공개 경로는 구조적으로 단건만 처리
+  - 캘린더 4개 뷰의 `canRequestCancel`에 `!series_id` 추가 + 팝오버에 "반복 예약은 담당자에게 문의해 주세요" 안내 노출 (버튼이 그냥 사라지면 혼란스러움)
+- **시리즈 일괄 취소**: 관리자 경로 전용 (`PATCH /api/admin/series/[id]`, `action: 'cancel'`)
   - 반복 예약은 관리자만 만들 수 있는데 **취소는 공개 경로에만 있었음** — 관리자가 자기가 만든 시리즈를 지우려면 예약자 이메일을 공개 폼에 입력하거나 회차를 하나씩 삭제해야 했음 (2026-09 수정)
   - 관리자 경로는 **이메일 확인을 생략**하고 **오늘 이후만** 취소 (지난 회차는 사용 기록으로 보존). 공개 경로의 "이 일정부터 이후"와 같은 원칙
   - 알림은 시리즈당 1통
@@ -319,7 +324,8 @@ approved → cancelled (취소 신청 시 즉시 처리)
 - **월간 뷰 예약 블록**: 셀당 최대 3개 표시, 초과 시 `+N개` 표시. 모바일(`< sm`)에서는 텍스트 숨김(`hidden sm:inline`), 색상 바만 표시 (`h-3 sm:h-auto sm:leading-5`)
 - 예약 신청 폼: 타이틀, 장소(드롭다운), 날짜, 시작/종료 시간(15분 단위), 반복설정(관리자 전용), 담당자, 이메일, 노트(선택)
   - 일반 사용자: 날짜 `max` = 오늘+1달, 반복 섹션 숨김. 관리자(`?admin=true`): 날짜 제한 없음, 반복 섹션 표시, 사용수칙 모달 미표시
-  - 모든 input/select/textarea: `text-base`(16px) — iOS Safari 자동 확대 방지 (예약 폼 + 관리자 페이지 모두 적용)
+  - **모달의 닫기 버튼은 `닫기`, 폼의 취소 버튼은 `취소`.** 시리즈 취소 모달에서 `취소`/`전체 취소`가 나란히 놓여 헷갈렸음 (2026-09 수정)
+- 모든 input/select/textarea: `text-base`(16px) — iOS Safari 자동 확대 방지 (예약 폼 + 관리자 페이지 모두 적용)
 - 관리자: "예약하기" 버튼 + 탭(예약 목록 / 취소 목록 / 전체) + 설정. 예약 목록: 삭제 가능. 취소 목록: 개별 행으로 표시(시리즈 묶음 없음), 상세보기만. 전체: 상태 컬럼 표시(거절 제외)
 - **관리자 상세보기**: 각 행 버튼 영역 맨 왼쪽 "상세보기" 버튼 → `ReservationDetailModal` 팝업 (제목·상태·장소·시간·담당자·이메일·메모·취소사유·신청일). `z-[200]`으로 장소 필터 패널(`z-50`)보다 항상 위에 표시
 - **관리자 장소 필터**: 메인 캘린더와 동일한 UI (토글 버튼, 선택 chip, 오버레이 패널). `/api/rooms`에서 전체 20개 장소 fetch. 선택한 장소에 내역 없으면 "선택한 장소의 예약 내역이 없습니다." 표시
