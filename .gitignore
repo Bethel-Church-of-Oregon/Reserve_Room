@@ -43,3 +43,6 @@ next-env.d.ts
 # database backups — contain reservers' email addresses, which are also the
 # credential the cancel/edit routes check. Never commit these.
 /backups/
+
+# Scratch output for a verification build run alongside `next dev`
+/.next-check/

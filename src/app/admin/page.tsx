@@ -758,7 +758,13 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
               {/* Search box. Filters whichever tab is open, so the term carries
                   over when switching between 예약 목록 / 취소 목록 / 전체 — the
                   same person's bookings and cancellations are usually looked up
-                  together. `text-base` keeps iOS Safari from zooming on focus. */}
+                  together.
+
+                  The input stays `text-base` (16px) or iOS Safari zooms the page
+                  on focus, but only the typed value needs that size: the
+                  placeholder is dropped to 12px to match the 장소 필터 label
+                  beside it. Set as an arbitrary size rather than `text-xs` so it
+                  carries no line-height and cannot shift the field's height. */}
               <div className="relative flex-1 min-w-0">
                 <svg className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
@@ -768,7 +774,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder={t.adminSearchPlaceholder}
-                  className="w-full pl-7 pr-7 py-1 rounded-lg border border-gray-200 bg-white text-base leading-tight text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-gray-400 transition"
+                  className="w-full pl-7 pr-7 py-1 rounded-lg border border-gray-200 bg-white text-base leading-tight text-gray-800 placeholder:text-[12px] placeholder:text-gray-400 focus:outline-none focus:border-gray-400 transition"
                 />
                 {search !== '' && (
                   <button
