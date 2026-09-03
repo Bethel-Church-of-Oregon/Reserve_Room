@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ReservationWithRoom, NotificationRecipient } from '@/lib/db';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -303,6 +303,22 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const [addError, setAddError] = useState('');
   const [addLoading, setAddLoading] = useState(false);
 
+  // The desktop table's own header sticks to the top of its scroll box, so the
+  // box has to end where the toolbar begins. The toolbar's height is not a
+  // constant — the buttons use `clamp()` font sizes, the row wraps on a narrow
+  // screen, and selected room chips add a line — so it is measured rather than
+  // guessed.
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const [toolbarHeight, setToolbarHeight] = useState(0);
+  useEffect(() => {
+    const el = toolbarRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setToolbarHeight(el.offsetHeight));
+    ro.observe(el);
+    setToolbarHeight(el.offsetHeight);
+    return () => ro.disconnect();
+  }, []);
+
   function showToast(msg: string, type: 'success' | 'error' = 'success') {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
@@ -534,83 +550,211 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
         />
       )}
 
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
-        <div className="max-w-screen-xl mx-auto px-4 py-3 flex items-center gap-3">
-          <button
-            onClick={() => router.push('/')}
-            className="text-gray-500 hover:text-gray-700 p-1 rounded transition"
-          >
-            ←
-          </button>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold text-gray-800 truncate">{t.adminTitle}</h1>
-            <p className="text-xs text-gray-500 truncate">{t.adminSubtitle}</p>
-          </div>
-          <button
-            onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
-            className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition whitespace-nowrap"
-          >
-            {lang === 'ko' ? 'EN' : '한국어'}
-          </button>
-          <button
-            onClick={async () => {
-              await fetch('/api/admin/auth', { method: 'DELETE' });
-              sessionStorage.removeItem('adminVerified');
-              onLogout();
-            }}
-            className="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition"
-          >
-            {t.adminLogout}
-          </button>
-        </div>
-      </header>
+      {/* Everything above the list stays put. The 전체 tab runs to ~1,700
+          rows, and having to scroll back to the top to switch tab or narrow
+          the search was the entire cost of putting those controls there.
 
-      <main className="max-w-screen-xl mx-auto px-4 py-6">
-        {/* Filter tabs + bulk actions. Wraps rather than overflowing: the row is
-            tuned to fit one line at 360px, and anything narrower breaks onto a
-            second line instead of running off the side of the screen. */}
-        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-4">
-          <button
-            onClick={() => router.push('/reserve?admin=true')}
-            className="flex-shrink-0 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition whitespace-nowrap"
-            style={{ fontSize: 'clamp(10px, 3.5vw, 14px)', padding: '8px clamp(4px, 1.5vw, 12px)' }}
-          >
-            {t.adminReserveBtn}
-          </button>
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden flex-shrink-0" style={{ fontSize: 'clamp(10px, 3.5vw, 14px)' }}>
-            {(['approved', 'cancelled', 'all'] as FilterStatus[]).map((f) => (
-              <button
-                key={f}
-                onClick={() => { setFilter(f); setAdminView('reservations'); }}
-                style={{ padding: '8px clamp(4px, 1.5vw, 12px)' }}
-                className={`font-medium transition border-l first:border-l-0 border-gray-200 whitespace-nowrap ${
-                  adminView === 'reservations' && filter === f ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {f === 'approved' ? t.adminTabReservations : f === 'cancelled' ? t.adminTabCancellations : t.adminTabAll}
-              </button>
-            ))}
+          Done with `sticky` rather than an `h-screen` + inner-scroll shell:
+          that shell would need `overflow-hidden` on an ancestor, which clips
+          the room-filter dropdown out of existence, and `100vh` on iOS Safari
+          includes the collapsing address bar, which cuts off the last row. */}
+      <div ref={toolbarRef} className="sticky top-0 z-30 bg-gray-50 shadow-sm">
+        <header className="bg-white border-b border-gray-200">
+          <div className="max-w-screen-xl mx-auto px-4 py-3 flex items-center gap-3">
+            <button
+              onClick={() => router.push('/')}
+              className="text-gray-500 hover:text-gray-700 p-1 rounded transition"
+            >
+              ←
+            </button>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl font-bold text-gray-800 truncate">{t.adminTitle}</h1>
+              <p className="text-xs text-gray-500 truncate">{t.adminSubtitle}</p>
+            </div>
+            <button
+              onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}
+              className="px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition whitespace-nowrap"
+            >
+              {lang === 'ko' ? 'EN' : '한국어'}
+            </button>
+            <button
+              onClick={async () => {
+                await fetch('/api/admin/auth', { method: 'DELETE' });
+                sessionStorage.removeItem('adminVerified');
+                onLogout();
+              }}
+              className="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition"
+            >
+              {t.adminLogout}
+            </button>
+          </div>
+        </header>
+
+        <div className="max-w-screen-xl mx-auto px-4">
+          {/* Filter tabs + bulk actions. Wraps rather than overflowing: the row is
+              tuned to fit one line at 360px, and anything narrower breaks onto a
+              second line instead of running off the side of the screen. */}
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 py-3">
+            <button
+              onClick={() => router.push('/reserve?admin=true')}
+              className="flex-shrink-0 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition whitespace-nowrap"
+              style={{ fontSize: 'clamp(10px, 3.5vw, 14px)', padding: '8px clamp(4px, 1.5vw, 12px)' }}
+            >
+              {t.adminReserveBtn}
+            </button>
+            <div className="flex rounded-lg border border-gray-200 overflow-hidden flex-shrink-0" style={{ fontSize: 'clamp(10px, 3.5vw, 14px)' }}>
+              {(['approved', 'cancelled', 'all'] as FilterStatus[]).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => { setFilter(f); setAdminView('reservations'); }}
+                  style={{ padding: '8px clamp(4px, 1.5vw, 12px)' }}
+                  className={`font-medium transition border-l first:border-l-0 border-gray-200 whitespace-nowrap ${
+                    adminView === 'reservations' && filter === f ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {f === 'approved' ? t.adminTabReservations : f === 'cancelled' ? t.adminTabCancellations : t.adminTabAll}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setAdminView(v => v === 'settings' ? 'reservations' : 'settings')}
+              style={{ fontSize: 'clamp(10px, 3.5vw, 14px)', padding: '8px clamp(4px, 1.5vw, 12px)' }}
+              className={`flex-shrink-0 rounded-lg border font-medium transition whitespace-nowrap ${
+                adminView === 'settings' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              {t.adminTabSettings}
+            </button>
+            <button
+              onClick={adminView === 'settings' ? () => { fetchAccessCode(); fetchRecipients(); } : fetchReservations}
+              className="ml-auto border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition whitespace-nowrap flex-shrink-0"
+              style={{ fontSize: 'clamp(10px, 3.5vw, 14px)', padding: '8px clamp(6px, 2vw, 12px)' }}
+            >
+              <span className="min-[420px]:hidden">↻</span>
+              <span className="hidden min-[420px]:inline">{t.btnRefresh}</span>
+            </button>
           </div>
 
-          <button
-            onClick={() => setAdminView(v => v === 'settings' ? 'reservations' : 'settings')}
-            style={{ fontSize: 'clamp(10px, 3.5vw, 14px)', padding: '8px clamp(4px, 1.5vw, 12px)' }}
-            className={`flex-shrink-0 rounded-lg border font-medium transition whitespace-nowrap ${
-              adminView === 'settings' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-            }`}
-          >
-            {t.adminTabSettings}
-          </button>
-          <button
-            onClick={adminView === 'settings' ? () => { fetchAccessCode(); fetchRecipients(); } : fetchReservations}
-            className="ml-auto border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition whitespace-nowrap flex-shrink-0"
-            style={{ fontSize: 'clamp(10px, 3.5vw, 14px)', padding: '8px clamp(6px, 2vw, 12px)' }}
-          >
-            <span className="min-[420px]:hidden">↻</span>
-            <span className="hidden min-[420px]:inline">{t.btnRefresh}</span>
-          </button>
+          {/* Search + room filter */}
+          {adminView === 'reservations' && (
+            <div className="relative border-b border-gray-100 -mx-4 px-4">
+              <div className="relative z-50 flex items-center gap-2 py-2">
+                {uniqueRooms.length > 0 && (
+                  <button
+                    onClick={() => setRoomFilterOpen(v => !v)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition whitespace-nowrap flex-shrink-0 ${roomFilterOpen ? 'bg-gray-100 border-gray-300 text-gray-800' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+                    </svg>
+                    <span className={selectedRooms.size > 0 ? 'hidden sm:inline' : ''}>{t.roomFilter}</span>
+                    {selectedRooms.size > 0 && (
+                      <span className="ml-0.5 px-1.5 py-0.5 bg-blue-600 text-white rounded-full text-xs leading-none">{selectedRooms.size}</span>
+                    )}
+                    <span className="text-gray-400">{roomFilterOpen ? t.filterCollapse : t.filterExpand}</span>
+                  </button>
+                )}
+
+                {/* Search box. Filters whichever tab is open, so the term carries
+                    over when switching between 예약 목록 / 취소 목록 / 전체 — the
+                    same person's bookings and cancellations are usually looked up
+                    together.
+
+                    Sizing lives in `.admin-search-input` (globals.css), which
+                    shrinks the text on pointer devices but holds it at 16px on
+                    touch, where anything smaller makes iOS Safari zoom the page
+                    on focus. */}
+                <div className="relative flex-1 min-w-0">
+                  <svg className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+                  </svg>
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder={t.adminSearchPlaceholder}
+                    className="admin-search-input w-full pl-7 pr-7 py-1 rounded-lg border border-gray-200 bg-white text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-gray-400 transition"
+                  />
+                  {search !== '' && (
+                    <button
+                      onClick={() => setSearch('')}
+                      aria-label={t.adminSearchClear}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 px-1.5 text-gray-400 hover:text-gray-600 leading-none transition"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+                {searching && (
+                  <span className="hidden sm:inline text-xs text-gray-400 whitespace-nowrap flex-shrink-0 tabular-nums">
+                    {t.adminSearchHits(filtered.length)}
+                  </span>
+                )}
+
+                {selectedRooms.size > 0 && !roomFilterOpen && (
+                  <button
+                    onClick={() => setSelectedRooms(new Set())}
+                    className="text-xs text-gray-400 hover:text-gray-600 underline transition whitespace-nowrap flex-shrink-0"
+                  >
+                    {t.showAll}
+                  </button>
+                )}
+                {selectedRooms.size > 0 && roomFilterOpen && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setSelectedRooms(new Set()); }}
+                    className="text-xs text-gray-400 hover:text-gray-600 underline transition whitespace-nowrap flex-shrink-0"
+                  >
+                    {t.deselect}
+                  </button>
+                )}
+              </div>
+
+              {!roomFilterOpen && selectedRooms.size > 0 && (
+                <div className="pb-2 flex flex-wrap gap-x-2 gap-y-1.5">
+                  {uniqueRooms.filter(r => selectedRooms.has(r.id)).map(room => (
+                    <button
+                      key={room.id}
+                      onClick={() => setSelectedRooms(prev => { const n = new Set(prev); n.delete(room.id); return n; })}
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs transition border-transparent text-white font-medium"
+                      style={{ backgroundColor: room.color }}
+                    >
+                      <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: 'rgba(255,255,255,0.7)' }} />
+                      {tRoom(room.name)}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {roomFilterOpen && (
+                <>
+                  <div className="fixed inset-0 z-40 sm:hidden" onClick={() => setRoomFilterOpen(false)} />
+                  <div className="sm:relative sm:z-auto sm:shadow-none sm:border-0 sm:bg-transparent sm:px-0 sm:pb-2 sm:pt-0 absolute left-0 right-0 z-50 bg-white shadow-lg border-t border-gray-200 px-3 pb-3 pt-2">
+                    <div className="flex flex-wrap gap-x-2 gap-y-1.5">
+                      {uniqueRooms.map(room => {
+                        const active = selectedRooms.has(room.id);
+                        return (
+                          <button
+                            key={room.id}
+                            onClick={(e) => { e.stopPropagation(); setSelectedRooms(prev => { const n = new Set(prev); active ? n.delete(room.id) : n.add(room.id); return n; }); }}
+                            className={`flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs transition ${active ? 'border-transparent text-white font-medium' : 'border-gray-200 text-gray-600 bg-white hover:bg-gray-50'}`}
+                            style={active ? { backgroundColor: room.color, borderColor: room.color } : {}}
+                          >
+                            <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: active ? 'rgba(255,255,255,0.7)' : room.color }} />
+                            {tRoom(room.name)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
+      </div>
+
+      <main className="max-w-screen-xl mx-auto px-4 pt-4 pb-6">
 
         {adminView === 'settings' && (
           <div className="max-w-lg">
@@ -768,122 +912,6 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           </div>
         )}
 
-        {/* Search + room filter */}
-        {adminView === 'reservations' && (
-          <div className="relative border-b border-gray-100 -mx-4 sm:-mx-6 px-4 sm:px-6 mb-4">
-            <div className="relative z-50 flex items-center gap-2 py-2">
-              {uniqueRooms.length > 0 && (
-                <button
-                  onClick={() => setRoomFilterOpen(v => !v)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition whitespace-nowrap flex-shrink-0 ${roomFilterOpen ? 'bg-gray-100 border-gray-300 text-gray-800' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-                >
-                  <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
-                  </svg>
-                  <span className={selectedRooms.size > 0 ? 'hidden sm:inline' : ''}>{t.roomFilter}</span>
-                  {selectedRooms.size > 0 && (
-                    <span className="ml-0.5 px-1.5 py-0.5 bg-blue-600 text-white rounded-full text-xs leading-none">{selectedRooms.size}</span>
-                  )}
-                  <span className="text-gray-400">{roomFilterOpen ? t.filterCollapse : t.filterExpand}</span>
-                </button>
-              )}
-
-              {/* Search box. Filters whichever tab is open, so the term carries
-                  over when switching between 예약 목록 / 취소 목록 / 전체 — the
-                  same person's bookings and cancellations are usually looked up
-                  together.
-
-                  Sizing lives in `.admin-search-input` (globals.css), which
-                  shrinks the text on pointer devices but holds it at 16px on
-                  touch, where anything smaller makes iOS Safari zoom the page
-                  on focus. */}
-              <div className="relative flex-1 min-w-0">
-                <svg className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
-                </svg>
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder={t.adminSearchPlaceholder}
-                  className="admin-search-input w-full pl-7 pr-7 py-1 rounded-lg border border-gray-200 bg-white text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-gray-400 transition"
-                />
-                {search !== '' && (
-                  <button
-                    onClick={() => setSearch('')}
-                    aria-label={t.adminSearchClear}
-                    className="absolute right-1 top-1/2 -translate-y-1/2 px-1.5 text-gray-400 hover:text-gray-600 leading-none transition"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-              {searching && (
-                <span className="hidden sm:inline text-xs text-gray-400 whitespace-nowrap flex-shrink-0 tabular-nums">
-                  {t.adminSearchHits(filtered.length)}
-                </span>
-              )}
-
-              {selectedRooms.size > 0 && !roomFilterOpen && (
-                <button
-                  onClick={() => setSelectedRooms(new Set())}
-                  className="text-xs text-gray-400 hover:text-gray-600 underline transition whitespace-nowrap flex-shrink-0"
-                >
-                  {t.showAll}
-                </button>
-              )}
-              {selectedRooms.size > 0 && roomFilterOpen && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); setSelectedRooms(new Set()); }}
-                  className="text-xs text-gray-400 hover:text-gray-600 underline transition whitespace-nowrap flex-shrink-0"
-                >
-                  {t.deselect}
-                </button>
-              )}
-            </div>
-
-            {!roomFilterOpen && selectedRooms.size > 0 && (
-              <div className="pb-2 flex flex-wrap gap-x-2 gap-y-1.5">
-                {uniqueRooms.filter(r => selectedRooms.has(r.id)).map(room => (
-                  <button
-                    key={room.id}
-                    onClick={() => setSelectedRooms(prev => { const n = new Set(prev); n.delete(room.id); return n; })}
-                    className="flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs transition border-transparent text-white font-medium"
-                    style={{ backgroundColor: room.color }}
-                  >
-                    <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: 'rgba(255,255,255,0.7)' }} />
-                    {tRoom(room.name)}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {roomFilterOpen && (
-              <>
-                <div className="fixed inset-0 z-40 sm:hidden" onClick={() => setRoomFilterOpen(false)} />
-                <div className="sm:relative sm:z-auto sm:shadow-none sm:border-0 sm:bg-transparent sm:px-0 sm:pb-2 sm:pt-0 absolute left-0 right-0 z-50 bg-white shadow-lg border-t border-gray-200 px-3 pb-3 pt-2">
-                  <div className="flex flex-wrap gap-x-2 gap-y-1.5">
-                    {uniqueRooms.map(room => {
-                      const active = selectedRooms.has(room.id);
-                      return (
-                        <button
-                          key={room.id}
-                          onClick={(e) => { e.stopPropagation(); setSelectedRooms(prev => { const n = new Set(prev); active ? n.delete(room.id) : n.add(room.id); return n; }); }}
-                          className={`flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs transition ${active ? 'border-transparent text-white font-medium' : 'border-gray-200 text-gray-600 bg-white hover:bg-gray-50'}`}
-                          style={active ? { backgroundColor: room.color, borderColor: room.color } : {}}
-                        >
-                          <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: active ? 'rgba(255,255,255,0.7)' : room.color }} />
-                          {tRoom(room.name)}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
         {/* Table */}
         {adminView === 'reservations' && <>
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
@@ -902,10 +930,27 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
             </div>
           ) : (
             <>
-              {/* Desktop table */}
-              <div className="hidden admin:block overflow-x-auto">
+              {/* Desktop table.
+                  `overflow-x-auto` already makes this a scroll box on both axes
+                  (a `visible` axis computes to `auto` when the other is not), so
+                  the only thing missing was a height for it to scroll within.
+                  With one, `thead` sticks to the top of this box — which is what
+                  the column labels have to stay pinned to, since losing them is
+                  worse over 1,700 rows than losing the toolbar.
+
+                  Bounded only at the `admin:` breakpoint, where this layout
+                  exists at all. The card layout below keeps plain page scroll,
+                  which is also what keeps `100vh` away from a phone. */}
+              <div
+                className="hidden admin:block overflow-x-auto"
+                style={
+                  toolbarHeight > 0
+                    ? { maxHeight: `calc(100vh - ${toolbarHeight}px - 4.5rem)` }
+                    : undefined
+                }
+              >
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b border-gray-200">
+                  <thead className="bg-gray-50 sticky top-0 z-10 shadow-[inset_0_-1px_0_rgb(229_231_235)]">
                     <tr>
                       {filter === 'all' && <th className="text-left px-3 py-2 text-gray-600 font-medium w-px whitespace-nowrap">{t.colStatus}</th>}
                       <th className="text-left px-3 py-2 text-gray-600 font-medium">{t.colTitle}</th>
