@@ -60,6 +60,23 @@ export function toDateKey(d: Date): string {
 }
 
 /** Shape of a reservation timestamp: 'YYYY-MM-DDTHH:MM' with optional seconds. */
+/**
+ * Shifts a 'YYYY-MM-DD' key by whole months.
+ *
+ * Clamps the day to the end of the target month, so 2026-03-31 minus one month
+ * is 2026-02-28 rather than rolling forward into March the way `setMonth` would
+ * — a lower bound that jumps *forward* would quietly drop days of history.
+ */
+export function addMonthsToKey(key: string, months: number): string {
+  const [y, m, d] = key.split('-').map(Number);
+  const target = m - 1 + months;
+  const year = y + Math.floor(target / 12);
+  const month = ((target % 12) + 12) % 12;
+  // Day 0 of the next month is the last day of this one.
+  const day = Math.min(d, new Date(year, month + 1, 0).getDate());
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
 export const DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
 
 /** 'YYYY-MM-DD', the shape of a recurrence end date. */

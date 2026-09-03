@@ -4,11 +4,20 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ReservationWithRoom, NotificationRecipient } from '@/lib/db';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { pacificDateKey } from '@/lib/date';
+import { pacificDateKey, addMonthsToKey } from '@/lib/date';
 import { LIMITS } from '@/lib/constants';
 import { EditRequestModal } from '@/components/ReservationDetailPopover';
 
 type FilterStatus = 'pending' | 'approved' | 'cancelled' | 'all';
+
+/**
+ * How far back the 전체 tab reaches. 예약 목록 and 취소 목록 show today onward
+ * regardless, so this only bounds the archive tab.
+ *
+ * Anything older is still in the database and in the monthly backup — it is out
+ * of the admin UI, not gone.
+ */
+const ADMIN_HISTORY_MONTHS = 1;
 
 /** '5039545830' → '(503) 954-5830'; anything unexpected is shown as-is. */
 function formatPhone(phone: string): string {
@@ -302,15 +311,17 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const fetchReservations = useCallback(async () => {
     setLoading(true);
     try {
-      // No date bound. 전체 is the archive, and the two worklists trim
-      // themselves to today onward below, so a bound here would only hide
-      // history from the one tab that exists to show it.
+      // 전체 reaches back one month, no further. The two worklists trim
+      // themselves to today onward below, so this bound decides one thing only:
+      // how much history the 전체 tab holds.
       //
-      // It bought almost nothing anyway. Measured at ~1,300 rows, dropping the
-      // bound grew the response by 9% (696 KB → 758 KB): the future-dated
-      // recurring series dominate the payload either way, so bounding the past
-      // trimmed a rounding error. Search is what makes 전체 usable at this size.
-      const res = await fetch('/api/admin/reservations');
+      // It is a cap on growth rather than a speed fix. The payload is dominated
+      // by *future* recurring occurrences — a 500-week series is 500 rows — so
+      // trimming the past saves single-digit percentages today. What it does
+      // buy is that the response stops growing on the past side at all, instead
+      // of carrying every year the church has ever booked.
+      const from = addMonthsToKey(pacificDateKey(), -ADMIN_HISTORY_MONTHS);
+      const res = await fetch(`/api/admin/reservations?from=${from}`);
       if (res.status === 401) { onLogout(); return; }
       const data = await res.json();
       setReservations(Array.isArray(data) ? data : []);
