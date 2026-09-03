@@ -68,7 +68,7 @@ npm run restore -- ~/받은파일/backup-2026-09-01.json --yes   # 메일 첨부
 - `src/app/api/reservations/[id]/edit/route.ts` — POST 예약 변경 (동일 룸·동일 날짜 내 시간/제목/담당자/노트)
 - `src/app/api/admin/auth/route.ts` — GET/POST/DELETE 관리자 세션 쿠키
 - `src/app/api/admin/reservations/route.ts` — GET 전체 목록 (관리자 전용)
-- `src/app/api/admin/series/[id]/route.ts` — PATCH 시리즈 취소 처리
+- `src/app/api/admin/series/[id]/route.ts` — PATCH `action: 'cancel'` (시리즈 일괄 취소, 관리자 전용)
 - `src/app/api/rooms/route.ts` — GET 회의실 목록
 - `src/app/api/access-code/route.ts` — GET 예약 코드 **필요 여부만** (공개, 코드값은 절대 노출 안 함)
 - `src/app/api/admin/access-code/route.ts` — GET/PUT 예약 코드 (관리자 전용)
@@ -281,7 +281,16 @@ approved → cancelled (취소 신청 시 즉시 처리)
     - 반복예약 bulk는 단일 statement라 한 건만 충돌해도 전체 롤백 → "다시 시도해 주세요" 안내
   - 기존 겹침 행이 있으면 제약 추가가 실패하므로 `ensureDbReady()`에서 오류를 로그만 남기고 진행 (앱 레벨 검사는 유지)
   - 충돌 메시지는 예약신청 버튼 바로 위에 표시
-- 시리즈 전체 취소: `PATCH /api/admin/series/[id]`
+- **시리즈 일괄 취소**: 공개 경로(예약 클릭 → 취소 신청 → "이 일정부터 이후 전체") + 관리자 경로(`PATCH /api/admin/series/[id]`, `action: 'cancel'`)
+  - 반복 예약은 관리자만 만들 수 있는데 **취소는 공개 경로에만 있었음** — 관리자가 자기가 만든 시리즈를 지우려면 예약자 이메일을 공개 폼에 입력하거나 회차를 하나씩 삭제해야 했음 (2026-09 수정)
+  - 관리자 경로는 **이메일 확인을 생략**하고 **오늘 이후만** 취소 (지난 회차는 사용 기록으로 보존). 공개 경로의 "이 일정부터 이후"와 같은 원칙
+  - 알림은 시리즈당 1통
+- **관리자 예약 목록은 반복 예약을 1행으로 묶어 표시.** 취소 목록은 회차별로 그대로 (어느 날짜가 빠졌는지가 중요하므로)
+  - 묶기 전에는 `청년부 식사 친교` 497건·`새가족 교육` 246건이 개별 행이라 **545행**이 나왔음 → 현재 **19행**
+- **승인/거절 흐름은 전부 제거됨** (2026-09). 예약이 즉시 `approved`, 취소도 즉시 `cancelled`가 된 뒤로 `pending`·`cancellation_requested` 상태가 생기지 않아 죽은 코드였음
+  - 제거: `PATCH` 의 `approve`/`reject`/`approve_cancellation`/`reject_cancellation` (단건·시리즈 양쪽), `POST /api/admin/reservations`(일괄 승인), 관련 db·email 함수 13개, 모달 4개, i18n 31키
+  - 관리자 탭은 원래 `approved`/`cancelled`/`all` 셋뿐이라 `pending` 필터는 **도달 불가**였음 → 체크박스 선택·일괄 승인 UI도 함께 제거
+  - **DB에 옛 상태 행 21건이 남아 있음** (전부 2026-03 테스트 데이터, 미래 건 0). `deleteReservation`은 `status='approved'`만 지우므로 UI로는 정리 불가
 - Rate limiting: **IP + 이메일 2계층** (Upstash 미설정 시 **전부 무제한** — Vercel 환경변수 확인 필수)
   - IP: admin-login 5회/분, reservation·cancel·edit 각 60회/분
   - 이메일: reservation 5회/분, cancel 5회/분, edit 10회/분. 관리자는 이메일 계층 면제

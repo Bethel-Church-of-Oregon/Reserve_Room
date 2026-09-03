@@ -120,118 +120,69 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
 }
 
 // ── Rejection Modal ───────────────────────────────────────────────────────────
-function RejectModal({
-  reservation,
-  onConfirm,
-  onCancel,
-}: {
-  reservation: ReservationWithRoom;
-  onConfirm: (reason: string) => void;
-  onCancel: () => void;
-}) {
-  const [reason, setReason] = useState('');
-  const [error, setError] = useState('');
-  const { t } = useLanguage();
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
-        <h3 className="text-lg font-bold text-gray-800 mb-1">{t.rejectTitle}</h3>
-        <p className="text-sm text-gray-500 mb-4">
-          <strong className="text-gray-700">{reservation.title}</strong> — {t.rejectDesc(reservation.title).replace(`"${reservation.title}" `, '')}
-        </p>
-        <div className="mb-4">
-          <label htmlFor="reject-reason" className="block text-sm font-medium text-gray-700 mb-1">{t.rejectReasonLabel} <span className="text-red-500">*</span></label>
-          <textarea
-            id="reject-reason"
-            value={reason}
-            onChange={(e) => { setReason(e.target.value); setError(''); }}
-            placeholder={t.rejectReasonPlaceholder}
-            rows={3}
-            autoFocus
-            className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-red-400 resize-none ${
-              error ? 'border-red-400 bg-red-50' : 'border-gray-300'
-            }`}
-          />
-          {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
-        </div>
-        <div className="flex gap-3">
-          <button
-            onClick={onCancel}
-            className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm transition"
-          >
-            {t.btnCancel}
-          </button>
-          <button
-            onClick={() => {
-              if (!reason.trim()) { setError(t.errRejectReasonRequired); return; }
-              onConfirm(reason.trim());
-            }}
-            className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition"
-          >
-            {t.btnRejectConfirm}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Reject Series Modal ──────────────────────────────────────────────────────
-function RejectSeriesModal({
-  seriesId,
+// ── Reject Cancel Series Modal ───────────────────────────────────────────────
+// ── Reject Cancellation Modal ─────────────────────────────────────────────────
+// ── Delete Confirmation Modal ─────────────────────────────────────────────────
+/**
+ * Cancelling a whole recurring series. Deliberately reports how many
+ * occurrences will go, because a series can hold hundreds — the 새가족 교육
+ * series runs to 246 — and "cancel this booking" reads very differently once
+ * you know the number.
+ */
+function CancelSeriesModal({
   title,
   roomName,
   count,
   onConfirm,
   onCancel,
 }: {
-  seriesId: string;
   title: string;
   roomName: string;
   count: number;
   onConfirm: (reason: string) => void;
   onCancel: () => void;
 }) {
+  const { t, tRoom } = useLanguage();
   const [reason, setReason] = useState('');
-  const [error, setError] = useState('');
-  const { t } = useLanguage();
+  const [saving, setSaving] = useState(false);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
       <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
-        <h3 className="text-lg font-bold text-gray-800 mb-1">{t.rejectSeriesTitle}</h3>
-        <p className="text-sm text-gray-500 mb-4">{t.rejectSeriesDesc(title, roomName, count)}</p>
-        <div className="mb-4">
-          <label htmlFor="reject-series-reason" className="block text-sm font-medium text-gray-700 mb-1">{t.rejectReasonLabel} <span className="text-red-500">*</span></label>
-          <textarea
-            id="reject-series-reason"
-            value={reason}
-            onChange={(e) => { setReason(e.target.value); setError(''); }}
-            placeholder={t.rejectReasonPlaceholder}
-            rows={3}
-            autoFocus
-            className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-red-400 resize-none ${
-              error ? 'border-red-400 bg-red-50' : 'border-gray-300'
-            }`}
-          />
-          {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+        <h3 className="text-lg font-bold text-gray-800 mb-2">{t.cancelSeriesTitle}</h3>
+        <div className="bg-gray-50 rounded-lg p-3 mb-3 text-sm">
+          <p className="font-medium text-gray-800">{title}</p>
+          <p className="text-gray-500">{tRoom(roomName)}</p>
+          <p className="text-gray-500">{t.cancelSeriesCount(count)}</p>
         </div>
+        <p className="text-xs text-gray-500 mb-4">{t.cancelSeriesNote}</p>
+        <label htmlFor="cancel-series-reason" className="block text-sm font-medium text-gray-700 mb-1">
+          {t.cancelReasonLabel}
+        </label>
+        <textarea
+          id="cancel-series-reason"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          rows={2}
+          maxLength={LIMITS.reason}
+          placeholder={t.cancelReasonPlaceholder}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base mb-4"
+        />
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm transition"
+            disabled={saving}
+            className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 text-sm transition"
           >
             {t.btnCancel}
           </button>
           <button
-            onClick={() => {
-              if (!reason.trim()) { setError(t.errRejectReasonRequired); return; }
-              onConfirm(reason.trim());
-            }}
-            className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition"
+            onClick={() => { setSaving(true); onConfirm(reason.trim()); }}
+            disabled={saving}
+            className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition"
           >
-            {t.btnRejectConfirm}
+            {saving ? t.btnCancelSubmitting : t.btnCancelSeriesConfirm}
           </button>
         </div>
       </div>
@@ -239,109 +190,6 @@ function RejectSeriesModal({
   );
 }
 
-// ── Reject Cancel Series Modal ───────────────────────────────────────────────
-function RejectCancelSeriesModal({
-  title,
-  roomName,
-  count,
-  onConfirm,
-  onCancel,
-}: {
-  title: string;
-  roomName: string;
-  count: number;
-  onConfirm: (reason?: string) => void;
-  onCancel: () => void;
-}) {
-  const [reason, setReason] = useState('');
-  const { t } = useLanguage();
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
-        <h3 className="text-lg font-bold text-gray-800 mb-1">{t.rejectCancelSeriesTitle}</h3>
-        <p className="text-sm text-gray-500 mb-4">{t.rejectCancelSeriesDesc(title, roomName, count)}</p>
-        <div className="mb-4">
-          <label htmlFor="reject-cancel-series-reason" className="block text-sm font-medium text-gray-700 mb-1">{t.rejectCancelReasonOptional}</label>
-          <textarea
-            id="reject-cancel-series-reason"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder={t.rejectCancelPlaceholderOptional}
-            rows={3}
-            autoFocus
-            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
-          />
-        </div>
-        <div className="flex gap-3">
-          <button
-            onClick={onCancel}
-            className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm transition"
-          >
-            {t.btnClose}
-          </button>
-          <button
-            onClick={() => onConfirm(reason.trim() || undefined)}
-            className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition"
-          >
-            {t.btnRejectCancelConfirm}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Reject Cancellation Modal ─────────────────────────────────────────────────
-function RejectCancelModal({
-  reservation,
-  onConfirm,
-  onCancel,
-}: {
-  reservation: ReservationWithRoom;
-  onConfirm: (reason?: string) => void;
-  onCancel: () => void;
-}) {
-  const [reason, setReason] = useState('');
-  const { t } = useLanguage();
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
-        <h3 className="text-lg font-bold text-gray-800 mb-1">{t.rejectCancelTitle}</h3>
-        <p className="text-sm text-gray-500 mb-4">{t.rejectCancelDesc(reservation.title)}</p>
-        <div className="mb-4">
-          <label htmlFor="reject-cancel-reason" className="block text-sm font-medium text-gray-700 mb-1">{t.rejectCancelReasonOptional}</label>
-          <textarea
-            id="reject-cancel-reason"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder={t.rejectCancelPlaceholderOptional}
-            rows={3}
-            autoFocus
-            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
-          />
-        </div>
-        <div className="flex gap-3">
-          <button
-            onClick={onCancel}
-            className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm transition"
-          >
-            {t.btnClose}
-          </button>
-          <button
-            onClick={() => onConfirm(reason.trim() || undefined)}
-            className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition"
-          >
-            {t.btnRejectCancelConfirm}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Delete Confirmation Modal ─────────────────────────────────────────────────
 function DeleteModal({
   reservation,
   onConfirm,
@@ -387,27 +235,17 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const router = useRouter();
   const { lang, setLang, t, tRoom } = useLanguage();
   const [reservations, setReservations] = useState<ReservationWithRoom[]>([]);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
   const [filter, setFilter] = useState<FilterStatus>('approved');
   const [selectedRooms, setSelectedRooms] = useState<Set<number>>(new Set());
   const [roomFilterOpen, setRoomFilterOpen] = useState(false);
   const [allRooms, setAllRooms] = useState<{ id: number; name: string; color: string }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [rejectTarget, setRejectTarget] = useState<ReservationWithRoom | null>(null);
-  const [rejectSeriesTarget, setRejectSeriesTarget] = useState<{ seriesId: string; title: string; roomName: string; count: number } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ReservationWithRoom | null>(null);
   const [detailTarget, setDetailTarget] = useState<ReservationWithRoom | null>(null);
   const [editTarget, setEditTarget] = useState<ReservationWithRoom | null>(null);
-  const [rejectCancelTarget, setRejectCancelTarget] = useState<ReservationWithRoom | null>(null);
-  const [rejectCancelSeriesTarget, setRejectCancelSeriesTarget] = useState<{
-    seriesId: string;
-    title: string;
-    roomName: string;
-    count: number;
-  } | null>(null);
+  const [cancelSeriesTarget, setCancelSeriesTarget] = useState<{ seriesId: string; title: string; roomName: string; count: number } | null>(null);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [seriesActionLoading, setSeriesActionLoading] = useState<string | null>(null);
-  const [bulkLoading, setBulkLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [adminView, setAdminView] = useState<'reservations' | 'settings'>('reservations');
   const [accessCode, setAccessCode] = useState('');
@@ -487,7 +325,6 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   ).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
 
   const filtered = reservations.filter((r) => {
-    if (filter === 'pending' && r.status !== 'pending') return false;
     if (filter === 'approved' && r.status !== 'approved') return false;
     if (filter === 'cancelled' && r.status !== 'cancelled') return false;
     if (filter === 'all' && r.status === 'rejected') return false;
@@ -521,130 +358,37 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
     return rows;
   }
 
-  const pendingRows: DisplayRow[] =
-    filter === 'pending' ? buildGroupedRows() : filtered.map((r) => ({ type: 'single' as const, reservation: r }));
-  const cancellationRows: DisplayRow[] =
-    filtered.map((r) => ({ type: 'single' as const, reservation: r }));
-
+  // Recurring bookings are collapsed into a single row in the reservation list.
+  // The 새가족 교육 series alone runs to 246 occurrences, which as individual
+  // rows buries everything else and leaves nowhere to put a series-level action.
+  //
+  // The cancellation list stays one row per occurrence on purpose: what matters
+  // there is which specific dates were dropped, and why.
   const displayRows: DisplayRow[] =
-    filter === 'pending' ? pendingRows : filter === 'cancelled' ? cancellationRows : filtered.map((r) => ({ type: 'single' as const, reservation: r }));
+    filter === 'cancelled'
+      ? filtered.map((r) => ({ type: 'single' as const, reservation: r }))
+      : buildGroupedRows();
 
-  const pendingSingleIds = filter === 'pending' ? filtered.filter((r) => !r.series_id).map((r) => r.id) : [];
-
-  function toggleSelect(id: number) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleSelectAll() {
-    const ids = filter === 'pending' ? pendingSingleIds : filtered.filter((r) => r.status === 'pending').map((r) => r.id);
-    if (ids.length > 0 && ids.every((id) => selected.has(id))) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(ids));
-    }
-  }
-
-  async function handleApprove(id: number) {
-    setActionLoading(id);
-    try {
-      const res = await fetch(`/api/reservations/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'approve' }),
-      });
-      if (res.ok) { showToast(t.toastApproved); fetchReservations(); setSelected((p) => { const n = new Set(p); n.delete(id); return n; }); }
-      else { const d = await res.json(); showToast(d.error ?? t.toastError, 'error'); }
-    } catch { showToast(t.toastNetworkError, 'error'); }
-    finally { setActionLoading(null); }
-  }
-
-  async function handleApproveSeries(seriesId: string) {
-    setBulkLoading(true);
-    try {
-      const res = await fetch(`/api/admin/series/${encodeURIComponent(seriesId)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'approve' }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        showToast(t.toastSeriesApproved(data.approved ?? 0));
-        setSelected(new Set());
-        fetchReservations();
-      } else {
-        showToast(data.error ?? t.toastError, 'error');
-      }
-    } catch {
-      showToast(t.toastNetworkError, 'error');
-    } finally {
-      setBulkLoading(false);
-    }
-  }
-
-  async function handleApproveSelected() {
-    const ids = Array.from(selected).filter((id) => reservations.find((r) => r.id === id)?.status === 'pending');
-    if (ids.length === 0) return;
-    setBulkLoading(true);
-    try {
-      const res = await fetch('/api/admin/reservations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'approve', ids }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        showToast(t.toastBulkApproved(data.approved));
-        setSelected(new Set());
-        fetchReservations();
-      } else {
-        showToast(data.error ?? t.toastError, 'error');
-      }
-    } catch {
-      showToast(t.toastNetworkError, 'error');
-    } finally {
-      setBulkLoading(false);
-    }
-  }
-
-  async function handleReject(id: number, reason: string) {
-    setActionLoading(id);
-    try {
-      const res = await fetch(`/api/reservations/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reject', reason }),
-      });
-      if (res.ok) { showToast(t.toastRejected); fetchReservations(); }
-      else { const d = await res.json(); showToast(d.error ?? t.toastError, 'error'); }
-    } catch { showToast(t.toastNetworkError, 'error'); }
-    finally { setActionLoading(null); setRejectTarget(null); }
-  }
-
-  async function handleRejectSeries(seriesId: string, reason: string) {
+  async function handleCancelSeries(seriesId: string, reason: string) {
     setSeriesActionLoading(seriesId);
     try {
       const res = await fetch(`/api/admin/series/${encodeURIComponent(seriesId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reject', reason }),
+        body: JSON.stringify({ action: 'cancel', reason }),
       });
-      const data = await res.json();
-      if (res.ok) {
-        showToast(t.toastSeriesRejected(data.rejected ?? 0));
-        fetchReservations();
-        setRejectSeriesTarget(null);
-      } else {
-        showToast(data.error ?? t.toastError, 'error');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(typeof data?.error === 'string' ? data.error : t.errGeneral);
+        return;
       }
+      setCancelSeriesTarget(null);
+      showToast(t.toastSeriesCancelled(data.cancelled ?? 0));
+      fetchReservations();
     } catch {
-      showToast(t.toastNetworkError, 'error');
+      showToast(t.errGeneral);
     } finally {
       setSeriesActionLoading(null);
-      setRejectSeriesTarget(null);
     }
   }
 
@@ -659,81 +403,6 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   }
 
   const cancelledCount = reservations.filter((r) => r.status === 'cancelled').length;
-  const selectedPendingCount = Array.from(selected).filter((id) => reservations.find((r) => r.id === id)?.status === 'pending').length;
-
-  async function handleApproveCancellation(id: number) {
-    setActionLoading(id);
-    try {
-      const res = await fetch(`/api/reservations/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'approve_cancellation' }),
-      });
-      if (res.ok) { showToast(t.toastCancelApproved); fetchReservations(); }
-      else { const d = await res.json(); showToast(d.error ?? t.toastError, 'error'); }
-    } catch { showToast(t.toastNetworkError, 'error'); }
-    finally { setActionLoading(null); }
-  }
-
-  async function handleRejectCancellation(id: number, reason?: string) {
-    setActionLoading(id);
-    try {
-      const res = await fetch(`/api/reservations/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reject_cancellation', reason: reason ?? '' }),
-      });
-      if (res.ok) { showToast(t.toastCancelRejected); fetchReservations(); setRejectCancelTarget(null); }
-      else { const d = await res.json(); showToast(d.error ?? t.toastError, 'error'); }
-    } catch { showToast(t.toastNetworkError, 'error'); }
-    finally { setActionLoading(null); setRejectCancelTarget(null); }
-  }
-
-  async function handleApproveCancellationSeries(seriesId: string) {
-    setSeriesActionLoading(seriesId);
-    try {
-      const res = await fetch(`/api/admin/series/${encodeURIComponent(seriesId)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'approve_cancellation' }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        showToast(t.toastSeriesCancelApproved(data.approved ?? 0));
-        fetchReservations();
-      } else {
-        showToast(data.error ?? t.toastError, 'error');
-      }
-    } catch {
-      showToast(t.toastNetworkError, 'error');
-    } finally {
-      setSeriesActionLoading(null);
-    }
-  }
-
-  async function handleRejectCancellationSeries(seriesId: string, reason?: string) {
-    setSeriesActionLoading(seriesId);
-    try {
-      const res = await fetch(`/api/admin/series/${encodeURIComponent(seriesId)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reject_cancellation', reason: reason ?? '' }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        showToast(t.toastSeriesCancelRejected(data.rejected ?? 0));
-        fetchReservations();
-        setRejectCancelSeriesTarget(null);
-      } else {
-        showToast(data.error ?? t.toastError, 'error');
-      }
-    } catch {
-      showToast(t.toastNetworkError, 'error');
-    } finally {
-      setSeriesActionLoading(null);
-      setRejectCancelSeriesTarget(null);
-    }
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -747,23 +416,6 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
       )}
 
       {/* Modals */}
-      {rejectTarget && (
-        <RejectModal
-          reservation={rejectTarget}
-          onConfirm={(reason) => handleReject(rejectTarget.id, reason)}
-          onCancel={() => setRejectTarget(null)}
-        />
-      )}
-      {rejectSeriesTarget && (
-        <RejectSeriesModal
-          seriesId={rejectSeriesTarget.seriesId}
-          title={rejectSeriesTarget.title}
-          roomName={rejectSeriesTarget.roomName}
-          count={rejectSeriesTarget.count}
-          onConfirm={(reason) => handleRejectSeries(rejectSeriesTarget.seriesId, reason)}
-          onCancel={() => setRejectSeriesTarget(null)}
-        />
-      )}
       {detailTarget && (
         <ReservationDetailModal
           reservation={detailTarget}
@@ -789,20 +441,13 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           onCancel={() => setDeleteTarget(null)}
         />
       )}
-      {rejectCancelTarget && (
-        <RejectCancelModal
-          reservation={rejectCancelTarget}
-          onConfirm={(reason) => handleRejectCancellation(rejectCancelTarget.id, reason)}
-          onCancel={() => setRejectCancelTarget(null)}
-        />
-      )}
-      {rejectCancelSeriesTarget && (
-        <RejectCancelSeriesModal
-          title={rejectCancelSeriesTarget.title}
-          roomName={rejectCancelSeriesTarget.roomName}
-          count={rejectCancelSeriesTarget.count}
-          onConfirm={(reason) => handleRejectCancellationSeries(rejectCancelSeriesTarget.seriesId, reason)}
-          onCancel={() => setRejectCancelSeriesTarget(null)}
+      {cancelSeriesTarget && (
+        <CancelSeriesModal
+          title={cancelSeriesTarget.title}
+          roomName={cancelSeriesTarget.roomName}
+          count={cancelSeriesTarget.count}
+          onConfirm={(reason) => handleCancelSeries(cancelSeriesTarget.seriesId, reason)}
+          onCancel={() => setCancelSeriesTarget(null)}
         />
       )}
 
@@ -854,7 +499,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
             {(['approved', 'cancelled', 'all'] as FilterStatus[]).map((f) => (
               <button
                 key={f}
-                onClick={() => { setFilter(f); setSelected(new Set()); setAdminView('reservations'); }}
+                onClick={() => { setFilter(f); setAdminView('reservations'); }}
                 style={{ padding: '8px clamp(4px, 1.5vw, 12px)' }}
                 className={`font-medium transition border-l first:border-l-0 border-gray-200 whitespace-nowrap ${
                   adminView === 'reservations' && filter === f ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
@@ -1124,7 +769,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
             <div className="text-center py-16 text-gray-400 text-sm">{t.loading}</div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-16 text-gray-400 text-sm">
-              {selectedRooms.size > 0 ? t.adminNoRoomFilter : filter === 'pending' ? t.adminNoPending : t.adminNoReservations}
+              {selectedRooms.size > 0 ? t.adminNoRoomFilter : t.adminNoReservations}
             </div>
           ) : (
             <>
@@ -1133,18 +778,6 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
-                      {filter === 'pending' && (
-                        <th className="w-10 px-4 py-3">
-                          {pendingSingleIds.length > 0 && (
-                            <input
-                              type="checkbox"
-                              checked={pendingSingleIds.every((id) => selected.has(id))}
-                              onChange={toggleSelectAll}
-                              className="rounded"
-                            />
-                          )}
-                        </th>
-                      )}
                       {filter === 'all' && <th className="text-left px-3 py-2 text-gray-600 font-medium w-px whitespace-nowrap">{t.colStatus}</th>}
                       <th className="text-left px-3 py-2 text-gray-600 font-medium">{t.colTitle}</th>
                       <th className="text-left px-3 py-2 text-gray-600 font-medium w-[160px]">{t.colRoom}</th>
@@ -1189,71 +822,34 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                           <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{row.reservations[0].person_in_charge}</td>
                           <td className="px-3 py-2 text-xs text-gray-400 whitespace-nowrap">{formatDateTime(row.reservations[0].created_at)}</td>
                           <td className="px-3 py-2">
-                            {filter === 'pending' ? (
-                              <div className="flex gap-1.5 whitespace-nowrap">
-                                <button
-                                  onClick={() => handleApproveSeries(row.seriesId)}
-                                  disabled={seriesActionLoading === row.seriesId || bulkLoading}
-                                  className="px-2 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs rounded-lg font-medium transition"
-                                >
-                                  {seriesActionLoading === row.seriesId ? '...' : t.btnApproveSeries}
-                                </button>
+                            <div className="flex gap-1.5 whitespace-nowrap">
+                              <button
+                                onClick={() => setDetailTarget(row.reservations[0])}
+                                className="px-3 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-600 text-xs rounded-lg transition"
+                              >
+                                {t.btnDetail}
+                              </button>
+                              {row.reservations.some((r) => r.status === 'approved') && (
                                 <button
                                   onClick={() =>
-                                    setRejectSeriesTarget({
+                                    setCancelSeriesTarget({
                                       seriesId: row.seriesId,
                                       title: row.reservations[0].title,
                                       roomName: row.reservations[0].room_name,
-                                      count: row.reservations.length,
+                                      count: row.reservations.filter((r) => r.status === 'approved').length,
                                     })
                                   }
-                                  disabled={seriesActionLoading === row.seriesId || bulkLoading}
-                                  className="px-2 py-1.5 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-xs rounded-lg font-medium transition"
+                                  disabled={seriesActionLoading === row.seriesId}
+                                  className="px-3 py-1.5 border border-red-300 hover:bg-red-50 disabled:opacity-50 text-red-600 text-xs rounded-lg transition"
                                 >
-                                  {t.btnRejectSeries}
+                                  {seriesActionLoading === row.seriesId ? '...' : t.btnCancelSeries}
                                 </button>
-                              </div>
-                            ) : (
-                              <div className="flex gap-1.5 whitespace-nowrap">
-                                <button
-                                  onClick={() => handleApproveCancellationSeries(row.seriesId)}
-                                  disabled={seriesActionLoading === row.seriesId || bulkLoading}
-                                  className="px-2 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs rounded-lg font-medium transition"
-                                >
-                                  {seriesActionLoading === row.seriesId ? '...' : t.btnApproveCancelSeries}
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    setRejectCancelSeriesTarget({
-                                      seriesId: row.seriesId,
-                                      title: row.reservations[0].title,
-                                      roomName: row.reservations[0].room_name,
-                                      count: row.reservations.length,
-                                    })
-                                  }
-                                  disabled={seriesActionLoading === row.seriesId || bulkLoading}
-                                  className="px-2 py-1.5 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-xs rounded-lg font-medium transition"
-                                >
-                                  {t.btnRejectCancelSeries}
-                                </button>
-                              </div>
-                            )}
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ) : (
-                        <tr key={row.reservation.id} className={`hover:bg-gray-50 ${selected.has(row.reservation.id) ? 'bg-blue-50' : ''}`}>
-                          {filter === 'pending' && (
-                            <td className="px-3 py-2">
-                              {row.reservation.status === 'pending' && (
-                                <input
-                                  type="checkbox"
-                                  checked={selected.has(row.reservation.id)}
-                                  onChange={() => toggleSelect(row.reservation.id)}
-                                  className="rounded"
-                                />
-                              )}
-                            </td>
-                          )}
+                        <tr key={row.reservation.id} className="hover:bg-gray-50">
                           {filter === 'all' && <td className="px-3 py-2"><StatusBadge status={row.reservation.status} /></td>}
                           <td className="px-3 py-2 font-medium text-gray-800 w-[120px] max-w-[120px]">
                             <div className="truncate">{row.reservation.title}</div>
@@ -1282,11 +878,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                               loading={actionLoading === row.reservation.id}
                               onDetail={() => setDetailTarget(row.reservation)}
                               onEdit={() => setEditTarget(row.reservation)}
-                              onApprove={() => handleApprove(row.reservation.id)}
-                              onReject={() => setRejectTarget(row.reservation)}
                               onDelete={() => setDeleteTarget(row.reservation)}
-                              onApproveCancellation={() => handleApproveCancellation(row.reservation.id)}
-                              onRejectCancellation={() => setRejectCancelTarget(row.reservation)}
                             />
                           </td>
                         </tr>
@@ -1326,59 +918,32 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                         <p className="text-xs text-amber-700 mb-3">{t.cancelReasonPrefix}{row.reservations[0].cancellation_reason}</p>
                       )}
                       <div className="flex gap-2">
-                        {filter === 'pending' ? (
-                          <>
-                            <button
-                              onClick={() => handleApproveSeries(row.seriesId)}
-                              disabled={seriesActionLoading === row.seriesId || bulkLoading}
-                              className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs rounded-lg font-medium transition"
-                            >
-                              {seriesActionLoading === row.seriesId ? '...' : t.btnApproveSeries}
-                            </button>
-                            <button
-                              onClick={() =>
-                                setRejectSeriesTarget({
-                                  seriesId: row.seriesId,
-                                  title: row.reservations[0].title,
-                                  roomName: row.reservations[0].room_name,
-                                  count: row.reservations.length,
-                                })
-                              }
-                              disabled={seriesActionLoading === row.seriesId || bulkLoading}
-                              className="px-3 py-1.5 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-xs rounded-lg font-medium transition"
-                            >
-                              {t.btnRejectSeries}
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              onClick={() => handleApproveCancellationSeries(row.seriesId)}
-                              disabled={seriesActionLoading === row.seriesId || bulkLoading}
-                              className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs rounded-lg font-medium transition"
-                            >
-                              {seriesActionLoading === row.seriesId ? '...' : t.btnApproveCancelSeries}
-                            </button>
-                            <button
-                              onClick={() =>
-                                setRejectCancelSeriesTarget({
-                                  seriesId: row.seriesId,
-                                  title: row.reservations[0].title,
-                                  roomName: row.reservations[0].room_name,
-                                  count: row.reservations.length,
-                                })
-                              }
-                              disabled={seriesActionLoading === row.seriesId || bulkLoading}
-                              className="px-3 py-1.5 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-xs rounded-lg font-medium transition"
-                            >
-                              {t.btnRejectCancelSeries}
-                            </button>
-                          </>
+                        <button
+                          onClick={() => setDetailTarget(row.reservations[0])}
+                          className="px-3 py-1.5 border border-gray-300 hover:bg-gray-50 text-gray-600 text-xs rounded-lg transition"
+                        >
+                          {t.btnDetail}
+                        </button>
+                        {row.reservations.some((r) => r.status === 'approved') && (
+                          <button
+                            onClick={() =>
+                              setCancelSeriesTarget({
+                                seriesId: row.seriesId,
+                                title: row.reservations[0].title,
+                                roomName: row.reservations[0].room_name,
+                                count: row.reservations.filter((r) => r.status === 'approved').length,
+                              })
+                            }
+                            disabled={seriesActionLoading === row.seriesId}
+                            className="px-3 py-1.5 border border-red-300 hover:bg-red-50 disabled:opacity-50 text-red-600 text-xs rounded-lg transition"
+                          >
+                            {seriesActionLoading === row.seriesId ? '...' : t.btnCancelSeries}
+                          </button>
                         )}
                       </div>
                     </div>
                   ) : (
-                    <div key={row.reservation.id} className={`p-4 ${selected.has(row.reservation.id) ? 'bg-blue-50' : ''}`}>
+                    <div key={row.reservation.id} className="p-4">
                       <div className="flex items-start justify-between gap-2 mb-2">
                         {filter === 'all' ? <StatusBadge status={row.reservation.status} /> : <span />}
                         <span className="text-xs text-gray-400">{formatDateTime(row.reservation.created_at)}</span>
@@ -1405,11 +970,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                           loading={actionLoading === row.reservation.id}
                           onDetail={() => setDetailTarget(row.reservation)}
                           onEdit={() => setEditTarget(row.reservation)}
-                          onApprove={() => handleApprove(row.reservation.id)}
-                          onReject={() => setRejectTarget(row.reservation)}
                           onDelete={() => setDeleteTarget(row.reservation)}
-                          onApproveCancellation={() => handleApproveCancellation(row.reservation.id)}
-                          onRejectCancellation={() => setRejectCancelTarget(row.reservation)}
                         />
                       </div>
                     </div>
@@ -1543,21 +1104,13 @@ function ActionButtons({
   loading,
   onDetail,
   onEdit,
-  onApprove,
-  onReject,
   onDelete,
-  onApproveCancellation,
-  onRejectCancellation,
 }: {
   reservation: ReservationWithRoom;
   loading: boolean;
   onDetail: () => void;
   onEdit: () => void;
-  onApprove: () => void;
-  onReject: () => void;
   onDelete: () => void;
-  onApproveCancellation: () => void;
-  onRejectCancellation: () => void;
 }) {
   const { t } = useLanguage();
 
@@ -1570,63 +1123,32 @@ function ActionButtons({
     </button>
   );
 
-  if (reservation.status === 'pending') {
-    return (
-      <div className="flex gap-1.5 whitespace-nowrap">
-        {detailBtn}
-        <button
-          onClick={onApprove}
-          disabled={loading}
-          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs rounded-lg font-medium transition"
-        >
-          {loading ? '...' : t.btnApprove}
-        </button>
-        <button
-          onClick={onReject}
-          disabled={loading}
-          className="px-3 py-1.5 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-xs rounded-lg font-medium transition"
-        >
-          {t.btnReject}
-        </button>
-      </div>
-    );
-  }
-
-  if (reservation.status === 'approved') {
-    return (
-      <div className="flex gap-1.5 whitespace-nowrap">
-        {detailBtn}
-        <button
-          onClick={onEdit}
-          disabled={loading}
-          className="px-3 py-1.5 border border-blue-300 hover:bg-blue-50 disabled:opacity-50 text-blue-600 text-xs rounded-lg transition"
-        >
-          {t.adminBtnEdit}
-        </button>
-        <button
-          onClick={onDelete}
-          disabled={loading}
-          className="px-3 py-1.5 border border-red-300 hover:bg-red-50 disabled:opacity-50 text-red-600 text-xs rounded-lg transition"
-        >
-          {loading ? '...' : t.btnDelete}
-        </button>
-      </div>
-    );
-  }
-
-  if (reservation.status === 'cancelled') {
+  // Only a confirmed booking can still be acted on. Everything else — cancelled,
+  // plus the handful of rows left behind in the retired pending/rejected states —
+  // is a record to read, not to change.
+  if (reservation.status !== 'approved') {
     return <div className="flex gap-1.5 whitespace-nowrap">{detailBtn}</div>;
   }
 
-  if (reservation.status === 'rejected') {
-    return (
-      <div className="flex gap-1.5 whitespace-nowrap">
-        {detailBtn}
-      </div>
-    );
-  }
-
-  return detailBtn;
+  return (
+    <div className="flex gap-1.5 whitespace-nowrap">
+      {detailBtn}
+      <button
+        onClick={onEdit}
+        disabled={loading}
+        className="px-3 py-1.5 border border-blue-300 hover:bg-blue-50 disabled:opacity-50 text-blue-600 text-xs rounded-lg transition"
+      >
+        {t.adminBtnEdit}
+      </button>
+      <button
+        onClick={onDelete}
+        disabled={loading}
+        className="px-3 py-1.5 border border-red-300 hover:bg-red-50 disabled:opacity-50 text-red-600 text-xs rounded-lg transition"
+      >
+        {loading ? '...' : t.btnDelete}
+      </button>
+    </div>
+  );
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────

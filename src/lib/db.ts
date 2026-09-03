@@ -685,34 +685,6 @@ export async function checkConflict(
   return Number(rows[0]?.c ?? 0) > 0;
 }
 
-export async function approveReservation(id: number): Promise<boolean> {
-  await ensureDbReady();
-  const rows = (await getSql()`
-    UPDATE reservations
-    SET status = 'approved', rejection_reason = NULL
-    WHERE id = ${id} AND status = 'pending'
-    RETURNING id
-  `) as { id: number }[];
-  return rows.length > 0;
-}
-
-export async function approveReservationsBySeries(seriesId: string): Promise<ReservationWithRoom[]> {
-  await ensureDbReady();
-  const rows = (await getSql()`
-    WITH updated AS (
-      UPDATE reservations
-      SET status = 'approved', rejection_reason = NULL
-      WHERE series_id = ${seriesId} AND status = 'pending'
-      RETURNING *
-    )
-    SELECT u.*, rm.name as room_name, rm.color as room_color
-    FROM updated u
-    JOIN rooms rm ON u.room_id = rm.id
-    ORDER BY u.start_time
-  `) as ReservationWithRoom[];
-  return rows;
-}
-
 export async function setReservationSeriesStatus(
   seriesId: string,
   status: ReservationSeriesStatus,
@@ -727,38 +699,6 @@ export async function setReservationSeriesStatus(
     RETURNING id
   `) as { id: string }[];
   return rows.length > 0;
-}
-
-export async function rejectReservation(
-  id: number,
-  reason: string
-): Promise<boolean> {
-  await ensureDbReady();
-  const rows = (await getSql()`
-    UPDATE reservations
-    SET status = 'rejected', rejection_reason = ${reason}
-    WHERE id = ${id} AND status = 'pending'
-    RETURNING id
-  `) as { id: number }[];
-  return rows.length > 0;
-}
-
-export async function rejectReservationsBySeries(seriesId: string, reason: string): Promise<ReservationWithRoom[]> {
-  await ensureDbReady();
-  const rows = (await getSql()`
-    WITH updated AS (
-      UPDATE reservations
-      SET status = 'rejected', rejection_reason = ${reason}
-      WHERE series_id = ${seriesId} AND status = 'pending'
-      RETURNING *
-    )
-    SELECT u.*, rm.name as room_name, rm.color as room_color
-    FROM updated u
-    JOIN rooms rm ON u.room_id = rm.id
-    ORDER BY u.start_time
-  `) as ReservationWithRoom[];
-  await setReservationSeriesStatus(seriesId, 'rejected', reason);
-  return rows;
 }
 
 export async function deleteReservation(id: number): Promise<boolean> {
@@ -818,6 +758,29 @@ export async function requestCancellation(
   return rows.length > 0;
 }
 
+/**
+ * First still-active occurrence of a series at or after `from`. Used to build the
+ * notification for an administrator cancelling a series, where there is no
+ * single reservation the request was made against.
+ */
+export async function getSeriesOccurrenceFrom(
+  seriesId: string,
+  fromStartTimeInclusive: string
+): Promise<ReservationWithRoom | null> {
+  await ensureDbReady();
+  const rows = (await getSql()`
+    SELECT r.*, rm.name as room_name, rm.color as room_color
+    FROM reservations r
+    JOIN rooms rm ON r.room_id = rm.id
+    WHERE r.series_id = ${seriesId}
+      AND r.start_time >= ${fromStartTimeInclusive}
+      AND r.status IN ('pending', 'approved')
+    ORDER BY r.start_time
+    LIMIT 1
+  `) as ReservationWithRoom[];
+  return rows[0] ?? null;
+}
+
 export async function requestCancellationSeries(
   seriesId: string,
   fromStartTimeInclusive: string,
@@ -833,47 +796,6 @@ export async function requestCancellationSeries(
     RETURNING id
   `) as { id: number }[];
   return rows.length;
-}
-
-export async function approveCancellation(id: number): Promise<boolean> {
-  await ensureDbReady();
-  const rows = (await getSql()`
-    DELETE FROM reservations
-    WHERE id = ${id} AND status = 'cancellation_requested'
-    RETURNING id
-  `) as { id: number }[];
-  return rows.length > 0;
-}
-
-export async function rejectCancellation(id: number): Promise<boolean> {
-  await ensureDbReady();
-  const rows = (await getSql()`
-    UPDATE reservations
-    SET status = COALESCE(previous_status, 'approved'),
-        cancellation_reason = NULL,
-        cancellation_requested_at = NULL,
-        previous_status = NULL
-    WHERE id = ${id} AND status = 'cancellation_requested'
-    RETURNING id
-  `) as { id: number }[];
-  return rows.length > 0;
-}
-
-export async function approveCancellationBySeries(seriesId: string): Promise<ReservationWithRoom[]> {
-  await ensureDbReady();
-  const rows = (await getSql()`
-    WITH deleted AS (
-      DELETE FROM reservations
-      WHERE series_id = ${seriesId} AND status = 'cancellation_requested'
-      RETURNING *
-    )
-    SELECT d.*, rm.name as room_name, rm.color as room_color
-    FROM deleted d
-    JOIN rooms rm ON d.room_id = rm.id
-    ORDER BY d.start_time
-  `) as ReservationWithRoom[];
-  await setReservationSeriesStatus(seriesId, 'cancelled');
-  return rows;
 }
 
 // ---------- Notification Recipients ----------
@@ -940,22 +862,3 @@ export async function deleteNotificationRecipient(id: number): Promise<boolean> 
   return rows.length > 0;
 }
 
-export async function rejectCancellationBySeries(seriesId: string, reason?: string | null): Promise<ReservationWithRoom[]> {
-  await ensureDbReady();
-  const rows = (await getSql()`
-    WITH updated AS (
-      UPDATE reservations
-      SET status = COALESCE(previous_status, 'approved'),
-          cancellation_reason = NULL,
-          cancellation_requested_at = NULL,
-          previous_status = NULL
-      WHERE series_id = ${seriesId} AND status = 'cancellation_requested'
-      RETURNING *
-    )
-    SELECT u.*, rm.name as room_name, rm.color as room_color
-    FROM updated u
-    JOIN rooms rm ON u.room_id = rm.id
-    ORDER BY u.start_time
-  `) as ReservationWithRoom[];
-  return rows;
-}

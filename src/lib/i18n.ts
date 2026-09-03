@@ -298,6 +298,14 @@ const ko = {
   // Cancel button
   btnRequestCancel: '취소 신청하기',
 
+  // Admin: cancel a whole recurring series
+  cancelSeriesTitle: '반복 예약 전체 취소',
+  cancelSeriesCount: (n: number) => `오늘 이후 ${n}건이 취소됩니다`,
+  cancelSeriesNote: '지난 일정은 기록으로 남고, 오늘 이후 일정만 취소됩니다. 신청자에게 안내 메일이 발송됩니다.',
+  btnCancelSeries: '시리즈 취소',
+  btnCancelSeriesConfirm: '전체 취소',
+  toastSeriesCancelled: (n: number) => `${n}건 취소 완료`,
+
   // Edit reservation modal
   editModalTitle: '예약 변경',
   editDesc: (title: string) => `"${title}" 예약의 시간·내용을 변경합니다.`,
@@ -336,7 +344,6 @@ const ko = {
   adminTabCancellations: '취소 목록',
   adminTabAll: '전체',
   adminNoReservations: '예약 내역이 없습니다.',
-  adminNoPending: '승인 대기 중인 예약이 없습니다.',
   adminNoRoomFilter: '선택한 장소의 예약 내역이 없습니다.',
   adminDataError: '데이터를 불러오지 못했습니다.',
   adminChecking: '확인 중...',
@@ -357,48 +364,18 @@ const ko = {
   personLabelAdmin: '담당: ',
 
   // Admin action buttons
-  btnApprove: '승인',
-  btnReject: '거절',
   btnDelete: '삭제',
   btnDetail: '상세보기',
-  btnApproveSeries: '시리즈 승인',
-  btnRejectSeries: '시리즈 거절',
-  btnApproveCancelSeries: '시리즈 취소 승인',
-  btnRejectCancelSeries: '시리즈 취소 거절',
 
   // Toast messages
-  toastApproved: '승인 완료',
-  toastSeriesApproved: (n: number) => `${n}건 시리즈 승인 완료`,
-  toastBulkApproved: (n: number) => `${n}건 승인 완료`,
-  toastRejected: '거절 처리되었습니다.',
-  toastSeriesRejected: (n: number) => `${n}건 시리즈 거절 처리되었습니다.`,
   toastDeleted: '삭제되었습니다.',
-  toastCancelApproved: '취소 승인되었습니다.',
-  toastCancelRejected: '취소 거절되었습니다.',
-  toastSeriesCancelApproved: (n: number) => `${n}건 시리즈 취소 승인되었습니다.`,
-  toastSeriesCancelRejected: (n: number) => `${n}건 시리즈 취소 거절되었습니다.`,
   toastError: '오류',
   toastNetworkError: '네트워크 오류',
 
   // Reject modals
-  rejectTitle: '예약 거절',
-  rejectDesc: (title: string) => `"${title}" 예약을 거절합니다.`,
-  rejectReasonLabel: '거절 사유',
-  rejectReasonPlaceholder: '거절 사유를 입력해주세요.',
-  errRejectReasonRequired: '거절 사유를 입력해주세요.',
-  btnRejectConfirm: '거절 확정',
 
-  rejectSeriesTitle: '반복 예약 전체 거절',
-  rejectSeriesDesc: (title: string, room: string, count: number) => `"${title}" — ${room} · ${count}건을 모두 거절합니다.`,
 
-  rejectCancelSeriesTitle: '시리즈 취소 신청 거절',
-  rejectCancelSeriesDesc: (title: string, room: string, count: number) => `"${title}" — ${room} · ${count}건의 취소 신청을 거절합니다.`,
-  rejectCancelReasonOptional: '거절 사유 (선택, 요청자 이메일에 포함)',
-  rejectCancelPlaceholderOptional: '선택 사항입니다.',
-  btnRejectCancelConfirm: '취소 거절',
 
-  rejectCancelTitle: '취소 신청 거절',
-  rejectCancelDesc: (title: string) => `"${title}" 예약의 취소 신청을 거절합니다.`,
 
   // Delete modal
   deleteTitle: '예약 삭제',
@@ -603,6 +580,14 @@ const en: typeof ko = {
 
   btnRequestCancel: 'Request Cancellation',
 
+  // Admin: cancel a whole recurring series
+  cancelSeriesTitle: 'Cancel Entire Series',
+  cancelSeriesCount: (n: number) => `${n} future booking${n === 1 ? '' : 's'} will be cancelled`,
+  cancelSeriesNote: 'Past dates are kept as a record; only today onward is cancelled. The requester is notified by email.',
+  btnCancelSeries: 'Cancel series',
+  btnCancelSeriesConfirm: 'Cancel all',
+  toastSeriesCancelled: (n: number) => `${n} cancelled`,
+
   // Edit reservation modal
   editModalTitle: 'Edit Reservation',
   editDesc: (title: string) => `Editing the time and details of "${title}".`,
@@ -639,7 +624,6 @@ const en: typeof ko = {
   adminTabCancellations: 'Cancellations',
   adminTabAll: 'All',
   adminNoReservations: 'No reservations found.',
-  adminNoPending: 'No pending reservations.',
   adminNoRoomFilter: 'No reservations for the selected room.',
   adminDataError: 'Failed to load data.',
   adminChecking: 'Verifying...',
@@ -657,46 +641,16 @@ const en: typeof ko = {
   rejectionReasonPrefix: 'Rejection: ',
   personLabelAdmin: 'Contact: ',
 
-  btnApprove: 'Approve',
-  btnReject: 'Reject',
   btnDelete: 'Delete',
   btnDetail: 'Details',
-  btnApproveSeries: 'Approve Series',
-  btnRejectSeries: 'Reject Series',
-  btnApproveCancelSeries: 'Approve Cancel (Series)',
-  btnRejectCancelSeries: 'Reject Cancel (Series)',
 
-  toastApproved: 'Approved',
-  toastSeriesApproved: (n: number) => `${n} in series approved`,
-  toastBulkApproved: (n: number) => `${n} approved`,
-  toastRejected: 'Rejected.',
-  toastSeriesRejected: (n: number) => `${n} in series rejected.`,
   toastDeleted: 'Deleted.',
-  toastCancelApproved: 'Cancellation approved.',
-  toastCancelRejected: 'Cancellation rejected.',
-  toastSeriesCancelApproved: (n: number) => `${n} cancellations in series approved.`,
-  toastSeriesCancelRejected: (n: number) => `${n} cancellations in series rejected.`,
   toastError: 'Error',
   toastNetworkError: 'Network error',
 
-  rejectTitle: 'Reject Reservation',
-  rejectDesc: (title: string) => `You are rejecting the reservation "${title}".`,
-  rejectReasonLabel: 'Reason for rejection',
-  rejectReasonPlaceholder: 'Enter your reason for rejection.',
-  errRejectReasonRequired: 'Please enter a reason for rejection.',
-  btnRejectConfirm: 'Confirm Rejection',
 
-  rejectSeriesTitle: 'Reject Entire Recurring Series',
-  rejectSeriesDesc: (title: string, room: string, count: number) => `Rejecting all ${count} events for "${title}" — ${room}.`,
 
-  rejectCancelSeriesTitle: 'Reject Series Cancellation Request',
-  rejectCancelSeriesDesc: (title: string, room: string, count: number) => `Rejecting cancellation request for ${count} events in "${title}" — ${room}.`,
-  rejectCancelReasonOptional: 'Reason (optional, sent to requester)',
-  rejectCancelPlaceholderOptional: 'Optional.',
-  btnRejectCancelConfirm: 'Reject Cancellation',
 
-  rejectCancelTitle: 'Reject Cancellation Request',
-  rejectCancelDesc: (title: string) => `Rejecting the cancellation request for "${title}".`,
 
   deleteTitle: 'Delete Reservation',
   deleteConfirmMsg: 'Are you sure you want to delete this reservation?',
