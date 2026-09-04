@@ -20,7 +20,7 @@ function getSql() {
  * finds this value already recorded skips the entire migration block — 36 round
  * trips to Neon, about 2.6 seconds, paid by every new serverless instance.
  */
-const SCHEMA_VERSION = '2026-09-01';
+const SCHEMA_VERSION = '2026-09-04';
 const SCHEMA_VERSION_KEY = 'schema_version';
 
 type Sql = ReturnType<typeof getSql>;
@@ -191,6 +191,31 @@ async function runSchemaMigrations(sql: Sql): Promise<void> {
       await sql`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS previous_end_time TEXT`;
     } catch {
       // Columns may already exist; ignore
+    }
+
+    // Every calendar view queries a date window, and without this the planner has
+    // to read the whole table to answer one: a one-month window returned 18 rows
+    // out of 1,835 read. That is 11 ms today and grows in step with the table,
+    // which matters because recurring series add 500 rows at a time — a 500-week
+    // booking is one request and five hundred rows.
+    //
+    // `start_time` leads because it carries both the range and the ORDER BY that
+    // every one of those queries ends with. `end_time` rides along so the
+    // `end_time >= from` half can be settled from the index tuple instead of a
+    // heap fetch per candidate row.
+    //
+    // Deliberately not partial on `status`: a partial index only applies when the
+    // query repeats its predicate verbatim, so the day someone edits the status
+    // list the index would stop being used with nothing to show it had happened.
+    try {
+      await sql`
+        CREATE INDEX IF NOT EXISTS reservations_time_range_idx
+          ON reservations (start_time, end_time)
+      `;
+    } catch (e) {
+      // Not worth failing a cold start over: every query still returns the same
+      // rows without it, just by reading more pages.
+      console.error('[db] 시간 범위 인덱스 생성 실패:', e);
     }
 
     // Key/value settings the administrator can change at runtime, so things like
