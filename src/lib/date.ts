@@ -67,6 +67,13 @@ export function toDateKey(d: Date): string {
  * is 2026-02-28 rather than rolling forward into March the way `setMonth` would
  * — a lower bound that jumps *forward* would quietly drop days of history.
  */
+/** Shifts a 'YYYY-MM-DD' key by whole days. */
+export function addDaysToKey(key: string, days: number): string {
+  const [y, m, d] = key.split('-').map(Number);
+  const shifted = new Date(y, m - 1, d + days);
+  return `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, '0')}-${String(shifted.getDate()).padStart(2, '0')}`;
+}
+
 export function addMonthsToKey(key: string, months: number): string {
   const [y, m, d] = key.split('-').map(Number);
   const target = m - 1 + months;

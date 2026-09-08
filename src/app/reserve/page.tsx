@@ -3,10 +3,10 @@
 import React, { Suspense, useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { format, addMonths } from 'date-fns';
-import { Room } from '@/lib/db';
+import { Room, PublicReservation } from '@/lib/db';
 import { LIMITS } from '@/lib/constants';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { pacificDateKey, pacificTodayDate } from '@/lib/date';
+import { pacificDateKey, pacificTodayDate, addDaysToKey, DATE_RE } from '@/lib/date';
 
 type RecurringType = 'none' | 'daily' | 'weekly' | 'monthly';
 
@@ -123,6 +123,17 @@ function ReserveForm() {
   const [recurringUntil, setRecurringUntil] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
+
+  // What is already booked in the chosen room on the chosen date.
+  //
+  // The form used to show nothing, so the first a member heard of a clash was a
+  // 409 after typing everything in — and not only in the rare case where two
+  // people submit at the same instant. Far more often the slot had been taken
+  // minutes earlier and this page simply never knew.
+  const [taken, setTaken] = useState<{ start: string; end: string; title: string }[]>([]);
+  const [takenState, setTakenState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  // Bumped after a 409 so the panel reloads and shows what actually took the slot.
+  const [takenReload, setTakenReload] = useState(0);
   const [success, setSuccess] = useState(false);
   const [successInfo, setSuccessInfo] = useState<SuccessInfo | null>(null);
 
@@ -149,6 +160,50 @@ function ReserveForm() {
       });
   }, [isAdmin]);
   useEffect(() => { loadRooms(); }, [loadRooms]);
+
+  useEffect(() => {
+    const roomId = Number(form.room_id);
+    const date = form.date;
+    if (!roomId || !DATE_RE.test(date)) {
+      setTaken([]);
+      setTakenState('idle');
+      return;
+    }
+    let cancelled = false;
+    setTakenState('loading');
+    // `to` is the next day, not this one: the range filter compares
+    // `start_time <= to` as strings, and '2026-09-10T09:00' sorts *after*
+    // '2026-09-10', so asking for a single day returns nothing.
+    fetch(`/api/reservations?from=${date}&to=${addDaysToKey(date, 1)}`)
+      .then((r) => {
+        if (!r.ok) throw new Error('availability');
+        return r.json();
+      })
+      .then((rows: PublicReservation[]) => {
+        if (cancelled) return;
+        setTaken(
+          (Array.isArray(rows) ? rows : [])
+            .filter((r) => r.room_id === roomId && r.start_time.slice(0, 10) === date)
+            .map((r) => ({ start: r.start_time.slice(11, 16), end: r.end_time.slice(11, 16), title: r.title }))
+            .sort((a, b) => a.start.localeCompare(b.start))
+        );
+        setTakenState('ready');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setTaken([]);
+        setTakenState('error');
+      });
+    return () => { cancelled = true; };
+  }, [form.room_id, form.date, takenReload]);
+
+  // Half-open `[)`, the same rule as `checkConflict` and the database's
+  // exclusion constraint: a booking that ends at 11:00 does not clash with one
+  // that starts at 11:00.
+  const overlapping =
+    takenState === 'ready'
+      ? taken.filter((b) => form.start_time < b.end && form.end_time > b.start)
+      : [];
 
   function validate(): FormErrors {
     const errs: FormErrors = {};
@@ -221,6 +276,11 @@ function ReserveForm() {
         const msg = typeof data?.message === 'string' ? data.message : t.errConflictDefault;
         const dates = Array.isArray(data?.conflictDates) ? data.conflictDates : undefined;
         setErrors({ conflict: msg, conflictDates: dates });
+        // The slot was taken while this form was open, so what the panel above
+        // is showing is now stale. Reload it: the point of the message is to let
+        // the member pick another time without leaving the page, and they
+        // cannot do that while the list still says the slot is free.
+        setTakenReload((n) => n + 1);
         return;
       }
 
@@ -525,6 +585,43 @@ function ReserveForm() {
               </div>
             </div>
           </div>
+
+          {/* Already-booked times for the chosen room and date */}
+          {form.room_id && DATE_RE.test(form.date) && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5">
+              <p className="text-xs font-medium text-gray-600">{t.availabilityTitle}</p>
+              {takenState === 'loading' && (
+                <p className="mt-1 text-xs text-gray-400">{t.availabilityLoading}</p>
+              )}
+              {/* Not an error state for the member to act on: the server checks
+                  again on submit, so a failed load costs information, not safety. */}
+              {takenState === 'error' && (
+                <p className="mt-1 text-xs text-gray-500">{t.availabilityError}</p>
+              )}
+              {takenState === 'ready' && taken.length === 0 && (
+                <p className="mt-1 text-xs text-green-700">{t.availabilityNone}</p>
+              )}
+              {takenState === 'ready' && taken.length > 0 && (
+                <ul className="mt-1.5 space-y-1">
+                  {taken.map((b, i) => {
+                    const clash = form.start_time < b.end && form.end_time > b.start;
+                    return (
+                      <li
+                        key={i}
+                        className={`flex items-baseline gap-2 text-xs ${clash ? 'font-medium text-red-600' : 'text-gray-600'}`}
+                      >
+                        <span className="whitespace-nowrap tabular-nums">{b.start}–{b.end}</span>
+                        <span className="min-w-0 truncate">{b.title}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {overlapping.length > 0 && (
+                <p className="mt-2 text-xs font-medium text-red-600">{t.availabilityOverlap}</p>
+              )}
+            </div>
+          )}
 
           {/* Recurring — admin only */}
           {isAdmin && <div className="border border-gray-200 rounded-xl p-4 space-y-3">

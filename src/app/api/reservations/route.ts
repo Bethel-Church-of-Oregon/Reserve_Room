@@ -6,7 +6,7 @@ import { LIMITS } from '@/lib/constants';
 import { sendReservationCreatedEmail, sendReservationCreatedBulkEmail } from '@/lib/email';
 import { sendSmsNotifications, buildReservationSmsMessage, buildBulkReservationSmsMessage } from '@/lib/sms';
 import { sendTelegramNotification, buildReservationTelegramMessage, buildBulkReservationTelegramMessage } from '@/lib/telegram';
-import { pacificTodayDate, pacificDateKey, normalizeDateTime, DATE_RE } from '@/lib/date';
+import { pacificTodayDate, pacificDateKey, normalizeDateTime, addDaysToKey, DATE_RE } from '@/lib/date';
 import { cookies } from 'next/headers';
 import { verifyAdminSession } from '@/lib/auth';
 
@@ -17,11 +17,6 @@ import { verifyAdminSession } from '@/lib/auth';
  * reservation ever made in one response.
  */
 const MAX_RANGE_DAYS = 400;
-
-function addDaysToKey(key: string, days: number): string {
-  const [y, m, d] = key.split('-').map(Number);
-  return format(addDays(new Date(y, m - 1, d), days), 'yyyy-MM-dd');
-}
 
 export async function GET(req: NextRequest) {
   try {

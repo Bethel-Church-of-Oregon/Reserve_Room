@@ -255,6 +255,12 @@ const ko = {
   btnBackToCalendar: '캘린더로 돌아가기',
 
   // Conflict banner
+  availabilityTitle: '이 날짜에 이미 예약된 시간',
+  availabilityLoading: '확인 중...',
+  availabilityNone: '아직 예약이 없습니다.',
+  availabilityError: '예약 현황을 불러오지 못했습니다. 제출할 때 서버에서 다시 확인합니다.',
+  availabilityOverlap: '선택한 시간이 위 예약과 겹칩니다. 다른 시간을 선택해 주세요.',
+
   conflictTitle: '예약 시간 충돌',
 
   // Success
@@ -584,6 +590,12 @@ const en: typeof ko = {
   btnReserveAction: 'Submit',
   btnMoreReserve: 'Make Another Reservation',
   btnBackToCalendar: 'Back to Calendar',
+
+  availabilityTitle: 'Already booked on this date',
+  availabilityLoading: 'Checking...',
+  availabilityNone: 'Nothing booked yet.',
+  availabilityError: 'Could not load current bookings. The server checks again when you submit.',
+  availabilityOverlap: 'Your selected time overlaps a booking above. Please choose another time.',
 
   conflictTitle: 'Time Conflict',
 
