@@ -75,7 +75,7 @@ npm run restore -- ~/받은파일/backup-2026-09-01.json --yes   # 메일 첨부
 
 ## DB 스키마
 - `app_settings`: key(PK), value, updated_at — 런타임 설정 key/value. 현재 키: `reservation_access_code`
-- `rooms`: id, name, color, hidden, sort_order — 비전홀 + 은혜성전 20개 시드 데이터
+- `rooms`: id, name, color, hidden, sort_order — 비전홀 + 은혜성전 21개 시드 데이터
 - `reservation_series`: id(TEXT/UUID), title, room_id, person_in_charge, email, notes, recurring, recurring_until, status(pending/approved/rejected/cancelled), rejection_reason, created_at
 - `reservations`: id, series_id(→reservation_series), series_index, title, room_id, start_time, end_time, person_in_charge, email, notes, status(pending/approved/rejected/cancellation_requested), rejection_reason, cancellation_reason, cancellation_requested_at, previous_status, created_at, updated_at, previous_start_time, previous_end_time
 - Postgres: Vercel Marketplace에서 Neon 연동 시 `POSTGRES_URL` 또는 `DATABASE_URL` 자동 주입
@@ -112,8 +112,8 @@ npm run restore -- ~/받은파일/backup-2026-09-01.json --yes   # 메일 첨부
 - 은퇴(숨김) 장소는 원래 자리를 유지
 - `은혜성전 교실 5`는 실재하지 않는 곳이라 **완전 삭제됨** (2026-09). 삭제문은 참조가 없을 때만 실행되도록 자기방어형이라 멱등하고, 예약이 붙어 있으면 스스로 건너뜀
 
-## 장소 목록 (20개, 일반 사용자에게는 18개)
-비전홀: 대예배실, 새가족실, 영아부실, 유아부실, 유치부실, 찬양대실, 2층 교실 1~4, 2층 올리브홀(초등부), 2층 초등부 교사실
+## 장소 목록 (21개, 일반 사용자에게는 19개)
+비전홀: 대예배실, 새가족실, 영아부실, 유아부실, 유치부실, 찬양대실, 2층 교실 1~4, 2층 올리브홀(초등부), 2층 초등부 교사실, 2층 메자닌
 은혜성전: 예배실, 친교실, 2층 교실 302·303·305·306, 청년부실, (구)부교역자실 (2026-09 개편)
 
 ## 장소명 영문 변환
@@ -205,6 +205,14 @@ approved → cancelled (취소 신청 시 즉시 처리)
   - 클라이언트는 성공 시 `localStorage['bethel_reservation_code']`에 기억, 403이면 삭제
   - `GET /api/access-code`는 **필요 여부(`{required}`)만** 반환. 코드값은 절대 내려보내지 않음
   - 이 라우트에는 `dynamic = 'force-dynamic'` **과** `fetchCache = 'force-no-store'` 둘 다 필요. Neon 드라이버가 fetch로 통신하므로 fetchCache 없으면 코드를 바꿔도 한동안 옛 값이 응답됨
+
+## 정적 프리렌더와 날짜 (중요)
+- **`/` 는 빌드 시점에 정적 생성됨 (`○`).** 프리렌더 중에 날짜 의존 UI 를 그리면 **빌드한 날짜가 HTML 에 박힘**
+  - React 는 이걸 **영구히 고치지 못함.** 하이드레이션은 속성(className) 불일치를 복구하지 않고, 더 나쁜 건 React 의 파이버 트리가 이미 올바른 클라이언트 값을 들고 있어서 **이후 어떤 리렌더도 diff 를 못 봄** → 배포가 살아 있는 동안 DOM 이 빌드 당일 값을 유지
+  - 실제 증상: 월간 뷰가 새로고침마다 **빌드한 날짜**를 오늘로 하이라이트 (2026-09 수정)
+  - 대책: `page.tsx` 의 **`mounted` 게이트.** 마운트 전에는 캘린더를 아예 렌더하지 않음. 예약을 클라이언트에서 fetch 하므로 프리렌더된 캘린더는 어차피 빈 격자였음
+  - `/reserve` 는 `useSearchParams` Suspense 경계 때문에 클라이언트 렌더로 빠져서 `min`/`max` 날짜가 박히지 않음 — 확인함 (프리렌더 HTML 에 `type="date"` 0개)
+  - **날짜·시각에 의존하는 UI 를 프리렌더되는 경로에 새로 넣을 때는 이 게이트 안쪽에 둘 것**
 
 ## 시간대 원칙 (중요)
 - **"오늘"/"지금"에 대한 모든 판단은 서부시간(`America/Los_Angeles`) 기준.** Vercel 서버는 UTC로 돌고 사용자 브라우저는 어느 시간대든 될 수 있어서, `new Date()`를 그대로 쓰면 태평양 오후 5시 이후 "내일"로 넘어가 당일 예약/변경이 막힘

@@ -84,9 +84,23 @@ export default function HomePage() {
 
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
 
-  // Sync to church-local (Pacific) time after SSR hydration
+  // `/` is prerendered at build time, so anything date-dependent that renders
+  // during the prerender bakes the *build* date into the shipped HTML — and
+  // React never repairs it. Hydration does not fix attribute mismatches, and
+  // because React's fiber tree already holds the correct client value, no later
+  // re-render sees a diff either: the DOM keeps the build-day value for the life
+  // of the deployment. That is why the month view highlighted 9/4 on every
+  // refresh — 9/4 was the day the deployment was built.
+  //
+  // Nothing is lost by waiting for mount. Reservations are fetched client-side,
+  // so the prerendered calendar was an empty grid with a stale highlight on it.
+  const [mounted, setMounted] = useState(false);
+
+  // Both are post-mount concerns and batch into one render: the browser's clock
+  // may not be on church-local (Pacific) time either.
   useEffect(() => {
     setCurrentDate(pacificTodayDate());
+    setMounted(true);
   }, []);
 
   // Swipe gesture animation state
@@ -595,7 +609,11 @@ export default function HomePage() {
             ref={calendarRef}
             className="bg-white border-t border-gray-200 h-full overflow-hidden"
           >
-            {viewMode === 'day' ? (
+            {!mounted ? (
+              <div className="h-full flex items-center justify-center text-sm text-gray-400">
+                {t.loading}
+              </div>
+            ) : viewMode === 'day' ? (
               <DayView key="day" currentDate={currentDate} reservations={filteredReservations} onDayClick={setCurrentDate} onRefresh={refreshReservations} swipeOffset={swipeX} swipeDragging={isDragging} />
             ) : viewMode === 'week' ? (
               <WeekView key="week" weekStart={weekStart} reservations={filteredReservations} onRefresh={refreshReservations} swipeOffset={swipeX} swipeDragging={isDragging} />

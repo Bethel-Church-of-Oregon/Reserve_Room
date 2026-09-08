@@ -20,7 +20,7 @@ function getSql() {
  * finds this value already recorded skips the entire migration block — 36 round
  * trips to Neon, about 2.6 seconds, paid by every new serverless instance.
  */
-const SCHEMA_VERSION = '2026-09-04';
+const SCHEMA_VERSION = '2026-09-07';
 const SCHEMA_VERSION_KEY = 'schema_version';
 
 type Sql = ReturnType<typeof getSql>;
@@ -327,6 +327,7 @@ async function runSchemaMigrations(sql: Sql): Promise<void> {
         { name: '비전홀 2층 교실 4',           color: '#D35400' },
         { name: '비전홀 2층 올리브홀(초등부)', color: '#af645cff' },
         { name: '비전홀 2층 초등부 교사실',    color: '#16A085' },
+        { name: '비전홀 2층 메자닌',           color: '#795548' },
         { name: '은혜성전 예배실',             color: '#3F51B5' },
         { name: '은혜성전 친교실',        color: '#27AE60' },
         { name: '은혜성전 2층 교실 302',       color: '#F39C12' },
@@ -340,6 +341,27 @@ async function runSchemaMigrations(sql: Sql): Promise<void> {
       for (const r of rooms) {
         await sql`INSERT INTO rooms (name, color) VALUES (${r.name}, ${r.color})`;
       }
+    }
+
+    // Added 2026-09. Must come after the seed above, which only fires when the
+    // table is empty: inserting a room before it would leave a fresh database
+    // holding this one room and none of the others.
+    //
+    // Marker-guarded rather than a bare ON CONFLICT, so an administrator who
+    // later retires the room does not find it back on the next restart.
+    try {
+      const marker = 'rooms_mezzanine_v1';
+      const done = (await sql`SELECT 1 FROM app_settings WHERE key = ${marker}`) as unknown[];
+      if (done.length === 0) {
+        await sql`
+          INSERT INTO rooms (name, color) VALUES ('비전홀 2층 메자닌', '#795548')
+          ON CONFLICT (name) DO NOTHING
+        `;
+        await sql`INSERT INTO app_settings (key, value) VALUES (${marker}, 'done')
+                  ON CONFLICT (key) DO NOTHING`;
+      }
+    } catch (e) {
+      console.error('[db] 메자닌 장소 추가 실패:', e);
     }
 
     // 은혜성전 교실 5 does not exist as a physical room. The delete guards itself
@@ -390,6 +412,7 @@ async function applyRoomOrder(sql: Sql): Promise<void> {
       '비전홀 2층 교실 4',
       '비전홀 2층 올리브홀(초등부)',
       '비전홀 2층 초등부 교사실',
+      '비전홀 2층 메자닌',
       '은혜성전 예배실',
       '은혜성전 친교실',
       '은혜성전 2층 교실 302',
