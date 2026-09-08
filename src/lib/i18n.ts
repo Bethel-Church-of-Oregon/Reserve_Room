@@ -26,7 +26,7 @@ export const roomNameMap: Record<string, string> = {
   '2층 초등부 교사실': '2F Elementary Teachers Room',
   '2층 메자닌': '2F Mezzanine',
   '예배실': 'Sanctuary',
-  '친교실': 'Fellowship Hall',
+  '친교실': 'Cafeteria',
   '2층 교실 302': '2F Classroom 302',
   '2층 교실 303': '2F Classroom 303',
   '2층 교실 305': '2F Classroom 305',
