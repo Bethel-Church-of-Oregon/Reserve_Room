@@ -3,7 +3,7 @@ export type Lang = 'ko' | 'en';
 /** Building prefixes, translated separately from the room itself. */
 export const buildingNameMap: Record<string, string> = {
   '비전홀': 'Vision Hall',
-  '은혜성전': 'Grace Hall',
+  '은혜성전': 'Grace Chapel',
 };
 
 /**
@@ -36,7 +36,7 @@ export const roomNameMap: Record<string, string> = {
 };
 
 /**
- * '은혜성전 2층 교실 302' -> 'Grace Hall 2F Classroom 302'.
+ * '은혜성전 2층 교실 302' -> 'Grace Chapel 2F Classroom 302'.
  * Anything unmapped falls back to the Korean text, so a new room shows up
  * readably even before it has a translation.
  */
