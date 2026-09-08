@@ -244,6 +244,10 @@ function ReserveForm() {
     else if (title.length > LIMITS.title) errs.title = t.errTitleLength(LIMITS.title);
     if (!form.room_id) errs.room_id = t.errRoomRequired;
     if (!form.date) errs.date = t.errDateRequired;
+    // The `max` attribute on the input does not hold on its own: the form is
+    // `noValidate`, so nothing checks it, and a typed-in date sails past a date
+    // input's max in every desktop browser.
+    else if (!isAdmin && form.date > oneMonthLaterStr()) errs.date = t.errDateTooFar;
     if (!form.start_time) errs.start_time = t.errStartRequired;
     if (!form.end_time) errs.end_time = t.errEndRequired;
     if (form.start_time && form.end_time && form.start_time >= form.end_time) {
@@ -299,6 +303,10 @@ function ReserveForm() {
           recurring: recurring !== 'none' ? recurring : undefined,
           recurring_until: recurring !== 'none' ? recurringUntil : undefined,
           access_code: accessCode.trim() || undefined,
+          // Says "this member is deliberately booking as an administrator", which
+          // is what lifts the one-month limit. The server still requires the signed
+          // session cookie as well, so this flag alone grants nothing.
+          admin_mode: isAdmin || undefined,
         }),
       });
 

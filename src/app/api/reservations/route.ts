@@ -109,6 +109,14 @@ export async function POST(req: NextRequest) {
     // create recurring series, and suppress the administrator notifications.
     const isAdmin = verifyAdminSession(cookies().get('admin_auth')?.value);
 
+    // Lifting the one-month limit takes more than a signed-in browser — it takes a
+    // request that meant to book as an administrator. Keying it on the cookie alone
+    // meant anyone who had opened /admin once in this browser silently lost the
+    // limit on the ordinary form, which is the same mistake the notification
+    // suppression made. The flag is a client hint and grants nothing without the
+    // verified cookie beside it.
+    const asAdmin = isAdmin && body?.admin_mode === true;
+
     // Shared reservation code, checked before anything else touches the database
     // and skipped for administrators, who are already authenticated. With no code
     // configured the gate is simply off, so the app works without one.
@@ -196,7 +204,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 일반 사용자는 오늘로부터 1달 이내만 예약 가능 (서부시간 기준 날짜 문자열 비교)
-    if (!isAdmin) {
+    if (!asAdmin) {
       const maxDateKey = format(addMonths(pacificTodayDate(), 1), 'yyyy-MM-dd');
       if (startStr.slice(0, 10) > maxDateKey) {
         return NextResponse.json({ error: '예약은 오늘로부터 1달 이내만 신청할 수 있습니다.' }, { status: 400 });

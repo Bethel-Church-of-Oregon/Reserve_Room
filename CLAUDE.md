@@ -315,7 +315,14 @@ approved → cancelled (취소 신청 시 즉시 처리)
   - bulk INSERT가 경합으로 실패하는 드문 경우에만 고아 행이 남을 수 있음. 트랜잭션 왕복을 매번 추가할 만한 빈도가 아니라고 판단해 그대로 둠
   - 충돌 날짜 자동 제외하고 나머지만 bulk INSERT
   - 생성 시 DB 쿼리 2번으로 고정 (범위 내 충돌 SELECT 1번 + 비충돌 건 UNNEST bulk INSERT 1번)
-- 1달 날짜 제한: 일반 사용자는 오늘~1달 이내만 예약. 클라이언트(date input `max`) + 서버(세션 쿠키 기반 `isAdmin`) 이중 검증
+- **1달 날짜 제한**: 일반 사용자는 오늘~1달 이내만 예약. 3중 검증 (2026-09 수정 — 예전에는 두 겹이 **둘 다 통과**했음)
+  - ① date input 의 `max` — **혼자서는 아무것도 막지 않음.** 폼이 `noValidate` 라 브라우저 제약 검증이 꺼져 있고, 데스크톱 브라우저에서는 `max` 를 넘는 날짜를 **직접 타이핑하면 그대로 들어감**
+  - ② `validate()` 의 `form.date > oneMonthLaterStr()` — ①이 안내일 뿐이므로 실제로 막는 건 여기
+  - ③ 서버 `if (!asAdmin)` — **`asAdmin = isAdmin && body.admin_mode === true`**
+    - 예전에는 `isAdmin`(세션 쿠키만) 이었음 → **관리자 패널에 한 번 로그인한 브라우저에서는 일반 폼의 1달 제한이 조용히 사라졌음.** 텔레그램 알림 억제와 **똑같은 실수** — 조건이 "관리자로 예약하려는 의도"가 아니라 "쿠키의 존재"였음. 개발자·담당자가 바로 그 상태라 테스트로도 안 잡혔음
+    - `admin_mode` 는 클라이언트 힌트라 **단독으로는 아무 권한도 주지 않음.** 반드시 검증된 쿠키와 AND. 클라이언트의 `isAdmin` 자체가 `?admin=true` **와** `GET /api/admin/auth` 양쪽을 요구함
+    - 반복 예약 403 은 그대로 `isAdmin` — 반복을 요청하는 것 자체가 명시적 의도이고, 플래그가 빠졌을 때 관리자 시리즈 예약이 깨지면 안 됨
+  - `/reserve` 는 `useSearchParams` Suspense 때문에 프리렌더 HTML 에 `type="date"` 가 **0개** → `max` 가 빌드 날짜로 박히지 않음 (매 배포 확인)
 - 이메일: 예약 신청 시 확인 메일 발송 (`sendReservationCreatedEmail` / `sendReservationCreatedBulkEmail`)
 - 회의실별 색상 20가지 시드 데이터로 정의
 - 일간/주간 뷰: 오전 6시~오후 11시, 1.5px/분, 겹침 감지 컬럼 레이아웃
