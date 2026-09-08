@@ -572,6 +572,13 @@ function ReserveForm() {
             <label htmlFor="reserve-date" className="block text-sm font-medium text-gray-700 mb-1">
               {t.fieldDate} <span className="text-red-500">*</span>
             </label>
+            {/* `appearance-none bg-white` is what keeps this field the same width as
+                the room select. Left native, iOS Safari sizes a date input from its
+                own intrinsic width and `w-full` cannot shrink it below that, so the
+                box overflowed the form's padding — and came out grey with centred
+                text besides. `min-w-0` clears the UA min-width that sizing leans on.
+                Desktop browsers have a small enough intrinsic width that `w-full`
+                won on its own, which is why this only showed up on a phone. */}
             <input
               id="reserve-date"
               type="date"
@@ -579,7 +586,7 @@ function ReserveForm() {
               min={isAdmin ? undefined : todayStr()}
               max={isAdmin ? undefined : oneMonthLaterStr()}
               onChange={(e) => handleChange('date', e.target.value)}
-              className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              className={`w-full min-w-0 appearance-none bg-white border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 errors.date ? 'border-red-400 bg-red-50' : 'border-gray-300'
               }`}
             />
@@ -723,7 +730,7 @@ function ReserveForm() {
                     setRecurringUntil(e.target.value);
                     setErrors((prev) => { const next = { ...prev }; delete next.recurring_until; return next; });
                   }}
-                  className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  className={`w-full min-w-0 appearance-none bg-white border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                     errors.recurring_until ? 'border-red-400 bg-red-50' : 'border-gray-300'
                   }`}
                 />
