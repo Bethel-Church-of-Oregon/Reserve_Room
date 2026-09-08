@@ -352,9 +352,15 @@ function ReserveForm() {
           >
             ←
           </button>
-          <div className="flex-1">
-            <h1 className="text-xl font-bold text-gray-800">{t.reservePageTitle}</h1>
-            <p className="text-sm text-gray-500">{t.reservePageSubtitle}</p>
+          {/* `min-w-0` is what makes `truncate` work: a flex item defaults to
+              `min-width: auto` and refuses to shrink below its own content, so
+              without it a long title wraps to two or three lines instead of
+              clipping. The admin header already had this pair; this one did
+              not, which is why the church's full name pushed the subtitle onto
+              extra lines at 320px. */}
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl font-bold text-gray-800 truncate">{t.reservePageTitle}</h1>
+            <p className="text-sm text-gray-500 truncate">{t.reservePageSubtitle}</p>
           </div>
           <button
             onClick={() => setLang(lang === 'ko' ? 'en' : 'ko')}

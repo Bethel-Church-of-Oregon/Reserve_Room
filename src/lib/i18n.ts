@@ -526,8 +526,8 @@ const en: typeof ko = {
 
   noUpcoming: 'No upcoming reservations.',
 
-  reservePageTitle: 'Room Reservation Request',
-  reservePageSubtitle: 'Oregon Bethel Presbyterian Church Room Reservation',
+  reservePageTitle: 'Book a Room',
+  reservePageSubtitle: 'Bethel Room Reservation',
   backLabel: 'Back',
 
   fieldTitle: 'Title',
@@ -692,9 +692,9 @@ const en: typeof ko = {
   personLabel: 'Contact:',
 
   adminTitle: 'Admin',
-  adminSubtitle: 'Oregon Bethel Presbyterian Church Reservations',
+  adminSubtitle: 'Bethel Room Reservation',
   adminLoginTitle: 'Admin Login',
-  adminLoginSubtitle: 'Oregon Bethel Presbyterian Church Reservation System',
+  adminLoginSubtitle: 'Bethel Room Reservation System',
   adminPasswordLabel: 'Password',
   adminPasswordPlaceholder: 'Enter admin password',
   adminLoginBtn: 'Login',
