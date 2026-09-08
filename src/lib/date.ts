@@ -67,6 +67,18 @@ export function toDateKey(d: Date): string {
  * is 2026-02-28 rather than rolling forward into March the way `setMonth` would
  * — a lower bound that jumps *forward* would quietly drop days of history.
  */
+/**
+ * Day of week for a 'YYYY-MM-DD' key, 0 = Sunday.
+ *
+ * Built from the components rather than by parsing the string as an instant, so
+ * it is the weekday of that calendar date and cannot shift with the server's
+ * timezone the way `new Date('2026-09-13').getDay()` can.
+ */
+export function weekdayOfKey(key: string): number {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d).getDay();
+}
+
 /** Shifts a 'YYYY-MM-DD' key by whole days. */
 export function addDaysToKey(key: string, days: number): string {
   const [y, m, d] = key.split('-').map(Number);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { addMonths, addDays, format } from 'date-fns';
-import { getReservations, createReservation, createReservationSeries, checkConflict, getRooms, getConflictingReservationsForRange, createReservationsBulk, getReservationAccessCode, isOverlapViolation } from '@/lib/db';
+import { getReservations, createReservation, createReservationSeries, checkConflict, getRooms, getConflictingReservationsForRange, createReservationsBulk, getReservationAccessCode, isOverlapViolation, getBlackouts } from '@/lib/db';
+import { findBlackout } from '@/lib/blackout';
 import { checkReservationLimit, checkReservationEmailLimit } from '@/lib/ratelimit';
 import { LIMITS } from '@/lib/constants';
 import { sendReservationCreatedEmail, sendReservationCreatedBulkEmail } from '@/lib/email';
@@ -236,15 +237,20 @@ export async function POST(req: NextRequest) {
       const maxEnd = occurrences[occurrences.length - 1].end_time;
       const existingConflicts = await getConflictingReservationsForRange(roomIdNum, minStart, maxEnd);
 
+      // Blackouts are fetched once for the whole range rather than per
+      // occurrence — the rules are a handful of rows and do not vary by date.
+      const blackouts = isAdmin ? [] : await getBlackouts();
+
       // Check each occurrence against in-memory conflict list
       const conflictDates: string[] = [];
       const toInsert: Array<{ start_time: string; end_time: string; series_index: number }> = [];
       let seriesIndex = 0;
 
       for (const occ of occurrences) {
-        const hasConflict = existingConflicts.some(
-          (c) => c.start_time < occ.end_time && c.end_time > occ.start_time
-        );
+        const hasConflict =
+          existingConflicts.some(
+            (c) => c.start_time < occ.end_time && c.end_time > occ.start_time
+          ) || findBlackout(blackouts, roomIdNum, occ.start_time, occ.end_time) !== null;
         if (hasConflict) {
           conflictDates.push(occ.start_time.slice(0, 10));
         } else {
@@ -349,6 +355,24 @@ export async function POST(req: NextRequest) {
     }
 
     // Single reservation
+    // Blackout windows — worship services and the like. Administrators are
+    // exempt, for the same reason they are exempt from the one-month limit: the
+    // office genuinely needs to book the sanctuary during a service window
+    // sometimes. The exemption comes from the signed session cookie, never from
+    // a request parameter.
+    if (!isAdmin) {
+      const hit = findBlackout(await getBlackouts(), roomIdNum, startStr, endStr);
+      if (hit) {
+        return NextResponse.json(
+          {
+            error: 'conflict',
+            message: `${hit.label} 시간(${hit.start_time}~${hit.end_time})에는 예약할 수 없습니다. 다른 시간이나 장소를 선택해 주세요.`,
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     const hasConflict = await checkConflict(roomIdNum, startStr, endStr);
     if (hasConflict) {
       return NextResponse.json(

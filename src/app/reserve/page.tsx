@@ -7,6 +7,7 @@ import { Room, PublicReservation } from '@/lib/db';
 import { LIMITS } from '@/lib/constants';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { pacificDateKey, pacificTodayDate, addDaysToKey, DATE_RE } from '@/lib/date';
+import { blackoutsOnDate, findBlackout, type RoomBlackout } from '@/lib/blackout';
 
 type RecurringType = 'none' | 'daily' | 'weekly' | 'monthly';
 
@@ -134,6 +135,11 @@ function ReserveForm() {
   const [takenState, setTakenState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   // Bumped after a 409 so the panel reloads and shows what actually took the slot.
   const [takenReload, setTakenReload] = useState(0);
+
+  // Standing unavailable windows (worship services). Fetched once — they are a
+  // handful of rules that do not depend on the chosen room or date, so the same
+  // list serves every selection and the rule is evaluated locally.
+  const [blackouts, setBlackouts] = useState<RoomBlackout[]>([]);
   const [success, setSuccess] = useState(false);
   const [successInfo, setSuccessInfo] = useState<SuccessInfo | null>(null);
 
@@ -160,6 +166,15 @@ function ReserveForm() {
       });
   }, [isAdmin]);
   useEffect(() => { loadRooms(); }, [loadRooms]);
+
+  useEffect(() => {
+    // Fails open: the server refuses the booking on submit regardless, so a
+    // failed load costs the member the warning, not the protection.
+    fetch('/api/blackouts')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows) => setBlackouts(Array.isArray(rows) ? rows : []))
+      .catch(() => setBlackouts([]));
+  }, []);
 
   useEffect(() => {
     const roomId = Number(form.room_id);
@@ -196,6 +211,23 @@ function ReserveForm() {
       });
     return () => { cancelled = true; };
   }, [form.room_id, form.date, takenReload]);
+
+  const blackoutsToday =
+    form.room_id && DATE_RE.test(form.date)
+      ? blackoutsOnDate(blackouts, Number(form.room_id), form.date)
+      : [];
+
+  // Administrators are exempt on the server, so the warning would be false for
+  // them; they still see the list, which is the useful part.
+  const blackoutHit =
+    !isAdmin && form.room_id && DATE_RE.test(form.date)
+      ? findBlackout(
+          blackouts,
+          Number(form.room_id),
+          `${form.date}T${form.start_time}:00`,
+          `${form.date}T${form.end_time}:00`
+        )
+      : null;
 
   // Half-open `[)`, the same rule as `checkConflict` and the database's
   // exclusion constraint: a booking that ends at 11:00 does not clash with one
@@ -589,6 +621,22 @@ function ReserveForm() {
           {/* Already-booked times for the chosen room and date */}
           {form.room_id && DATE_RE.test(form.date) && (
             <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5">
+              {blackoutsToday.length > 0 && (
+                <ul className="mb-2 space-y-1">
+                  {blackoutsToday.map((b) => (
+                    <li
+                      key={b.id}
+                      className="flex items-baseline gap-2 rounded border-l-[3px] border-amber-400 bg-amber-50 px-2 py-1 text-xs text-amber-900"
+                    >
+                      <span className="whitespace-nowrap tabular-nums">{b.start_time}–{b.end_time}</span>
+                      <span className="min-w-0 truncate font-medium">{b.label}</span>
+                      <span className="ml-auto whitespace-nowrap text-[11px] text-amber-700">
+                        {isAdmin ? t.blackoutAdminOnly : t.blackoutUnavailable}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
               <p className="text-xs font-medium text-gray-600">{t.availabilityTitle}</p>
               {takenState === 'loading' && (
                 <p className="mt-1 text-xs text-gray-400">{t.availabilityLoading}</p>
@@ -616,6 +664,11 @@ function ReserveForm() {
                     );
                   })}
                 </ul>
+              )}
+              {blackoutHit && (
+                <p className="mt-2 text-xs font-medium text-red-600">
+                  {t.blackoutOverlap(blackoutHit.label)}
+                </p>
               )}
               {overlapping.length > 0 && (
                 <p className="mt-2 text-xs font-medium text-red-600">{t.availabilityOverlap}</p>

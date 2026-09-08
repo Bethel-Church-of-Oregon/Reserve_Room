@@ -3,7 +3,9 @@ import {
   updateReservation,
   checkConflict,
   isOverlapViolation,
+  getBlackouts,
 } from '@/lib/db';
+import { findBlackout } from '@/lib/blackout';
 import { LIMITS } from '@/lib/constants';
 import { pacificDateKey, normalizeDateTime } from '@/lib/date';
 import { sendReservationUpdatedEmail } from '@/lib/email';
@@ -80,6 +82,22 @@ export async function applyReservationEdit(
   }
   if (start_time >= end_time) {
     return fail('종료 시간은 시작 시간보다 늦어야 합니다.', 400);
+  }
+
+  // Only when the time actually moves. A booking that already sits inside a
+  // blackout — 1,020 Sunday reservations predate the feature — must stay
+  // editable, or its owner cannot even fix a typo in the title. `allowPast`
+  // marks the admin path, which is exempt here as it is on creation.
+  const timeMoved =
+    start_time !== reservation.start_time || end_time !== reservation.end_time;
+  if (timeMoved && !allowPast) {
+    const hit = findBlackout(await getBlackouts(), reservation.room_id, start_time, end_time);
+    if (hit) {
+      return fail(
+        `${hit.label} 시간(${hit.start_time}~${hit.end_time})으로는 변경할 수 없습니다. 다른 시간을 선택해 주세요.`,
+        409
+      );
+    }
   }
 
   if (await checkConflict(reservation.room_id, start_time, end_time, id)) {

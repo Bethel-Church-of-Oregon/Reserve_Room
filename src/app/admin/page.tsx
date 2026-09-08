@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ReservationWithRoom, NotificationRecipient } from '@/lib/db';
+import type { RoomBlackout } from '@/lib/blackout';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { pacificDateKey, addMonthsToKey } from '@/lib/date';
 import { LIMITS } from '@/lib/constants';
@@ -303,6 +304,22 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const [addError, setAddError] = useState('');
   const [addLoading, setAddLoading] = useState(false);
 
+  // Blackout windows. Defaults match the shape of the rule the church actually
+  // has — a weekly Sunday service — so the common case is a few edits, not a
+  // form filled from scratch.
+  const [blackouts, setBlackouts] = useState<RoomBlackout[]>([]);
+  const [blackoutsLoading, setBlackoutsLoading] = useState(false);
+  const [boLabel, setBoLabel] = useState('');
+  const [boRoom, setBoRoom] = useState('');
+  const [boRecurring, setBoRecurring] = useState<'daily' | 'weekly'>('weekly');
+  const [boWeekday, setBoWeekday] = useState('0');
+  const [boStart, setBoStart] = useState('08:00');
+  const [boEnd, setBoEnd] = useState('15:30');
+  const [boFrom, setBoFrom] = useState('');
+  const [boTo, setBoTo] = useState('');
+  const [boError, setBoError] = useState('');
+  const [boLoading, setBoLoading] = useState(false);
+
   // The desktop table's own header sticks to the top of its scroll box, so the
   // box has to end where the toolbar begins. The toolbar's height is not a
   // constant — the buttons use `clamp()` font sizes, the row wraps on a narrow
@@ -355,6 +372,65 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
     }).catch(() => {});
   }, []);
 
+  const fetchBlackouts = useCallback(async () => {
+    setBlackoutsLoading(true);
+    try {
+      const res = await fetch('/api/blackouts');
+      const data = await res.json();
+      setBlackouts(Array.isArray(data) ? data : []);
+    } catch { /* silent */ }
+    finally { setBlackoutsLoading(false); }
+  }, []);
+
+  async function handleAddBlackout() {
+    if (!boLabel.trim()) { setBoError(t.errBlackoutLabel); return; }
+    setBoLoading(true);
+    setBoError('');
+    try {
+      const res = await fetch('/api/admin/blackouts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          label: boLabel.trim(),
+          room_id: boRoom === '' ? null : Number(boRoom),
+          recurring: boRecurring,
+          weekday: boRecurring === 'weekly' ? Number(boWeekday) : null,
+          start_time: boStart,
+          end_time: boEnd,
+          date_from: boFrom || null,
+          date_to: boTo || null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setBoError(typeof data?.error === 'string' ? data.error : t.errGeneral); return; }
+      setBoLabel('');
+      setBoFrom('');
+      setBoTo('');
+      // A rule saved over hundreds of existing bookings protects nothing, and
+      // the administrator has to hear that now rather than discover it later.
+      showToast(
+        data.existingCount > 0
+          ? t.toastBlackoutAddedWithExisting(data.existingCount)
+          : t.toastBlackoutAdded
+      );
+      fetchBlackouts();
+    } catch {
+      setBoError(t.errNetwork);
+    } finally {
+      setBoLoading(false);
+    }
+  }
+
+  async function handleDeleteBlackout(id: number) {
+    try {
+      const res = await fetch(`/api/admin/blackouts/${id}`, { method: 'DELETE' });
+      if (res.ok) { showToast(t.toastBlackoutDeleted); fetchBlackouts(); }
+      else { const d = await res.json().catch(() => ({})); showToast(d.error ?? t.toastError, 'error'); }
+    } catch {
+      showToast(t.errNetwork, 'error');
+    }
+  }
+
   const fetchRecipients = useCallback(async () => {
     setRecipientsLoading(true);
     try {
@@ -385,8 +461,8 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
 
   useEffect(() => {
     // Notification recipients live inside Settings, so both loads happen together.
-    if (adminView === 'settings') { fetchAccessCode(); fetchRecipients(); }
-  }, [adminView, fetchRecipients, fetchAccessCode]);
+    if (adminView === 'settings') { fetchAccessCode(); fetchRecipients(); fetchBlackouts(); }
+  }, [adminView, fetchRecipients, fetchAccessCode, fetchBlackouts]);
 
   const uniqueRooms = allRooms.length > 0 ? allRooms : Array.from(
     new Map(reservations.map(r => [r.room_id, { id: r.room_id, name: r.room_name, color: r.room_color }])).values()
@@ -627,7 +703,7 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
               {t.adminTabSettings}
             </button>
             <button
-              onClick={adminView === 'settings' ? () => { fetchAccessCode(); fetchRecipients(); } : fetchReservations}
+              onClick={adminView === 'settings' ? () => { fetchAccessCode(); fetchRecipients(); fetchBlackouts(); } : fetchReservations}
               className="ml-auto border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition whitespace-nowrap flex-shrink-0"
               style={{ fontSize: 'clamp(10px, 3.5vw, 14px)', padding: '8px clamp(6px, 2vw, 12px)' }}
             >
@@ -901,6 +977,139 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
                         if (res.ok) { showToast(t.recipientDeleted); fetchRecipients(); }
                         else { const d = await res.json(); showToast(d.error ?? t.toastError, 'error'); }
                       }}
+                      className="flex-shrink-0 text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 rounded-lg px-2.5 py-1.5 transition"
+                    >
+                      {t.btnDelete}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Blackout windows — worship services and the like */}
+        {adminView === 'settings' && (
+          <div className="max-w-lg mt-10 pt-8 border-t border-gray-200">
+            <h2 className="text-base font-bold text-gray-800 mb-1">{t.blackoutTitle}</h2>
+            <p className="text-xs text-gray-500 mb-5">{t.blackoutDesc}</p>
+
+            {/* Add form */}
+            <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-4">
+              <div className="flex flex-col gap-3">
+                <input
+                  type="text"
+                  value={boLabel}
+                  onChange={(e) => { setBoLabel(e.target.value); setBoError(''); }}
+                  placeholder={t.blackoutLabelPlaceholder}
+                  maxLength={LIMITS.title}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
+                />
+                {/* Empty value means every room, which is a real choice here
+                    rather than a missing one. */}
+                <select
+                  value={boRoom}
+                  onChange={(e) => { setBoRoom(e.target.value); setBoError(''); }}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base bg-white focus:outline-none focus:ring-2 focus:ring-gray-400"
+                >
+                  <option value="">{t.blackoutAllRooms}</option>
+                  {uniqueRooms.map((room) => (
+                    <option key={room.id} value={room.id}>{tRoom(room.name)}</option>
+                  ))}
+                </select>
+                <div className="flex gap-2">
+                  <select
+                    value={boRecurring}
+                    onChange={(e) => { setBoRecurring(e.target.value as 'daily' | 'weekly'); setBoError(''); }}
+                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base bg-white focus:outline-none focus:ring-2 focus:ring-gray-400"
+                  >
+                    <option value="weekly">{t.blackoutWeekly}</option>
+                    <option value="daily">{t.blackoutDaily}</option>
+                  </select>
+                  {boRecurring === 'weekly' && (
+                    <select
+                      value={boWeekday}
+                      onChange={(e) => { setBoWeekday(e.target.value); setBoError(''); }}
+                      className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base bg-white focus:outline-none focus:ring-2 focus:ring-gray-400"
+                    >
+                      {t.daysShort.map((d: string, i: number) => (
+                        <option key={i} value={i}>{d}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="time"
+                    step={900}
+                    value={boStart}
+                    onChange={(e) => { setBoStart(e.target.value); setBoError(''); }}
+                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
+                  />
+                  <span className="text-gray-400 flex-shrink-0">~</span>
+                  <input
+                    type="time"
+                    step={900}
+                    value={boEnd}
+                    onChange={(e) => { setBoEnd(e.target.value); setBoError(''); }}
+                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
+                  />
+                </div>
+                {/* Optional on both ends: a service runs indefinitely, a special
+                    season does not. */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={boFrom}
+                    onChange={(e) => { setBoFrom(e.target.value); setBoError(''); }}
+                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                  />
+                  <span className="text-gray-400 flex-shrink-0">~</span>
+                  <input
+                    type="date"
+                    value={boTo}
+                    onChange={(e) => { setBoTo(e.target.value); setBoError(''); }}
+                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                  />
+                </div>
+                <p className="text-xs text-gray-400">{t.blackoutRangeHint}</p>
+                {boError && <p className="text-xs text-red-500">{boError}</p>}
+                <button
+                  onClick={handleAddBlackout}
+                  disabled={boLoading}
+                  className="w-full px-4 py-2 bg-gray-800 hover:bg-gray-900 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition"
+                >
+                  {boLoading ? t.blackoutSaving : t.blackoutAdd}
+                </button>
+              </div>
+            </div>
+
+            {/* Existing rules */}
+            {blackoutsLoading ? (
+              <p className="text-xs text-gray-400">{t.loading}</p>
+            ) : blackouts.length === 0 ? (
+              <p className="text-xs text-gray-400">{t.blackoutNone}</p>
+            ) : (
+              <div className="space-y-2">
+                {blackouts.map((b) => (
+                  <div key={b.id} className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-800 truncate">{b.label}</p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {b.room_name ? tRoom(b.room_name) : t.blackoutAllRooms}
+                        {' · '}
+                        {b.recurring === 'daily' ? t.blackoutDaily : t.blackoutEveryWeekday(t.daysShort[b.weekday ?? 0])}
+                        {' '}
+                        <span className="tabular-nums">{b.start_time}~{b.end_time}</span>
+                      </p>
+                      {(b.date_from || b.date_to) && (
+                        <p className="text-xs text-gray-400 tabular-nums">
+                          {b.date_from ?? ''} ~ {b.date_to ?? ''}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => handleDeleteBlackout(b.id)}
                       className="flex-shrink-0 text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 rounded-lg px-2.5 py-1.5 transition"
                     >
                       {t.btnDelete}

@@ -1,4 +1,8 @@
 import { neon } from '@neondatabase/serverless';
+import { pacificDateKey } from './date';
+import { findBlackout, type RoomBlackout, type BlackoutRecurring } from './blackout';
+
+export type { RoomBlackout, BlackoutRecurring };
 
 let _sql: ReturnType<typeof neon> | null = null;
 
@@ -20,7 +24,7 @@ function getSql() {
  * finds this value already recorded skips the entire migration block — 36 round
  * trips to Neon, about 2.6 seconds, paid by every new serverless instance.
  */
-const SCHEMA_VERSION = '2026-09-07';
+const SCHEMA_VERSION = '2026-09-08';
 const SCHEMA_VERSION_KEY = 'schema_version';
 
 type Sql = ReturnType<typeof getSql>;
@@ -229,6 +233,28 @@ async function runSchemaMigrations(sql: Sql): Promise<void> {
       )
     `;
 
+    // Windows in which a room may not be booked — worship services and the
+    // like. One row is a standing rule, not an occurrence: "every Sunday,
+    // forever" is this single record rather than five hundred reservations.
+    //
+    // No exclusion constraint here, unlike `reservations`. That one exists
+    // because two concurrent requests can both pass a SELECT; a blackout is a
+    // static rule, so nothing changes between the check and the write.
+    await sql`
+      CREATE TABLE IF NOT EXISTS room_blackouts (
+        id         SERIAL PRIMARY KEY,
+        label      TEXT NOT NULL,
+        room_id    INTEGER REFERENCES rooms(id),
+        recurring  TEXT NOT NULL,
+        weekday    INTEGER,
+        start_time TEXT NOT NULL,
+        end_time   TEXT NOT NULL,
+        date_from  TEXT,
+        date_to    TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `;
+
     // Notification recipients table
     await sql`
       CREATE TABLE IF NOT EXISTS notification_recipients (
@@ -362,6 +388,27 @@ async function runSchemaMigrations(sql: Sql): Promise<void> {
       }
     } catch (e) {
       console.error('[db] 메자닌 장소 추가 실패:', e);
+    }
+
+    // The first blackout: 주일예배, every Sunday 08:00-15:30 in 비전홀 대예배실.
+    // Keyed on the room *name* like every other room migration here, because ids
+    // differ between databases. Marker-guarded rather than idempotent on
+    // content, so an administrator who deletes or edits the rule from the admin
+    // page does not find it restored on the next restart.
+    try {
+      const marker = 'blackout_sunday_service_v1';
+      const done = (await sql`SELECT 1 FROM app_settings WHERE key = ${marker}`) as unknown[];
+      if (done.length === 0) {
+        await sql`
+          INSERT INTO room_blackouts (label, room_id, recurring, weekday, start_time, end_time)
+          SELECT '주일예배', id, 'weekly', 0, '08:00', '15:30'
+          FROM rooms WHERE name = '비전홀 대예배실'
+        `;
+        await sql`INSERT INTO app_settings (key, value) VALUES (${marker}, 'done')
+                  ON CONFLICT (key) DO NOTHING`;
+      }
+    } catch (e) {
+      console.error('[db] 주일예배 blackout 시딩 실패:', e);
     }
 
     // 은혜성전 교실 5 does not exist as a physical room. The delete guards itself
@@ -884,6 +931,87 @@ export interface NotificationRecipient {
   /** Stored as entered; normalized to E.164 at send time (`toE164` in lib/sms). */
   phone: string;
   created_at: string;
+}
+
+/**
+ * Every blackout rule, with the room name joined for display. There are only
+ * ever a handful, and they are deliberately not memoised: a rule the
+ * administrator just saved has to take effect on the next request, not whenever
+ * the serverless instance happens to recycle.
+ */
+export async function getBlackouts(): Promise<RoomBlackout[]> {
+  await ensureDbReady();
+  return (await getSql()`
+    SELECT b.id, b.label, b.room_id, b.recurring, b.weekday,
+           b.start_time, b.end_time, b.date_from, b.date_to,
+           rm.name AS room_name
+    FROM room_blackouts b
+    LEFT JOIN rooms rm ON b.room_id = rm.id
+    ORDER BY b.weekday NULLS FIRST, b.start_time, b.id
+  `) as RoomBlackout[];
+}
+
+export async function createBlackout(data: {
+  label: string;
+  room_id: number | null;
+  recurring: BlackoutRecurring;
+  weekday: number | null;
+  start_time: string;
+  end_time: string;
+  date_from: string | null;
+  date_to: string | null;
+}): Promise<RoomBlackout> {
+  await ensureDbReady();
+  const rows = (await getSql()`
+    INSERT INTO room_blackouts (label, room_id, recurring, weekday, start_time, end_time, date_from, date_to)
+    VALUES (${data.label}, ${data.room_id}, ${data.recurring}, ${data.weekday},
+            ${data.start_time}, ${data.end_time}, ${data.date_from}, ${data.date_to})
+    RETURNING id, label, room_id, recurring, weekday, start_time, end_time, date_from, date_to
+  `) as RoomBlackout[];
+  return rows[0];
+}
+
+export async function deleteBlackout(id: number): Promise<boolean> {
+  await ensureDbReady();
+  const rows = (await getSql()`
+    DELETE FROM room_blackouts WHERE id = ${id} RETURNING id
+  `) as unknown[];
+  return rows.length > 0;
+}
+
+/**
+ * Approved future reservations that would fall inside a rule.
+ *
+ * A blackout never invalidates a booking that already exists — 1,020 Sunday
+ * bookings predate this feature — so saving a rule has to say how many are
+ * inside it. Otherwise the administrator believes the sanctuary is protected
+ * while hundreds of bookings sit in the window.
+ *
+ * Filtered by room in SQL and by the recurrence rule in JS, because the rule
+ * lives in one place (`lib/blackout`) and a second copy in SQL would drift.
+ */
+export async function countReservationsInBlackout(b: {
+  room_id: number | null;
+  recurring: BlackoutRecurring;
+  weekday: number | null;
+  start_time: string;
+  end_time: string;
+  date_from: string | null;
+  date_to: string | null;
+}): Promise<number> {
+  await ensureDbReady();
+  const sql = getSql();
+  const from = b.date_from ?? pacificDateKey();
+  const rows = (await sql`
+    SELECT start_time, end_time, room_id FROM reservations
+    WHERE status = 'approved'
+      AND start_time >= ${from}
+      AND (${b.room_id ?? null}::int IS NULL OR room_id = ${b.room_id ?? null})
+      AND (${b.date_to ?? null}::text IS NULL OR start_time <= ${b.date_to ?? null})
+  `) as { start_time: string; end_time: string; room_id: number }[];
+
+  const rule: RoomBlackout = { id: 0, label: '', ...b };
+  return rows.filter((r) => findBlackout([rule], r.room_id, r.start_time, r.end_time) !== null).length;
 }
 
 export async function getNotificationRecipients(): Promise<NotificationRecipient[]> {
