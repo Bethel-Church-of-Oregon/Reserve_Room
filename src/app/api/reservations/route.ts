@@ -203,10 +203,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '종료 시간은 시작 시간보다 늦어야 합니다.' }, { status: 400 });
     }
 
-    // 일반 사용자는 오늘로부터 1달 이내만 예약 가능 (서부시간 기준 날짜 문자열 비교)
+    // 일반 사용자의 예약 가능 창: 오늘 ~ 1달 이내 (서부시간 기준 날짜 문자열 비교)
+    //
+    // 아래쪽 경계가 예전에는 서버에 아예 없었음 — 클라이언트의 `min` 속성이 유일한
+    // 방어였고 그건 방어가 아니었음. iOS 사파리의 휠 피커가 범위 밖 값을 돌려주면
+    // 지난달 날짜로 예약이 그대로 저장됐음 (2026-09 수정)
     if (!asAdmin) {
+      const startKey = startStr.slice(0, 10);
+      // 날짜 기준이지 "이미 끝났는지" 기준이 아님. 오늘 오전 예약을 오후에 넣는 것은
+      // 허용 — 앱의 다른 "지난" 판정(canEdit·canRequestCancel·시리즈 취소)도 전부
+      // start_time 의 날짜 부분을 태평양 날짜키와 비교함
+      if (startKey < pacificDateKey()) {
+        return NextResponse.json({ error: '지난 날짜는 예약할 수 없습니다.' }, { status: 400 });
+      }
       const maxDateKey = format(addMonths(pacificTodayDate(), 1), 'yyyy-MM-dd');
-      if (startStr.slice(0, 10) > maxDateKey) {
+      if (startKey > maxDateKey) {
         return NextResponse.json({ error: '예약은 오늘로부터 1달 이내만 신청할 수 있습니다.' }, { status: 400 });
       }
     }

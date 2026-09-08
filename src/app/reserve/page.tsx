@@ -244,9 +244,11 @@ function ReserveForm() {
     else if (title.length > LIMITS.title) errs.title = t.errTitleLength(LIMITS.title);
     if (!form.room_id) errs.room_id = t.errRoomRequired;
     if (!form.date) errs.date = t.errDateRequired;
-    // The `max` attribute on the input does not hold on its own: the form is
-    // `noValidate`, so nothing checks it, and a typed-in date sails past a date
-    // input's max in every desktop browser.
+    // `min`/`max` on the input hold nothing on their own: the form is `noValidate`,
+    // so no browser constraint check runs, a typed-in date sails past the range in
+    // every desktop browser, and iOS Safari's wheel picker hands back out-of-range
+    // values too. These two lines are what actually stops it.
+    else if (!isAdmin && form.date < todayStr()) errs.date = t.errDatePast;
     else if (!isAdmin && form.date > oneMonthLaterStr()) errs.date = t.errDateTooFar;
     if (!form.start_time) errs.start_time = t.errStartRequired;
     if (!form.end_time) errs.end_time = t.errEndRequired;
@@ -574,7 +576,7 @@ function ReserveForm() {
               id="reserve-date"
               type="date"
               value={form.date}
-              min={todayStr()}
+              min={isAdmin ? undefined : todayStr()}
               max={isAdmin ? undefined : oneMonthLaterStr()}
               onChange={(e) => handleChange('date', e.target.value)}
               className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${
