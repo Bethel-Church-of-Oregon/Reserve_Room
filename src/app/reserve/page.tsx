@@ -65,6 +65,22 @@ function oneMonthLaterStr(): string {
   return format(addMonths(pacificTodayDate(), 1), 'yyyy-MM-dd');
 }
 
+/**
+ * The chevron for a select. `appearance-none` is what keeps a control the same
+ * width and colour as the rest of the form on iOS Safari, and it takes the
+ * native arrow with it — so every select that turns appearance off draws this.
+ * Sits in a `relative` wrapper and ignores clicks so the select still opens.
+ */
+function SelectChevron() {
+  return (
+    <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+    </div>
+  );
+}
+
 function ReserveForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -602,34 +618,40 @@ function ReserveForm() {
             </label>
             <div className="flex items-center gap-3">
               <div className="flex-1">
-                <select
-                  id="reserve-start-time"
-                  value={form.start_time}
-                  onChange={(e) => handleChange('start_time', e.target.value)}
-                  className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    errors.start_time ? 'border-red-400 bg-red-50' : 'border-gray-300'
-                  }`}
-                >
-                  {TIME_OPTIONS.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    id="reserve-start-time"
+                    value={form.start_time}
+                    onChange={(e) => handleChange('start_time', e.target.value)}
+                    className={`w-full appearance-none bg-white border rounded-lg pl-3 pr-8 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.start_time ? 'border-red-400 bg-red-50' : 'border-gray-300'
+                    }`}
+                  >
+                    {TIME_OPTIONS.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                  <SelectChevron />
+                </div>
                 {errors.start_time && <p className="mt-1 text-xs text-red-500">{errors.start_time}</p>}
               </div>
               <span className="text-gray-400 font-medium flex-shrink-0">~</span>
               <div className="flex-1">
-                <select
-                  id="reserve-end-time"
-                  value={form.end_time}
-                  onChange={(e) => handleChange('end_time', e.target.value)}
-                  className={`w-full border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    errors.end_time ? 'border-red-400 bg-red-50' : 'border-gray-300'
-                  }`}
-                >
-                  {TIME_OPTIONS.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    id="reserve-end-time"
+                    value={form.end_time}
+                    onChange={(e) => handleChange('end_time', e.target.value)}
+                    className={`w-full appearance-none bg-white border rounded-lg pl-3 pr-8 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.end_time ? 'border-red-400 bg-red-50' : 'border-gray-300'
+                    }`}
+                  >
+                    {TIME_OPTIONS.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                  <SelectChevron />
+                </div>
                 {errors.end_time && <p className="mt-1 text-xs text-red-500">{errors.end_time}</p>}
               </div>
             </div>
