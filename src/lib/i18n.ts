@@ -31,7 +31,7 @@ export const roomNameMap: Record<string, string> = {
   '2층 교실 303': '2F Classroom 303',
   '2층 교실 305': '2F Classroom 305',
   '2층 교실 306': '2F Classroom 306',
-  '청년부실': 'Youth Room',
+  '청년부실': 'Young Adults Room',
   '(구)부교역자실': '(Former) Associate Pastors Office',
 };
 
