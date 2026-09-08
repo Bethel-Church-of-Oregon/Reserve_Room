@@ -268,13 +268,53 @@ const ko = {
 
   // Rules modal
   rulesTitle: '장소 사용 수칙 및 주의 사항',
-  rulesIntro: '교회 내 모든 시설은 신앙 생활과 교제를 위한 공간입니다. 아래 사용 수칙을 반드시 준수해 주시기 바랍니다.',
+  rulesIntro:
+    '교회 내 모든 공간은 성도님들의 건강한 신앙 생활과 은혜로운 교제를 위해 마련된 곳입니다. 서로를 배려하고 안전하게 시설을 이용할 수 있도록 아래 이용 수칙을 확인해 주시기 바랍니다.',
+  // `body` is an array because several items make two distinct points, and
+  // running them into one paragraph buries the second one.
   rulesItems: [
-    { title: '1. 사용 목적 제한 (영리 활동 금지)', body: '개인적인 수입을 목적으로 하는 레슨(과외), 비즈니스 미팅, 물품 판매 등 모든 영리 활동은 엄격히 금지합니다.' },
-    { title: '2. 청결 및 정리 정돈', body: '사용 후에는 다음 사용자를 위해 반드시 정리 정돈을 완료해 주십시오. 발생한 쓰레기는 지정된 장소에 분리배출 하거나 직접 수거해 가시기 바랍니다.' },
-    { title: '3. 에너지 절약 및 화재 예방', body: '퇴실 시 반드시 모든 전등을 끄고, 냉난방기 및 전기 기구의 전원을 차단해 주십시오. 휴대용 버너, 양초 등 화기 사용은 절대 금지합니다.' },
-    { title: '4. 시설물 관리', body: '교회 기물 및 비품을 소중히 다뤄 주시고, 파손 시 즉시 교회 사무실에 알려 주시기 바랍니다.' },
+    {
+      title: '1. 예약 자격 및 이용 목적',
+      body: [
+        '본 시설 예약은 등록교인에 한해 가능하며, 사랑방 모임 및 사역팀 회의 등 교회 공식 사역과 교제를 주목적으로 합니다. 외부인 단독 예약이나 이용은 제한됩니다.',
+        'Youth 그룹 등 청소년 모임의 경우, 안전한 공간 이용과 시설 관리를 위해 성인(교역자, 교사 또는 보호자)이 직접 예약하고 동반하여 이용해 주시기 바랍니다.',
+      ],
+    },
+    {
+      title: '2. 영리 활동 및 사적 이용 제한',
+      body: [
+        '개인적 수입을 목적으로 하는 과외/레슨, 비즈니스 미팅, 물품 판매 등 일체의 영리 활동은 엄격히 금지합니다.',
+      ],
+    },
+    {
+      title: '3. 청결 유지 및 뒷정리',
+      body: [
+        '다음 모임을 위해 사용 후에는 청소 및 정리 정돈을 부탁드립니다. 모임 중 발생한 쓰레기는 지정된 장소에 분리배출해 주시거나 직접 수거해 주시기 바랍니다.',
+      ],
+    },
+    {
+      title: '4. 에너지 절약 및 화재 안전',
+      body: [
+        '퇴실 시에는 전등과 냉·난방기, 음향/전기 기기의 전원을 반드시 꺼 주십시오.',
+        '안전을 위해 허가되지 않은 휴대용 버너, 양초 등 화기 사용은 엄격히 금지됩니다.',
+      ],
+    },
+    {
+      title: '5. 시설물 관리 및 파손 시 안내',
+      body: [
+        '교회의 모든 비품과 시설물을 소중히 사용해 주시고, 비품이 고장 나거나 파손된 경우 즉시 교회 사무실로 알려 주시기 바랍니다.',
+      ],
+    },
+    {
+      title: '6. 예약 취소 및 유의사항',
+      body: [
+        '위 수칙에 부합하지 않거나 목적 외로 신청된 예약의 경우, 모두의 안전을 위해 관리자에 의해 예약이 조정되거나 취소될 수 있는 점 양해 부탁드립니다.',
+      ],
+    },
   ],
+  // Empty rather than invented: the Korean text has no closing paragraph, and
+  // the modal skips the block when this is blank.
+  rulesOutro: '',
   rulesAgree: '주의사항을 모두 숙지하였으며, 이를 준수할 것에 동의합니다.',
   btnReserveFromRules: '예약 신청하기',
 
@@ -556,13 +596,51 @@ const en: typeof ko = {
   recurringConflicts: (n: number) => `⚠ ${n} skipped due to time conflicts`,
 
   rulesTitle: 'Facility Usage Guidelines',
-  rulesIntro: 'All facilities in the church are spaces for faith and fellowship. Please follow the guidelines below.',
+  rulesIntro:
+    'All church facilities are entrusted to us as shared spaces for worship, spiritual growth, ministry, and fellowship. To help everyone use these spaces safely and respectfully, please review and follow the guidelines below.',
   rulesItems: [
-    { title: '1. Purpose Restrictions (No Commercial Activities)', body: 'All commercial activities, including private lessons (tutoring), business meetings, and product sales for personal income, are strictly prohibited.' },
-    { title: '2. Cleanliness and Tidiness', body: 'After use, please clean up and tidy the space for the next user. Dispose of all trash at designated locations or take it with you.' },
-    { title: '3. Energy Conservation and Fire Safety', body: 'When leaving, please turn off all lights and shut off HVAC and electrical appliances. Use of portable burners, candles, or open flame is strictly prohibited.' },
-    { title: '4. Facility Care', body: 'Please handle all church equipment and furnishings with care. Report any damage to the church office immediately.' },
+    {
+      title: '1. Reservation Eligibility and Approved Uses',
+      body: [
+        'Reservations are available only to registered church members. Facilities are intended primarily for church-related ministries, small group (Sarangbang) gatherings, and ministry department meetings. Reservations or use by individuals or groups from outside the church are not permitted.',
+        'For gatherings involving minors, such as Youth group meetings, an adult—such as a pastor, ministry leader, teacher, or parent/guardian—must make the reservation and accompany the group during its use of the facility. This is requested for the safety of the participants and the proper care of the facilities.',
+      ],
+    },
+    {
+      title: '2. Commercial and Personal Activities',
+      body: [
+        'Commercial activities intended for personal financial gain—including private tutoring or lessons, business meetings, and the sale of goods—are not permitted on church premises.',
+      ],
+    },
+    {
+      title: '3. Cleanliness and Restoring the Space',
+      body: [
+        'Out of consideration for the next group using the space, please return all furniture and equipment to their original positions and complete basic cleaning and tidying before leaving.',
+        'Please place all waste in the designated disposal or recycling areas. Alternatively, please take it with you when you leave.',
+      ],
+    },
+    {
+      title: '4. Energy Conservation and Fire Safety',
+      body: [
+        'Before leaving the facility, please make sure that all lights, heating and air-conditioning units, audio equipment, and other electrical devices are turned off.',
+        'For everyone’s safety, the use of open flames or unauthorized heating and cooking devices—including portable burners, gas stoves, and candles—is not permitted.',
+      ],
+    },
+    {
+      title: '5. Care of Church Property and Reporting Damage',
+      body: [
+        'Please treat all church facilities, furnishings, equipment, and supplies with care. If any equipment or property is damaged or malfunctions during your use, please notify the church office or facilities staff as soon as possible.',
+      ],
+    },
+    {
+      title: '6. Reservation Adjustments and Cancellations',
+      body: [
+        'Reservations that do not comply with these guidelines or that are submitted for unapproved purposes may be adjusted or canceled by the facility administrator in order to maintain the safety, proper order, and shared use of our church facilities.',
+      ],
+    },
   ],
+  rulesOutro:
+    'We appreciate your understanding and cooperation as we seek to care for these spaces responsibly and be good stewards of the resources entrusted to our church community.',
   rulesAgree: 'I have read and understood all guidelines and agree to comply.',
   btnReserveFromRules: 'Proceed to Reservation',
 

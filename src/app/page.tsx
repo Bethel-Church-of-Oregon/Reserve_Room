@@ -41,9 +41,14 @@ function RulesModal({ onAgree, onClose }: { onAgree: () => void; onClose: () => 
           {t.rulesItems.map((item, i) => (
             <div key={i}>
               <p className="font-semibold text-gray-900">{item.title}</p>
-              <p className="mt-1">{item.body}</p>
+              <div className="mt-1 space-y-2">
+                {item.body.map((para, j) => (
+                  <p key={j}>{para}</p>
+                ))}
+              </div>
             </div>
           ))}
+          {t.rulesOutro && <p className="text-gray-500">{t.rulesOutro}</p>}
         </div>
         <div className="px-6 py-4 border-t border-gray-200 flex-shrink-0 space-y-3">
           <label className="flex items-center gap-2 cursor-pointer select-none">
