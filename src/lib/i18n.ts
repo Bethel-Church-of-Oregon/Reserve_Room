@@ -548,7 +548,7 @@ const en: typeof ko = {
   errAccessCodeWrong: 'That reservation code is not correct. Please check the bulletin or contact the church office.',
   optional: 'Optional',
 
-  placeholderTitle: 'e.g. Home Group, Ministry Team Meeting',
+  placeholderTitle: 'e.g. Small Group, Ministry Team Meeting',
   placeholderRoom: 'Select a room',
   placeholderPerson: 'Name or contact',
   placeholderNotes: 'Enter any special requests or notes.',
@@ -581,7 +581,7 @@ const en: typeof ko = {
 
   btnSubmitting: 'Submitting...',
   btnRecurringReserve: 'Submit Recurring Reservation',
-  btnReserveAction: 'Submit Reservation',
+  btnReserveAction: 'Submit',
   btnMoreReserve: 'Make Another Reservation',
   btnBackToCalendar: 'Back to Calendar',
 
