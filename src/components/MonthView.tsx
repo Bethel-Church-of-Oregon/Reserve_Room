@@ -13,6 +13,8 @@ interface Props {
   onRefresh?: () => void;
   swipeOffset?: number;
   swipeDragging?: boolean;
+  /** Rendered inside the scroll area, below the grid, so it travels with it. */
+  footer?: React.ReactNode;
 }
 
 function dateKey(d: Date) {
@@ -52,7 +54,7 @@ function getCalendarDays(year: number, month: number): Date[] {
   return days;
 }
 
-export default function MonthView({ currentDate, reservations, onRefresh, swipeOffset = 0, swipeDragging = false }: Props) {
+export default function MonthView({ currentDate, reservations, onRefresh, swipeOffset = 0, swipeDragging = false, footer }: Props) {
   const { t, tRoom, lang } = useLanguage();
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -90,8 +92,21 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
         ))}
       </div>
 
-      {/* Calendar grid */}
-      <div className="month-grid flex-1 overflow-y-auto grid" style={{ gridTemplateRows: `repeat(${weeks.length}, minmax(var(--month-cell-min-h), 1fr))`, transform: `translateX(${swipeOffset}px)`, transition: swipeDragging ? 'none' : 'transform 0.22s ease-out', willChange: 'transform' }}>
+      {/* Calendar grid.
+          The scroller and the grid are separate elements. As one, it was the
+          scroller, the grid and the swipe target all at once, so there was
+          nowhere inside the scroll area to put anything after the weeks — the
+          footer had to go in the wrapper outside instead, which then overflowed
+          and produced a second scrollbar beside this one.
+          `min-h-full` keeps the `1fr` rows stretching to fill the viewport the
+          way they did while the grid was itself the flex item; without it the
+          grid's height goes content-driven and every row collapses to
+          `--month-cell-min-h`.
+          `month-grid` stays on the grid because that class is what defines
+          `--month-cell-min-h`, which both the row template here and the week
+          rows below read. */}
+      <div className="flex-1 overflow-y-auto calendar-scroll">
+        <div className="month-grid grid min-h-full" style={{ gridTemplateRows: `repeat(${weeks.length}, minmax(var(--month-cell-min-h), 1fr))`, transform: `translateX(${swipeOffset}px)`, transition: swipeDragging ? 'none' : 'transform 0.22s ease-out', willChange: 'transform' }}>
         {weeks.map((week, wi) => (
           <div key={wi} className="grid grid-cols-7 border-b border-gray-100 last:border-b-0" style={{ minHeight: 'var(--month-cell-min-h)' }}>
             {week.map((day, di) => {
@@ -147,6 +162,9 @@ export default function MonthView({ currentDate, reservations, onRefresh, swipeO
             })}
           </div>
         ))}
+        </div>
+        {/* Outside the transform above, so it does not slide on a swipe. */}
+        {footer}
       </div>
 
       {/* Day detail modal */}

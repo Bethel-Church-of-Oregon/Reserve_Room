@@ -81,6 +81,38 @@ function RulesModal({ onAgree, onClose }: { onAgree: () => void; onClose: () => 
   );
 }
 
+/**
+ * The way into the administration panel.
+ *
+ * Not a security boundary — the repository is public, so `/admin` is no secret,
+ * and the signed `admin_auth` cookie plus the server-side check on every admin
+ * route are what actually guard it. It is out of the header so the reserve
+ * button, which is what nearly every visitor came for, no longer shares that row
+ * with a control almost nobody can use, and it is still somewhere visible rather
+ * than gone so a future 담당자 can find it without being handed a URL.
+ *
+ * Rendered as the last child *inside* each view's scroll container, so it sits at
+ * the end of the calendar and travels with it. The alternative — a row in the
+ * viewport-locked flex column — would hold height off the calendar permanently,
+ * which tells at the 100px month cells on a phone.
+ */
+function AdminFooterLink({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    // All the padding sits on the button, none on the bar: that keeps the bar
+    // short while leaving the button a 26px tap target. `leading-none` pins the
+    // line box too — an arbitrary `text-[Npx]` sets only font-size, so the height
+    // would otherwise come from preflight's inherited `line-height: 1.5`.
+    <div className="border-t border-gray-200 bg-white flex justify-center">
+      <button
+        onClick={onClick}
+        className="px-4 py-2 text-[10px] leading-none text-gray-400 hover:text-gray-600 transition-colors"
+      >
+        {label}
+      </button>
+    </div>
+  );
+}
+
 export default function HomePage() {
   const router = useRouter();
   const { lang, setLang, t, tRoom } = useLanguage();
@@ -326,6 +358,10 @@ export default function HomePage() {
     ? effectiveReservations
     : effectiveReservations.filter((r) => selectedRooms.has(r.room_id));
 
+  // Built once here so the four views share one definition of it rather than
+  // each growing its own copy.
+  const adminFooter = <AdminFooterLink label={t.linkAdminLogin} onClick={() => router.push('/admin')} />;
+
   return (
     <div className="flex flex-col h-screen max-w-screen-xl mx-auto w-full border-x border-gray-200 overflow-hidden">
       {/* Top navigation bar */}
@@ -351,13 +387,6 @@ export default function HomePage() {
           >
             <span className="hidden sm:inline">{t.btnReserve}</span>
             <span className="sm:hidden">{t.btnReserveShort}</span>
-          </button>
-          <button
-            onClick={() => router.push('/admin')}
-            className="flex-shrink-0 px-2.5 py-1.5 sm:px-4 sm:py-2 bg-gray-700 hover:bg-gray-800 text-white text-[13px] sm:text-sm font-medium rounded-lg transition whitespace-nowrap"
-          >
-            <span className="hidden sm:inline">{t.btnAdmin}</span>
-            <span className="sm:hidden">{t.btnAdminShort}</span>
           </button>
           {/* Language toggle — shows the language it switches to */}
           <button
@@ -619,19 +648,23 @@ export default function HomePage() {
                 {t.loading}
               </div>
             ) : viewMode === 'day' ? (
-              <DayView key="day" currentDate={currentDate} reservations={filteredReservations} onDayClick={setCurrentDate} onRefresh={refreshReservations} swipeOffset={swipeX} swipeDragging={isDragging} />
+              <DayView key="day" currentDate={currentDate} reservations={filteredReservations} onDayClick={setCurrentDate} onRefresh={refreshReservations} swipeOffset={swipeX} swipeDragging={isDragging} footer={adminFooter} />
             ) : viewMode === 'week' ? (
-              <WeekView key="week" weekStart={weekStart} reservations={filteredReservations} onRefresh={refreshReservations} swipeOffset={swipeX} swipeDragging={isDragging} />
+              <WeekView key="week" weekStart={weekStart} reservations={filteredReservations} onRefresh={refreshReservations} swipeOffset={swipeX} swipeDragging={isDragging} footer={adminFooter} />
             ) : viewMode === 'list' ? (
               <ListView key="list" reservations={filteredReservations} loading={isFetchPending} onRefresh={refreshReservations} />
             ) : (
-              <div key="month" className="h-full overflow-y-auto calendar-scroll">
-                <MonthView currentDate={currentDate} reservations={filteredReservations} onRefresh={refreshReservations} swipeOffset={swipeX} swipeDragging={isDragging} />
+              /* No `overflow-y-auto` here: MonthView scrolls its own grid, so a
+                 scroller on this wrapper too meant two scrollbars as soon as
+                 anything made this one overflow. */
+              <div key="month" className="h-full">
+                <MonthView currentDate={currentDate} reservations={filteredReservations} onRefresh={refreshReservations} swipeOffset={swipeX} swipeDragging={isDragging} footer={adminFooter} />
               </div>
             )}
           </div>
         </div>
       </main>
+
       {showRulesModal && (
         <RulesModal
           onAgree={() => { setShowRulesModal(false); router.push('/reserve'); }}

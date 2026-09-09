@@ -34,6 +34,8 @@ interface Props {
   onRefresh?: () => void;
   swipeOffset?: number;
   swipeDragging?: boolean;
+  /** Rendered at the end of the scrolled content, below the last hour. */
+  footer?: React.ReactNode;
 }
 
 function timeToMinutes(dateStr: string): number {
@@ -88,7 +90,7 @@ function groupOverlapping(items: PublicReservation[]): Array<{ item: PublicReser
   return result;
 }
 
-export default function DayView({ currentDate, reservations, onDayClick, onRefresh, swipeOffset = 0, swipeDragging = false }: Props) {
+export default function DayView({ currentDate, reservations, onDayClick, onRefresh, swipeOffset = 0, swipeDragging = false, footer }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const timeLabelRef = useRef<HTMLDivElement>(null);
 
@@ -299,6 +301,7 @@ export default function DayView({ currentDate, reservations, onDayClick, onRefre
             })}
           </div>
         </div>
+        {footer}
         </div>{/* end scrollable events */}
       </div>{/* end flex row (time labels + events) */}
 

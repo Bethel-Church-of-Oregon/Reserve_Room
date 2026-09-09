@@ -136,6 +136,7 @@ const ko = {
   btnReserveShort: '+ 예약',
   btnAdmin: '관리자 모드',
   btnAdminShort: '관리자',
+  linkAdminLogin: '관리자 로그인',
 
   // Notice banner
   noticeDesktop: '본 시스템은 소모임(사랑방, 사역팀 등) 전용 입니다. 결혼식 등 큰 행사는',
@@ -511,6 +512,7 @@ const en: typeof ko = {
   btnReserveShort: '+ Reserve',
   btnAdmin: 'Admin',
   btnAdminShort: 'Admin',
+  linkAdminLogin: 'Admin login',
 
   noticeDesktop: 'This system is for small groups only. For large events such as weddings, please use the',
   noticeMobile: 'For small groups only. For large events like weddings, please use the',
