@@ -165,6 +165,11 @@ approved → cancelled (취소 신청 시 즉시 처리)
 ## 예약 변경 플로우
 - 캘린더/목록에서 예약 선택 → "변경하기" 버튼 (오늘 이후 + `approved` 예약에만 표시)
 - `EditRequestModal` (`ReservationDetailPopover.tsx`): 이메일 본인 확인 + 시작/종료 시간(15분 단위) + 제목·담당자·노트 수정
+- **변경 모달에도 예약 현황 패널이 있음** (2026-09 추가). 예약 폼과 같은 구성 — 그 장소·그 날짜의 다른 예약 + blackout 호박색 줄 + 겹침 경고
+  - **자기 자신은 목록에서 제외** (`r.id !== reservation.id`). 안 빼면 자기와 겹친다고 나옴 — 서버가 `checkConflict(..., excludeId)` 로 피하는 것과 같은 이유
+  - 장소·날짜가 고정이라 예약 폼과 달리 선택을 기다리지 않고 열자마자 조회함
+  - **blackout 빨간 경고는 `timeMoved && !admin` 일 때만** — `applyReservationEdit()` 의 조건과 글자 그대로 같아야 함. 아니면 blackout 안에 이미 있는 예약(일요일 1,020건)의 주인이 제목만 고치는데 "변경 불가"가 뜸. 호박색 *목록* 은 관리자 포함 항상 보임 (정보이지 경고가 아님)
+  - 409 를 받으면 패널 재조회 (`takenReload`)
 - **장소와 날짜는 변경 불가** — 모달에 읽기 전용으로 표시, 바꾸려면 취소 후 재예약 (안내 문구 노출)
 - `POST /api/reservations/[id]/edit` → `updateReservation()`
   - 검증: 이메일 일치(403) → `status='approved'`(400) → 지난 예약 차단(Pacific 기준, 400) → 새 시작/종료의 날짜가 원래 날짜와 동일(400) → 시작<종료(400) → `checkConflict(room_id, start, end, excludeId=id)`(409) → 변경 내용 유무(400)
@@ -196,6 +201,7 @@ approved → cancelled (취소 신청 시 즉시 처리)
   - `POST /api/reservations` 단건 → 409, 메시지에 규칙 이름·시간 명시
   - 반복 예약 → 충돌 날짜처럼 건너뛰고 `conflictDates` 로 보고. 규칙은 범위 전체에 대해 **1회 조회**
   - `applyReservationEdit()` → **시간이 실제로 바뀔 때만.** 안 걸면 blackout 안에 이미 있는 예약자가 제목 오타도 못 고침
+    - 공개 경로 `POST /api/reservations/[id]/edit` 는 `allowPast` 를 넘기지 않으므로 **적용됨**. 관리자 `PATCH /api/reservations/[id]` 는 `allowPast: true` 라 **면제** — 생성 때와 같은 규칙 (확인함)
   - 관리자 면제는 **서명된 세션 쿠키로만** (`?admin=true` 교훈). 사무실이 예배 시간에 대예배실을 잡아야 할 때가 있음
 - **기존 예약은 절대 무효화하지 않음.** blackout 은 **새 쓰기에만** 적용
   - 저장 시 `countReservationsInBlackout()` 으로 그 창 안의 확정 예약 수를 세서 관리자에게 알림 — 안 알리면 **보호된다고 믿는데 예약이 그 안에 앉아 있는** 상태가 됨

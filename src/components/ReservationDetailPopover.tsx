@@ -5,7 +5,8 @@ import { PublicReservation } from '@/lib/db';
 import { LIMITS } from '@/lib/constants';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatModalDayTitle } from '@/lib/i18n';
-import { pacificDateKey } from '@/lib/date';
+import { pacificDateKey, addDaysToKey } from '@/lib/date';
+import { blackoutsOnDate, findBlackout, type RoomBlackout } from '@/lib/blackout';
 
 function formatTime(dateStr: string): string {
   const d = new Date(dateStr);
@@ -71,6 +72,75 @@ export function EditRequestModal({
   const [submitted, setSubmitted] = useState(false);
 
   const dateKey = reservation.start_time.slice(0, 10);
+
+  // What else is booked in this room on this day, and which windows are closed.
+  // The edit form used to show neither, so the first anyone heard of a clash was
+  // the error after submitting — the same gap the reservation form had.
+  const [taken, setTaken] = useState<{ start: string; end: string; title: string }[]>([]);
+  const [takenState, setTakenState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  // Bumped after a 409 so the panel reloads and shows what actually took the slot.
+  const [takenReload, setTakenReload] = useState(0);
+  const [blackouts, setBlackouts] = useState<RoomBlackout[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setTakenState('loading');
+    // `to` is the next day, not this one: the range filter compares
+    // `start_time <= to` as strings, and '2026-09-10T09:00' sorts *after*
+    // '2026-09-10', so asking for a single day returns nothing.
+    fetch(`/api/reservations?from=${dateKey}&to=${addDaysToKey(dateKey, 1)}`)
+      .then((r) => {
+        if (!r.ok) throw new Error('availability');
+        return r.json();
+      })
+      .then((rows: PublicReservation[]) => {
+        if (cancelled) return;
+        setTaken(
+          (Array.isArray(rows) ? rows : [])
+            // This booking is left out on purpose — listing it would read as a
+            // clash with itself, which is exactly what `excludeId` prevents in
+            // `checkConflict` on the server.
+            .filter((r) => r.room_id === reservation.room_id && r.id !== reservation.id && r.start_time.slice(0, 10) === dateKey)
+            .map((r) => ({ start: r.start_time.slice(11, 16), end: r.end_time.slice(11, 16), title: r.title }))
+            .sort((a, b) => a.start.localeCompare(b.start))
+        );
+        setTakenState('ready');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setTaken([]);
+        setTakenState('error');
+      });
+    return () => { cancelled = true; };
+  }, [reservation.id, reservation.room_id, dateKey, takenReload]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/blackouts')
+      .then((r) => r.json())
+      .then((rows) => { if (!cancelled) setBlackouts(Array.isArray(rows) ? rows : []); })
+      .catch(() => { if (!cancelled) setBlackouts([]); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const blackoutsToday = blackoutsOnDate(blackouts, reservation.room_id, dateKey);
+
+  // Mirrors `applyReservationEdit()` exactly, or the warning would contradict
+  // what the server does:
+  //  - only when the time actually moves, so the owner of a booking that already
+  //    sits inside a window can still fix a typo in the title;
+  //  - never for admins, who are exempt there via `allowPast`.
+  const timeMoved =
+    `${dateKey}T${startTime}:00` !== reservation.start_time ||
+    `${dateKey}T${endTime}:00` !== reservation.end_time;
+  const blackoutHit =
+    !admin && timeMoved
+      ? findBlackout(blackouts, reservation.room_id, `${dateKey}T${startTime}:00`, `${dateKey}T${endTime}:00`)
+      : null;
+
+  // Half-open `[)`, the same rule as checkConflict and the DB constraint: a
+  // booking ending at 11:30 does not clash with one starting at 11:30.
+  const overlapping = taken.filter((b) => startTime < b.end && endTime > b.start);
 
   // Re-seed the form whenever the modal is opened for a different reservation
   useEffect(() => {
@@ -156,6 +226,10 @@ export function EditRequestModal({
         setSubmitted(true);
       } else {
         setError(data.error ?? t.errGeneral);
+        // The slot went while this modal was open, or a rule now covers it:
+        // reload the panel, since the message is only actionable if you can see
+        // what took it.
+        if (res.status === 409) setTakenReload((n) => n + 1);
       }
     } catch {
       setError(t.errNetwork);
@@ -232,6 +306,63 @@ export function EditRequestModal({
               ))}
             </select>
           </div>
+        </div>
+
+        {/* What else is on this room and day. Room and date are fixed here, so
+            unlike the reservation form this never has to wait for a selection. */}
+        <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5">
+          {blackoutsToday.length > 0 && (
+            <ul className="mb-2 space-y-1">
+              {blackoutsToday.map((b) => (
+                <li
+                  key={b.id}
+                  className="flex items-baseline gap-2 rounded border-l-[3px] border-amber-400 bg-amber-50 px-2 py-1 text-xs text-amber-900"
+                >
+                  <span className="whitespace-nowrap tabular-nums">{b.start_time}–{b.end_time}</span>
+                  <span className="min-w-0 truncate font-medium">{b.label}</span>
+                  <span className="ml-auto whitespace-nowrap text-[11px] text-amber-700">
+                    {admin ? t.blackoutAdminOnly : t.blackoutUnavailable}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="text-xs font-medium text-gray-600">{t.availabilityTitle}</p>
+          {takenState === 'loading' && (
+            <p className="mt-1 text-xs text-gray-400">{t.availabilityLoading}</p>
+          )}
+          {/* Not an error to act on: the server checks again on submit, so a
+              failed load costs information, not safety. */}
+          {takenState === 'error' && (
+            <p className="mt-1 text-xs text-gray-500">{t.availabilityError}</p>
+          )}
+          {takenState === 'ready' && taken.length === 0 && (
+            <p className="mt-1 text-xs text-green-700">{t.availabilityNone}</p>
+          )}
+          {takenState === 'ready' && taken.length > 0 && (
+            <ul className="mt-1.5 space-y-1">
+              {taken.map((b, i) => {
+                const clash = startTime < b.end && endTime > b.start;
+                return (
+                  <li
+                    key={i}
+                    className={`flex items-baseline gap-2 text-xs ${clash ? 'font-medium text-red-600' : 'text-gray-600'}`}
+                  >
+                    <span className="whitespace-nowrap tabular-nums">{b.start}–{b.end}</span>
+                    <span className="min-w-0 truncate">{b.title}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {blackoutHit && (
+            <p className="mt-2 text-xs font-medium text-red-600">
+              {t.blackoutOverlap(blackoutHit.label)}
+            </p>
+          )}
+          {overlapping.length > 0 && (
+            <p className="mt-2 text-xs font-medium text-red-600">{t.availabilityOverlap}</p>
+          )}
         </div>
 
         <div className="mb-4">
