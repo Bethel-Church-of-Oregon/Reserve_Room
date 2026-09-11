@@ -364,7 +364,7 @@ const ko = {
   editFixedNote: '장소와 날짜는 변경할 수 없습니다. 바꾸시려면 예약을 취소하신 후 다시 신청해 주세요.',
   editEmailLabel: '예약 시 입력한 이메일',
   editEmailPlaceholder: '예약에 사용한 이메일을 입력해주세요.',
-  btnEditSubmit: '변경 저장',
+  btnEditSubmit: '변경 신청',
   btnEditSubmitting: '저장 중...',
   editSuccess: '변경 완료',
   editSuccessDesc: '예약이 변경되었습니다.',
