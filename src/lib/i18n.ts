@@ -474,7 +474,7 @@ const ko = {
   settingsEnabled: (code: string) => `현재 코드: ${code}`,
   settingsWarn: '코드는 시간이 지나면 알려지게 됩니다. 필요할 때 여기서 바꾸시면 됩니다.',
   blackoutTitle: '예약 불가 시간대',
-  blackoutDesc: '예배처럼 정기적으로 쓰는 시간은 교인이 예약할 수 없게 막습니다. 관리자는 그대로 예약할 수 있습니다.',
+  blackoutDesc: '예배 등 정기적으로 사용하는 시간대 및 장소를 추가해 주세요. 일반 화면에서는 예약할 수 없게 막습니다. 관리자 모드에서는 그대로 예약할 수 있습니다.',
   blackoutLabelPlaceholder: '이름 (예: 주일예배)',
   blackoutAllRooms: '전체 장소',
   blackoutWeekly: '매주',
