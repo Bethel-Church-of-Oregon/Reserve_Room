@@ -833,291 +833,300 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
       <main className="max-w-screen-xl mx-auto px-4 pt-4 pb-6">
 
         {adminView === 'settings' && (
-          <div className="max-w-lg">
-            <h2 className="text-base font-bold text-gray-800 mb-1">{t.settingsTitle}</h2>
-            <p className="text-xs text-gray-500 mb-5">{t.settingsDesc}</p>
+          /* Two columns from `admin` (1000px) up — the same line the reservation
+             table uses to decide it is on a desktop, so the panel keeps one
+             definition of "desktop" instead of two.
+             The columns are for placing the sections, not for widening them:
+             each keeps its `max-w-lg`, because a form field stretched to the
+             full column is harder to use, not easier. Below 1000px nothing
+             applies and the three stack exactly as before. */
+          <div className="admin:grid admin:grid-cols-2 admin:gap-x-10 admin:items-start">
+            <div>
+              <div className="max-w-lg mx-auto admin:mx-0">
+                <h2 className="text-base font-bold text-gray-800 mb-1">{t.settingsTitle}</h2>
+                <p className="text-xs text-gray-500 mb-5">{t.settingsDesc}</p>
 
-            {accessCodeLoading ? (
-              <div className="text-sm text-gray-400 py-4">{t.loading}</div>
-            ) : (
-              <>
-                <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
-                  accessCodeSaved
-                    ? 'border-green-200 bg-green-50 text-green-800'
-                    : 'border-amber-200 bg-amber-50 text-amber-800'
-                }`}>
-                  {accessCodeSaved ? t.settingsEnabled(accessCodeSaved) : t.settingsDisabled}
+                {accessCodeLoading ? (
+                  <div className="text-sm text-gray-400 py-4">{t.loading}</div>
+                ) : (
+                  <>
+                    <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
+                      accessCodeSaved
+                        ? 'border-green-200 bg-green-50 text-green-800'
+                        : 'border-amber-200 bg-amber-50 text-amber-800'
+                    }`}>
+                      {accessCodeSaved ? t.settingsEnabled(accessCodeSaved) : t.settingsDisabled}
+                    </div>
+
+                    <label htmlFor="admin-access-code" className="block text-sm font-medium text-gray-700 mb-1">
+                      {t.settingsCodeLabel}
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        id="admin-access-code"
+                        type="text"
+                        value={accessCode}
+                        onChange={(e) => setAccessCode(e.target.value)}
+                        placeholder={t.settingsCodePlaceholder}
+                        autoComplete="off"
+                        maxLength={LIMITS.accessCode}
+                        className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
+                      />
+                      <button
+                        onClick={async () => {
+                          setAccessCodeLoading(true);
+                          try {
+                            const res = await fetch('/api/admin/access-code', {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ code: accessCode.trim() }),
+                            });
+                            const d = await res.json();
+                            if (res.ok) {
+                              setAccessCode(d.code ?? '');
+                              setAccessCodeSaved(d.code ?? '');
+                              showToast(t.settingsSaved);
+                            } else {
+                              showToast(d.error ?? t.toastError, 'error');
+                            }
+                          } catch {
+                            showToast(t.toastNetworkError, 'error');
+                          } finally {
+                            setAccessCodeLoading(false);
+                          }
+                        }}
+                        disabled={accessCodeLoading || accessCode.trim() === accessCodeSaved}
+                        className="flex-shrink-0 px-4 py-2 bg-gray-800 hover:bg-gray-900 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition"
+                      >
+                        {t.settingsSave}
+                      </button>
+                    </div>
+                    <p className="mt-3 text-xs text-gray-400">{t.settingsWarn}</p>
+                  </>
+                )}
+              </div>
+
+            {/* Second section of Settings. It used to be a top-level tab, but the button
+                row overflowed the width of a phone; folding it in here removes a button
+                and groups it with the other church-wide setting. */}
+              <div className="max-w-lg mx-auto admin:mx-0 mt-10 pt-8 border-t border-gray-200">
+                <h2 className="text-base font-bold text-gray-800 mb-1">{t.recipientsTitle}</h2>
+                <p className="text-xs text-gray-500 mb-5">{t.recipientsDesc}</p>
+
+                {/* Add form */}
+                <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-4">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newName}
+                        onChange={(e) => { setNewName(e.target.value); setAddError(''); }}
+                        placeholder={t.recipientNamePlaceholder}
+                        className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
+                      />
+                      <input
+                        type="tel"
+                        value={newPhone}
+                        onChange={(e) => { setNewPhone(e.target.value.replace(/\D/g, '')); setAddError(''); }}
+                        placeholder={t.recipientPhonePlaceholder}
+                        className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
+                      />
+                    </div>
+                    <div className="flex justify-end">
+                      <button
+                        onClick={async () => {
+                          if (!newName.trim()) { setAddError(t.errRecipientName); return; }
+                          if (newPhone.length < 10) { setAddError(t.errRecipientPhone); return; }
+                          setAddLoading(true);
+                          try {
+                            const res = await fetch('/api/admin/recipients', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ name: newName.trim(), phone: newPhone }),
+                            });
+                            if (res.ok) {
+                              setNewName(''); setNewPhone('');
+                              showToast(t.recipientAdded);
+                              fetchRecipients();
+                            } else {
+                              const d = await res.json();
+                              setAddError(d.error ?? t.errGeneral);
+                            }
+                          } catch { setAddError(t.errNetwork); }
+                          finally { setAddLoading(false); }
+                        }}
+                        disabled={addLoading}
+                        className="flex-shrink-0 px-4 py-2 bg-gray-800 hover:bg-gray-900 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition"
+                      >
+                        {t.recipientAdd}
+                      </button>
+                    </div>
+                    {addError && <p className="text-xs text-red-500">{addError}</p>}
+                  </div>
                 </div>
 
-                <label htmlFor="admin-access-code" className="block text-sm font-medium text-gray-700 mb-1">
-                  {t.settingsCodeLabel}
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    id="admin-access-code"
-                    type="text"
-                    value={accessCode}
-                    onChange={(e) => setAccessCode(e.target.value)}
-                    placeholder={t.settingsCodePlaceholder}
-                    autoComplete="off"
-                    maxLength={LIMITS.accessCode}
-                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
-                  />
-                  <button
-                    onClick={async () => {
-                      setAccessCodeLoading(true);
-                      try {
-                        const res = await fetch('/api/admin/access-code', {
-                          method: 'PUT',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ code: accessCode.trim() }),
-                        });
-                        const d = await res.json();
-                        if (res.ok) {
-                          setAccessCode(d.code ?? '');
-                          setAccessCodeSaved(d.code ?? '');
-                          showToast(t.settingsSaved);
-                        } else {
-                          showToast(d.error ?? t.toastError, 'error');
-                        }
-                      } catch {
-                        showToast(t.toastNetworkError, 'error');
-                      } finally {
-                        setAccessCodeLoading(false);
-                      }
-                    }}
-                    disabled={accessCodeLoading || accessCode.trim() === accessCodeSaved}
-                    className="flex-shrink-0 px-4 py-2 bg-gray-800 hover:bg-gray-900 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition"
-                  >
-                    {t.settingsSave}
-                  </button>
-                </div>
-                <p className="mt-3 text-xs text-gray-400">{t.settingsWarn}</p>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Second section of Settings. It used to be a top-level tab, but the button
-            row overflowed the width of a phone; folding it in here removes a button
-            and groups it with the other church-wide setting. */}
-        {adminView === 'settings' && (
-          <div className="max-w-lg mt-10 pt-8 border-t border-gray-200">
-            <h2 className="text-base font-bold text-gray-800 mb-1">{t.recipientsTitle}</h2>
-            <p className="text-xs text-gray-500 mb-5">{t.recipientsDesc}</p>
-
-            {/* Add form */}
-            <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-4">
-              <div className="flex flex-col gap-3">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newName}
-                    onChange={(e) => { setNewName(e.target.value); setAddError(''); }}
-                    placeholder={t.recipientNamePlaceholder}
-                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
-                  />
-                  <input
-                    type="tel"
-                    value={newPhone}
-                    onChange={(e) => { setNewPhone(e.target.value.replace(/\D/g, '')); setAddError(''); }}
-                    placeholder={t.recipientPhonePlaceholder}
-                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
-                  />
-                </div>
-                <div className="flex justify-end">
-                  <button
-                    onClick={async () => {
-                      if (!newName.trim()) { setAddError(t.errRecipientName); return; }
-                      if (newPhone.length < 10) { setAddError(t.errRecipientPhone); return; }
-                      setAddLoading(true);
-                      try {
-                        const res = await fetch('/api/admin/recipients', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ name: newName.trim(), phone: newPhone }),
-                        });
-                        if (res.ok) {
-                          setNewName(''); setNewPhone('');
-                          showToast(t.recipientAdded);
-                          fetchRecipients();
-                        } else {
-                          const d = await res.json();
-                          setAddError(d.error ?? t.errGeneral);
-                        }
-                      } catch { setAddError(t.errNetwork); }
-                      finally { setAddLoading(false); }
-                    }}
-                    disabled={addLoading}
-                    className="flex-shrink-0 px-4 py-2 bg-gray-800 hover:bg-gray-900 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition"
-                  >
-                    {t.recipientAdd}
-                  </button>
-                </div>
-                {addError && <p className="text-xs text-red-500">{addError}</p>}
+                {/* Recipients list */}
+                {recipientsLoading ? (
+                  <div className="text-sm text-gray-400 py-4">{t.loading}</div>
+                ) : recipients.length === 0 ? (
+                  <div className="text-sm text-gray-400 py-4">{t.noRecipients}</div>
+                ) : (
+                  <div className="space-y-2">
+                    {recipients.map((r) => (
+                      <div key={r.id} className="flex items-center justify-between gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3">
+                        <div className="min-w-0">
+                          <div className="font-medium text-sm text-gray-800">{r.name}</div>
+                          <div className="text-xs text-gray-500">{formatPhone(r.phone)}</div>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            const res = await fetch(`/api/admin/recipients/${r.id}`, { method: 'DELETE' });
+                            if (res.ok) { showToast(t.recipientDeleted); fetchRecipients(); }
+                            else { const d = await res.json(); showToast(d.error ?? t.toastError, 'error'); }
+                          }}
+                          className="flex-shrink-0 text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 rounded-lg px-2.5 py-1.5 transition"
+                        >
+                          {t.btnDelete}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Recipients list */}
-            {recipientsLoading ? (
-              <div className="text-sm text-gray-400 py-4">{t.loading}</div>
-            ) : recipients.length === 0 ? (
-              <div className="text-sm text-gray-400 py-4">{t.noRecipients}</div>
-            ) : (
-              <div className="space-y-2">
-                {recipients.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3">
-                    <div className="min-w-0">
-                      <div className="font-medium text-sm text-gray-800">{r.name}</div>
-                      <div className="text-xs text-gray-500">{formatPhone(r.phone)}</div>
-                    </div>
-                    <button
-                      onClick={async () => {
-                        const res = await fetch(`/api/admin/recipients/${r.id}`, { method: 'DELETE' });
-                        if (res.ok) { showToast(t.recipientDeleted); fetchRecipients(); }
-                        else { const d = await res.json(); showToast(d.error ?? t.toastError, 'error'); }
-                      }}
-                      className="flex-shrink-0 text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 rounded-lg px-2.5 py-1.5 transition"
-                    >
-                      {t.btnDelete}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+            <div>
+              {/* Blackout windows — worship services and the like */}
+              <div className="max-w-lg mx-auto admin:mx-0 mt-10 pt-8 border-t border-gray-200 admin:mt-0 admin:pt-0 admin:border-t-0">
+                <h2 className="text-base font-bold text-gray-800 mb-1">{t.blackoutTitle}</h2>
+                <p className="text-xs text-gray-500 mb-5">{t.blackoutDesc}</p>
 
-        {/* Blackout windows — worship services and the like */}
-        {adminView === 'settings' && (
-          <div className="max-w-lg mt-10 pt-8 border-t border-gray-200">
-            <h2 className="text-base font-bold text-gray-800 mb-1">{t.blackoutTitle}</h2>
-            <p className="text-xs text-gray-500 mb-5">{t.blackoutDesc}</p>
-
-            {/* Add form */}
-            <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-4">
-              <div className="flex flex-col gap-3">
-                <input
-                  type="text"
-                  value={boLabel}
-                  onChange={(e) => { setBoLabel(e.target.value); setBoError(''); }}
-                  placeholder={t.blackoutLabelPlaceholder}
-                  maxLength={LIMITS.title}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
-                />
-                {/* Empty value means every room, which is a real choice here
-                    rather than a missing one. */}
-                <select
-                  value={boRoom}
-                  onChange={(e) => { setBoRoom(e.target.value); setBoError(''); }}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base bg-white focus:outline-none focus:ring-2 focus:ring-gray-400"
-                >
-                  <option value="">{t.blackoutAllRooms}</option>
-                  {uniqueRooms.map((room) => (
-                    <option key={room.id} value={room.id}>{tRoom(room.name)}</option>
-                  ))}
-                </select>
-                <div className="flex gap-2">
-                  <select
-                    value={boRecurring}
-                    onChange={(e) => { setBoRecurring(e.target.value as 'daily' | 'weekly'); setBoError(''); }}
-                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base bg-white focus:outline-none focus:ring-2 focus:ring-gray-400"
-                  >
-                    <option value="weekly">{t.blackoutWeekly}</option>
-                    <option value="daily">{t.blackoutDaily}</option>
-                  </select>
-                  {boRecurring === 'weekly' && (
+                {/* Add form */}
+                <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-4">
+                  <div className="flex flex-col gap-3">
+                    <input
+                      type="text"
+                      value={boLabel}
+                      onChange={(e) => { setBoLabel(e.target.value); setBoError(''); }}
+                      placeholder={t.blackoutLabelPlaceholder}
+                      maxLength={LIMITS.title}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
+                    />
+                    {/* Empty value means every room, which is a real choice here
+                        rather than a missing one. */}
                     <select
-                      value={boWeekday}
-                      onChange={(e) => { setBoWeekday(e.target.value); setBoError(''); }}
-                      className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base bg-white focus:outline-none focus:ring-2 focus:ring-gray-400"
+                      value={boRoom}
+                      onChange={(e) => { setBoRoom(e.target.value); setBoError(''); }}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base bg-white focus:outline-none focus:ring-2 focus:ring-gray-400"
                     >
-                      {t.daysShort.map((d: string, i: number) => (
-                        <option key={i} value={i}>{d}</option>
+                      <option value="">{t.blackoutAllRooms}</option>
+                      {uniqueRooms.map((room) => (
+                        <option key={room.id} value={room.id}>{tRoom(room.name)}</option>
                       ))}
                     </select>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="time"
-                    step={900}
-                    value={boStart}
-                    onChange={(e) => { setBoStart(e.target.value); setBoError(''); }}
-                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
-                  />
-                  <span className="text-gray-400 flex-shrink-0">~</span>
-                  <input
-                    type="time"
-                    step={900}
-                    value={boEnd}
-                    onChange={(e) => { setBoEnd(e.target.value); setBoError(''); }}
-                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
-                  />
-                </div>
-                {/* Optional on both ends: a service runs indefinitely, a special
-                    season does not. */}
-                <div className="flex items-center gap-2">
-                  <input
-                    type="date"
-                    value={boFrom}
-                    onChange={(e) => { setBoFrom(e.target.value); setBoError(''); }}
-                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
-                  />
-                  <span className="text-gray-400 flex-shrink-0">~</span>
-                  <input
-                    type="date"
-                    value={boTo}
-                    onChange={(e) => { setBoTo(e.target.value); setBoError(''); }}
-                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
-                  />
-                </div>
-                <p className="text-xs text-gray-400">{t.blackoutRangeHint}</p>
-                {boError && <p className="text-xs text-red-500">{boError}</p>}
-                <button
-                  onClick={handleAddBlackout}
-                  disabled={boLoading}
-                  className="w-full px-4 py-2 bg-gray-800 hover:bg-gray-900 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition"
-                >
-                  {boLoading ? t.blackoutSaving : t.blackoutAdd}
-                </button>
-              </div>
-            </div>
-
-            {/* Existing rules */}
-            {blackoutsLoading ? (
-              <p className="text-xs text-gray-400">{t.loading}</p>
-            ) : blackouts.length === 0 ? (
-              <p className="text-xs text-gray-400">{t.blackoutNone}</p>
-            ) : (
-              <div className="space-y-2">
-                {blackouts.map((b) => (
-                  <div key={b.id} className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-3 py-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-800 truncate">{b.label}</p>
-                      <p className="text-xs text-gray-500 truncate">
-                        {b.room_name ? tRoom(b.room_name) : t.blackoutAllRooms}
-                        {' · '}
-                        {b.recurring === 'daily' ? t.blackoutDaily : t.blackoutEveryWeekday(t.daysShort[b.weekday ?? 0])}
-                        {' '}
-                        <span className="tabular-nums">{b.start_time}~{b.end_time}</span>
-                      </p>
-                      {(b.date_from || b.date_to) && (
-                        <p className="text-xs text-gray-400 tabular-nums">
-                          {b.date_from ?? ''} ~ {b.date_to ?? ''}
-                        </p>
+                    <div className="flex gap-2">
+                      <select
+                        value={boRecurring}
+                        onChange={(e) => { setBoRecurring(e.target.value as 'daily' | 'weekly'); setBoError(''); }}
+                        className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base bg-white focus:outline-none focus:ring-2 focus:ring-gray-400"
+                      >
+                        <option value="weekly">{t.blackoutWeekly}</option>
+                        <option value="daily">{t.blackoutDaily}</option>
+                      </select>
+                      {boRecurring === 'weekly' && (
+                        <select
+                          value={boWeekday}
+                          onChange={(e) => { setBoWeekday(e.target.value); setBoError(''); }}
+                          className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base bg-white focus:outline-none focus:ring-2 focus:ring-gray-400"
+                        >
+                          {t.daysShort.map((d: string, i: number) => (
+                            <option key={i} value={i}>{d}</option>
+                          ))}
+                        </select>
                       )}
                     </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="time"
+                        step={900}
+                        value={boStart}
+                        onChange={(e) => { setBoStart(e.target.value); setBoError(''); }}
+                        className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
+                      />
+                      <span className="text-gray-400 flex-shrink-0">~</span>
+                      <input
+                        type="time"
+                        step={900}
+                        value={boEnd}
+                        onChange={(e) => { setBoEnd(e.target.value); setBoError(''); }}
+                        className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-gray-400"
+                      />
+                    </div>
+                    {/* Optional on both ends: a service runs indefinitely, a special
+                        season does not. */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={boFrom}
+                        onChange={(e) => { setBoFrom(e.target.value); setBoError(''); }}
+                        className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                      />
+                      <span className="text-gray-400 flex-shrink-0">~</span>
+                      <input
+                        type="date"
+                        value={boTo}
+                        onChange={(e) => { setBoTo(e.target.value); setBoError(''); }}
+                        className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-base text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-400">{t.blackoutRangeHint}</p>
+                    {boError && <p className="text-xs text-red-500">{boError}</p>}
                     <button
-                      onClick={() => handleDeleteBlackout(b.id)}
-                      className="flex-shrink-0 text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 rounded-lg px-2.5 py-1.5 transition"
+                      onClick={handleAddBlackout}
+                      disabled={boLoading}
+                      className="w-full px-4 py-2 bg-gray-800 hover:bg-gray-900 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition"
                     >
-                      {t.btnDelete}
+                      {boLoading ? t.blackoutSaving : t.blackoutAdd}
                     </button>
                   </div>
-                ))}
+                </div>
+
+                {/* Existing rules */}
+                {blackoutsLoading ? (
+                  <p className="text-xs text-gray-400">{t.loading}</p>
+                ) : blackouts.length === 0 ? (
+                  <p className="text-xs text-gray-400">{t.blackoutNone}</p>
+                ) : (
+                  <div className="space-y-2">
+                    {blackouts.map((b) => (
+                      <div key={b.id} className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-800 truncate">{b.label}</p>
+                          <p className="text-xs text-gray-500 truncate">
+                            {b.room_name ? tRoom(b.room_name) : t.blackoutAllRooms}
+                            {' · '}
+                            {b.recurring === 'daily' ? t.blackoutDaily : t.blackoutEveryWeekday(t.daysShort[b.weekday ?? 0])}
+                            {' '}
+                            <span className="tabular-nums">{b.start_time}~{b.end_time}</span>
+                          </p>
+                          {(b.date_from || b.date_to) && (
+                            <p className="text-xs text-gray-400 tabular-nums">
+                              {b.date_from ?? ''} ~ {b.date_to ?? ''}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleDeleteBlackout(b.id)}
+                          className="flex-shrink-0 text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 rounded-lg px-2.5 py-1.5 transition"
+                        >
+                          {t.btnDelete}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         )}
 
