@@ -616,7 +616,17 @@ export async function getReservations(
     WHERE r.status NOT IN ('rejected', 'cancelled')
       AND (${from ?? null}::text IS NULL OR r.end_time >= ${from ?? null})
       AND (${to ?? null}::text IS NULL OR r.start_time <= ${to ?? null})
-    ORDER BY r.start_time
+    -- The tiebreakers are not decoration. Sunday 10:00 holds two standing
+    -- bookings in different rooms, and on start_time alone their order was
+    -- undefined: Postgres sorts with quicksort, which is not stable, so the pair
+    -- came out one way on one Sunday and the other way on the next. The views
+    -- cannot repair it either — MonthView's comparator returns 0 for equal times
+    -- and JS sort is stable, so it faithfully preserves whatever arrives.
+    -- sort_order is the order the rooms are listed in everywhere else; id follows
+    -- it because a room missing from ROOM_ORDER sits at sort_order 0 and would
+    -- tie all over again.
+    -- (No backticks in here: this is inside a template literal.)
+    ORDER BY r.start_time, rm.sort_order, r.id
   `) as PublicReservation[];
   return rows;
 }
@@ -645,13 +655,13 @@ export async function getAllReservationsForAdmin(from?: string): Promise<
         FROM reservations r
         JOIN rooms rm ON r.room_id = rm.id
         WHERE r.start_time >= ${from}
-        ORDER BY r.start_time ASC
+        ORDER BY r.start_time ASC, rm.sort_order, r.id
       `
     : await sql`
         SELECT r.*, rm.name as room_name, rm.color as room_color
         FROM reservations r
         JOIN rooms rm ON r.room_id = rm.id
-        ORDER BY r.start_time ASC
+        ORDER BY r.start_time ASC, rm.sort_order, r.id
       `
   ) as ReservationWithRoom[];
   return rows;
@@ -870,6 +880,8 @@ export async function getSeriesOccurrenceFrom(
     WHERE r.series_id = ${seriesId}
       AND r.start_time >= ${fromStartTimeInclusive}
       AND r.status IN ('pending', 'approved')
+    -- No tiebreaker needed, unlike the list queries: one series is one room, and
+    -- the exclusion constraint forbids two of its occurrences sharing a time.
     ORDER BY r.start_time
     LIMIT 1
   `) as ReservationWithRoom[];
