@@ -8,6 +8,7 @@ import { LIMITS } from '@/lib/constants';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { pacificDateKey, pacificTodayDate, addDaysToKey, DATE_RE } from '@/lib/date';
 import { blackoutsOnDate, findBlackout, type RoomBlackout } from '@/lib/blackout';
+import { START_TIME_OPTIONS, endTimeOptions, endTimeForNewStart } from '@/lib/timeOptions';
 
 type RecurringType = 'none' | 'daily' | 'weekly' | 'monthly';
 
@@ -44,18 +45,6 @@ interface SuccessInfo {
   conflictDates: string[];
   email: string;
 }
-
-function generateTimeOptions(): string[] {
-  const options: string[] = [];
-  for (let h = 0; h < 24; h++) {
-    for (let m = 0; m < 60; m += 15) {
-      options.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
-    }
-  }
-  return options;
-}
-
-const TIME_OPTIONS = generateTimeOptions();
 
 function todayStr(): string {
   return pacificDateKey();
@@ -382,6 +371,25 @@ function ReserveForm() {
     });
   }
 
+  // The end field only lists times after the start, so when the start moves past
+  // the end the end has to move too — otherwise the field holds a value it no
+  // longer offers and the select renders blank.
+  function handleStartTimeChange(next: string) {
+    setForm((prev) => ({
+      ...prev,
+      start_time: next,
+      end_time: prev.end_time > next ? prev.end_time : endTimeForNewStart(prev.start_time, prev.end_time, next),
+    }));
+    setErrors((prev) => {
+      const rest = { ...prev };
+      delete rest.start_time;
+      delete rest.end_time;
+      delete rest.conflict;
+      delete rest.conflictDates;
+      return rest;
+    });
+  }
+
   function handleReset() {
     setSuccess(false);
     setSuccessInfo(null);
@@ -622,12 +630,12 @@ function ReserveForm() {
                   <select
                     id="reserve-start-time"
                     value={form.start_time}
-                    onChange={(e) => handleChange('start_time', e.target.value)}
+                    onChange={(e) => handleStartTimeChange(e.target.value)}
                     className={`w-full appearance-none bg-white border rounded-lg pl-3 pr-8 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                       errors.start_time ? 'border-red-400 bg-red-50' : 'border-gray-300'
                     }`}
                   >
-                    {TIME_OPTIONS.map((t) => (
+                    {START_TIME_OPTIONS.map((t) => (
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>
@@ -646,7 +654,7 @@ function ReserveForm() {
                       errors.end_time ? 'border-red-400 bg-red-50' : 'border-gray-300'
                     }`}
                   >
-                    {TIME_OPTIONS.map((t) => (
+                    {endTimeOptions(form.start_time).map((t) => (
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>

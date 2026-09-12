@@ -7,6 +7,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { formatModalDayTitle } from '@/lib/i18n';
 import { pacificDateKey, addDaysToKey } from '@/lib/date';
 import { blackoutsOnDate, findBlackout, type RoomBlackout } from '@/lib/blackout';
+import { START_TIME_OPTIONS, endTimeOptions, endTimeForNewStart } from '@/lib/timeOptions';
 
 function formatTime(dateStr: string): string {
   const d = new Date(dateStr);
@@ -25,18 +26,6 @@ interface Props {
   /** Called when user clicks 변경하기; parent should show modal and handle submit */
   onRequestEdit?: (reservation: PublicReservation) => void;
 }
-
-function generateTimeOptions(): string[] {
-  const options: string[] = [];
-  for (let h = 0; h < 24; h++) {
-    for (let m = 0; m < 60; m += 15) {
-      options.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
-    }
-  }
-  return options;
-}
-
-const TIME_OPTIONS = generateTimeOptions();
 
 /** '2024-03-10T09:00:00' -> '09:00' */
 function toTimeValue(dateStr: string): string {
@@ -286,11 +275,19 @@ export function EditRequestModal({
           <div className="flex items-center gap-3">
             <select
               value={startTime}
-              onChange={(e) => { setStartTime(e.target.value); setError(''); }}
+              onChange={(e) => {
+                const next = e.target.value;
+                setStartTime(next);
+                // The end list only offers times after the start, so a start that
+                // passes the end takes the end with it rather than leaving the
+                // field holding a value it no longer lists.
+                if (endTime <= next) setEndTime(endTimeForNewStart(startTime, endTime, next));
+                setError('');
+              }}
               disabled={loading}
               className={inputClass}
             >
-              {TIME_OPTIONS.map((opt) => (
+              {START_TIME_OPTIONS.map((opt) => (
                 <option key={opt} value={opt}>{opt}</option>
               ))}
             </select>
@@ -301,7 +298,7 @@ export function EditRequestModal({
               disabled={loading}
               className={inputClass}
             >
-              {TIME_OPTIONS.map((opt) => (
+              {endTimeOptions(startTime).map((opt) => (
                 <option key={opt} value={opt}>{opt}</option>
               ))}
             </select>
