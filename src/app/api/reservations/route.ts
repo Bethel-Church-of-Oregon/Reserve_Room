@@ -174,8 +174,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '올바른 장소를 선택해 주세요.' }, { status: 400 });
     }
     // Regular members are validated against visible rooms only, so hiding a room
-    // in the picker cannot be undone by posting its id directly.
-    const rooms = await getRooms(isAdmin);
+    // in the picker cannot be undone by posting its id directly. `asAdmin` for the
+    // same reason as the blackout below: an administrator filling in the ordinary
+    // form is booking as a member, and the member form never lists hidden rooms.
+    const rooms = await getRooms(asAdmin);
     if (!rooms.some((r) => r.id === roomIdNum)) {
       return NextResponse.json({ error: '선택할 수 없는 장소입니다.' }, { status: 400 });
     }
@@ -258,7 +260,7 @@ export async function POST(req: NextRequest) {
 
       // Blackouts are fetched once for the whole range rather than per
       // occurrence — the rules are a handful of rows and do not vary by date.
-      const blackouts = isAdmin ? [] : await getBlackouts();
+      const blackouts = asAdmin ? [] : await getBlackouts();
 
       // Check each occurrence against in-memory conflict list
       const conflictDates: string[] = [];
@@ -377,9 +379,17 @@ export async function POST(req: NextRequest) {
     // Blackout windows — worship services and the like. Administrators are
     // exempt, for the same reason they are exempt from the one-month limit: the
     // office genuinely needs to book the sanctuary during a service window
-    // sometimes. The exemption comes from the signed session cookie, never from
-    // a request parameter.
-    if (!isAdmin) {
+    // sometimes.
+    //
+    // `asAdmin`, not `isAdmin` — the exemption belongs to a request that meant to
+    // book as an administrator, not to any browser that once signed in. Keyed on
+    // the cookie alone it did to blackouts exactly what it had already done to
+    // the one-month limit and to the notifications before that: opening /admin
+    // once turned the rule off on the ordinary form, silently, for the very
+    // people most likely to be testing it. Worse here than in those cases,
+    // because the form still drew its red warning (the client's own admin check
+    // wants ?admin=true too) and the server saved the booking anyway.
+    if (!asAdmin) {
       const hit = findBlackout(await getBlackouts(), roomIdNum, startStr, endStr);
       if (hit) {
         return NextResponse.json(
