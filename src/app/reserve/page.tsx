@@ -8,6 +8,7 @@ import { LIMITS } from '@/lib/constants';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { pacificDateKey, pacificTodayDate, addDaysToKey, DATE_RE } from '@/lib/date';
 import { blackoutsOnDate, findBlackout, type RoomBlackout } from '@/lib/blackout';
+import { roomNoticeFor } from '@/lib/i18n';
 import { START_TIME_OPTIONS, endTimeOptions, endTimeForNewStart } from '@/lib/timeOptions';
 
 type RecurringType = 'none' | 'daily' | 'weekly' | 'monthly';
@@ -26,6 +27,7 @@ interface FormData {
 interface FormErrors {
   title?: string;
   room_id?: string;
+  room_notice?: string;
   date?: string;
   start_time?: string;
   end_time?: string;
@@ -145,6 +147,10 @@ function ReserveForm() {
   // handful of rules that do not depend on the chosen room or date, so the same
   // list serves every selection and the rule is evaluated locally.
   const [blackouts, setBlackouts] = useState<RoomBlackout[]>([]);
+
+  // Rooms the youngest children use carry extra care notes, and the tick is how
+  // we know they were read rather than scrolled past.
+  const [noticeAgreed, setNoticeAgreed] = useState(false);
   const [success, setSuccess] = useState(false);
   const [successInfo, setSuccessInfo] = useState<SuccessInfo | null>(null);
 
@@ -217,6 +223,10 @@ function ReserveForm() {
     return () => { cancelled = true; };
   }, [form.room_id, form.date, takenReload]);
 
+  const selectedRoom = rooms.find((r) => String(r.id) === form.room_id) ?? null;
+  // Keyed on the stored name, prefix and all — see roomNoticeFor.
+  const roomNotice = roomNoticeFor(lang, selectedRoom?.name);
+
   const blackoutsToday =
     form.room_id && DATE_RE.test(form.date)
       ? blackoutsOnDate(blackouts, Number(form.room_id), form.date)
@@ -242,12 +252,18 @@ function ReserveForm() {
       ? taken.filter((b) => form.start_time < b.end && form.end_time > b.start)
       : [];
 
+  // Changing rooms clears the tick. Carrying it over would let someone confirm
+  // the nursery's notes and book the preschool room without seeing its third
+  // point, which is the one about the teachers' room.
+  useEffect(() => { setNoticeAgreed(false); }, [form.room_id]);
+
   function validate(): FormErrors {
     const errs: FormErrors = {};
     const title = form.title.trim();
     if (!title) errs.title = t.errTitleRequired;
     else if (title.length > LIMITS.title) errs.title = t.errTitleLength(LIMITS.title);
     if (!form.room_id) errs.room_id = t.errRoomRequired;
+    if (roomNotice && !noticeAgreed) errs.room_notice = t.errRoomNoticeAgree;
     if (!form.date) errs.date = t.errDateRequired;
     // `min`/`max` on the input hold nothing on their own: the form is `noValidate`,
     // so no browser constraint check runs, a typed-in date sails past the range in
@@ -590,6 +606,40 @@ function ReserveForm() {
             </div>
             {errors.room_id && <p className="mt-1 text-xs text-red-500">{errors.room_id}</p>}
           </div>
+
+          {/* Extra care notes, for the two rooms the youngest children use.
+              Sits between the room and the date because it is a consequence of
+              the room just chosen — putting it by the submit button would mean
+              filling the whole form before learning the room comes with terms.
+              Red, because it asks something of the person rather than telling
+              them something. */}
+          {roomNotice && (
+            <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3">
+              <p className="text-sm font-bold text-red-800">{roomNotice.title}</p>
+              <ul className="mt-2 space-y-1.5">
+                {roomNotice.items.map((line, i) => (
+                  <li key={i} className="flex gap-2 text-xs leading-relaxed text-red-900">
+                    <span aria-hidden className="select-none">·</span>
+                    <span className="min-w-0">{line}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2.5 text-xs font-medium leading-relaxed text-red-900">{roomNotice.footer}</p>
+              <label className="mt-3 flex cursor-pointer items-center gap-2 border-t border-red-200 pt-2.5 text-xs font-medium text-red-900">
+                <input
+                  type="checkbox"
+                  checked={noticeAgreed}
+                  onChange={(e) => {
+                    setNoticeAgreed(e.target.checked);
+                    setErrors((prev) => { const rest = { ...prev }; delete rest.room_notice; return rest; });
+                  }}
+                  className="h-4 w-4 flex-shrink-0 accent-red-600"
+                />
+                <span>{t.roomNoticeAgree}</span>
+              </label>
+              {errors.room_notice && <p className="mt-1.5 text-xs font-medium text-red-600">{errors.room_notice}</p>}
+            </div>
+          )}
 
           {/* Date */}
           <div>

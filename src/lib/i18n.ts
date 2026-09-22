@@ -51,6 +51,72 @@ export function translateRoomName(name: string): string {
 }
 
 // Date formatting utilities
+/** Extra care notes shown for rooms that need them. */
+export interface RoomNotice {
+  title: string;
+  items: string[];
+  footer: string;
+}
+
+/**
+ * Rooms that carry an extra notice, keyed by the **stored** name — the one with
+ * the building prefix, which is what the form has in hand. Same lesson as
+ * `roomNameMap`, where prefix-less keys meant the lookup never matched.
+ *
+ * Both languages sit together under each room on purpose: the type then makes
+ * adding a room without translating it a compile error, which a flat ko/en pair
+ * two hundred lines apart would not.
+ *
+ * Only rooms small children use are listed. A notice on every room would be a
+ * notice nobody reads.
+ */
+const roomNotices: Record<string, Record<Lang, RoomNotice>> = {
+  '비전홀 유치부실': {
+    ko: {
+      title: '유치부실 사용 시 주의사항',
+      items: [
+        '모임 후 사용하신 책상과 의자, 장난감 등 모든 물품을 제자리에 정리해 주시기 바랍니다.',
+        '모임 후 청소기를 돌려 주시고 쓰레기를 버려 주시기 바랍니다.',
+        '유치부 교사실에 있는 물품은 사용하실 수 없습니다.',
+      ],
+      footer: '어린 아이들이 예배드리는 공간입니다. 깨끗하게 사용해 주시고, 모임 후에는 모임 전과 같은 상태로 정리해 주시기 바랍니다.',
+    },
+    en: {
+      title: 'Before using the Preschool Room',
+      items: [
+        'Return every desk, chair and toy you use to its place after your gathering.',
+        'Vacuum the room and take the trash out before you leave.',
+        'Supplies kept in the preschool teachers\' room are not available for use.',
+      ],
+      footer: 'Young children worship in this room. Please keep it clean and leave it as you found it.',
+    },
+  },
+  '비전홀 영아부실': {
+    ko: {
+      title: '영아부실 사용 시 주의사항',
+      items: [
+        '모임 후 사용하신 책상과 의자, 장난감 등 모든 물품을 제자리에 정리해 주시기 바랍니다.',
+        '모임 후 청소기를 돌려 주시고 쓰레기를 버려 주시기 바랍니다.',
+      ],
+      footer: '아주 어린 영아와 부모님들이 함께 예배드리는 공간입니다. 깨끗하게 사용해 주시고, 모임 후에는 모임 전과 같은 상태로 정리해 주시기 바랍니다.',
+    },
+    en: {
+      title: 'Before using the Nursery',
+      items: [
+        'Return every desk, chair and toy you use to its place after your gathering.',
+        'Vacuum the room and take the trash out before you leave.',
+      ],
+      footer: 'Infants and their parents worship together in this room. Please keep it clean and leave it as you found it.',
+    },
+  },
+};
+
+/** The notice for a stored room name, or null when the room carries none. */
+export function roomNoticeFor(lang: Lang, name: string | null | undefined): RoomNotice | null {
+  if (!name) return null;
+  return roomNotices[name]?.[lang] ?? null;
+}
+
 export function formatMonthTitle(lang: Lang, d: Date): string {
   if (lang === 'en') return d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
@@ -237,6 +303,8 @@ const ko = {
   errDateRequired: '날짜를 선택해주세요.',
   errDateTooFar: '예약은 오늘로부터 한 달 이내만 신청할 수 있습니다.',
   errDatePast: '지난 날짜는 예약할 수 없습니다.',
+  roomNoticeAgree: '위 주의사항을 확인했습니다.',
+  errRoomNoticeAgree: '주의사항 확인란에 체크해 주세요.',
   errStartRequired: '시작 시간을 선택해주세요.',
   errEndRequired: '종료 시간을 선택해주세요.',
   errEndBeforeStart: '종료 시간은 시작 시간보다 늦어야 합니다.',
@@ -598,6 +666,8 @@ const en: typeof ko = {
   errDateRequired: 'Please select a date.',
   errDateTooFar: 'Reservations are limited to within one month from today.',
   errDatePast: 'Past dates cannot be reserved.',
+  roomNoticeAgree: 'I have read these notes.',
+  errRoomNoticeAgree: 'Please confirm you have read the notes.',
   errStartRequired: 'Please select a start time.',
   errEndRequired: 'Please select an end time.',
   errEndBeforeStart: 'End time must be after start time.',

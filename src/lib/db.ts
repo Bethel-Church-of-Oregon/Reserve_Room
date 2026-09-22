@@ -24,7 +24,7 @@ function getSql() {
  * finds this value already recorded skips the entire migration block — 36 round
  * trips to Neon, about 2.6 seconds, paid by every new serverless instance.
  */
-const SCHEMA_VERSION = '2026-09-08';
+const SCHEMA_VERSION = '2026-09-22';
 const SCHEMA_VERSION_KEY = 'schema_version';
 
 type Sql = ReturnType<typeof getSql>;
@@ -282,22 +282,41 @@ async function runSchemaMigrations(sql: Sql): Promise<void> {
       // Column may already exist; ignore
     }
 
-    // One-time retirement of the two nursery/preschool rooms. Guarded by a marker
-    // so an administrator who later un-hides a room does not get it re-hidden on
-    // the next start.
+    // One-time retirement of the nursery-age rooms. Guarded by a marker so an
+    // administrator who later un-hides a room does not get it re-hidden on the
+    // next start.
+    //
+    // 비전홀 유치부실 used to be in this list and no longer is, so a fresh
+    // database never hides it. Databases that ran the old list are corrected by
+    // the migration below — this one cannot do it, because its marker is already
+    // set and the whole block is skipped.
     try {
       const marker = 'rooms_hidden_init_v1';
       const done = (await sql`SELECT 1 FROM app_settings WHERE key = ${marker}`) as unknown[];
       if (done.length === 0) {
         await sql`
           UPDATE rooms SET hidden = true
-          WHERE name IN ('비전홀 유아부실', '비전홀 유치부실')
+          WHERE name IN ('비전홀 유아부실')
         `;
         await sql`INSERT INTO app_settings (key, value) VALUES (${marker}, 'done')
                   ON CONFLICT (key) DO NOTHING`;
       }
     } catch (e) {
       console.error('[db] 장소 숨김 초기화 실패:', e);
+    }
+
+    // 비전홀 유치부실 is open to members again (2026-09). Its own marker, so an
+    // administrator who hides it again later keeps that decision.
+    try {
+      const marker = 'rooms_unhide_preschool_v1';
+      const done = (await sql`SELECT 1 FROM app_settings WHERE key = ${marker}`) as unknown[];
+      if (done.length === 0) {
+        await sql`UPDATE rooms SET hidden = false WHERE name = '비전홀 유치부실'`;
+        await sql`INSERT INTO app_settings (key, value) VALUES (${marker}, 'done')
+                  ON CONFLICT (key) DO NOTHING`;
+      }
+    } catch (e) {
+      console.error('[db] 유치부실 공개 전환 실패:', e);
     }
 
     // Explicit display order. Rooms used to come out in id order, which put a
