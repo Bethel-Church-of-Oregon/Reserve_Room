@@ -138,7 +138,7 @@ npm run restore -- ~/받은파일/backup-2026-09-01.json --yes   # 메일 첨부
 ## 환경변수 (.env.local)
 ```env
 POSTGRES_URL=                     # Neon 연결 문자열 (Vercel 연동 시 자동, DATABASE_URL도 가능)
-ADMIN_PASSWORD=bethel2024         # 관리자 비밀번호 (HMAC 서명 키로도 사용)
+ADMIN_PASSWORD=                   # 관리자 비밀번호 (HMAC 서명 키로도 사용)
 GMAIL_USER=                       # Gmail 주소 (선택, 미설정 시 bethel.oregon.dev@gmail.com)
 GMAIL_APP_PASSWORD=               # Gmail 앱 비밀번호 16자리 (공백 없이)
 UPSTASH_REDIS_REST_URL=           # Upstash Redis URL (선택, rate limiting용)
