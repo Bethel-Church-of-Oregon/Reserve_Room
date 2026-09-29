@@ -267,6 +267,7 @@ const ko = {
   fieldTime: '예약 시간',
   fieldTimeUnit: '(15분 단위)',
   fieldRecurring: '반복 설정',
+  fieldRecurringInterval: '반복 간격',
   fieldRecurringUntil: '반복 종료일',
   fieldPerson: '담당자',
   fieldEmail: '이메일',
@@ -293,6 +294,16 @@ const ko = {
   recurringDaily: '매일',
   recurringWeekly: '매주',
   recurringMonthly: '매월',
+  recurringEvery: (unit: 'daily' | 'weekly' | 'monthly', n: number) => {
+    if (unit === 'daily') return n === 1 ? '매일' : `${n}일마다`;
+    if (unit === 'weekly') return n === 1 ? '매주' : n === 2 ? '격주' : `${n}주마다`;
+    return n === 1 ? '매월' : `${n}개월마다`;
+  },
+  recurringIntervalUnit: (unit: 'daily' | 'weekly' | 'monthly', _n: number) => {
+    if (unit === 'daily') return '일';
+    if (unit === 'weekly') return '주';
+    return '개월';
+  },
   recurringHint: (start: string, end: string, label: string) => `${start} 부터 ${end} 까지 ${label} 반복`,
   recurringHintDefault: (label: string) => `시작 날짜부터 종료일까지 ${label} 반복됩니다.`,
 
@@ -316,6 +327,7 @@ const ko = {
   errNotesLength: (n: number) => `노트는 ${n}자 이하여야 합니다.`,
   errRecurringUntilRequired: '반복 종료일을 선택해주세요.',
   errRecurringUntilAfterStart: '반복 종료일은 시작 날짜 이후여야 합니다.',
+  errRecurringInterval: (max: number) => `반복 간격은 1부터 ${max}까지의 정수로 입력해주세요.`,
   errConflictDefault: '선택하신 시간에 이미 해당 장소 예약이 있습니다. 다른 시간 또는 장소를 선택해주세요.',
 
   // Submit buttons
@@ -634,6 +646,7 @@ const en: typeof ko = {
   fieldTime: 'Time',
   fieldTimeUnit: '(15-min intervals)',
   fieldRecurring: 'Recurring',
+  fieldRecurringInterval: 'Repeat every',
   fieldRecurringUntil: 'Repeat Until',
   fieldPerson: 'Contact Person',
   fieldEmail: 'Email',
@@ -657,6 +670,17 @@ const en: typeof ko = {
   recurringDaily: 'Daily',
   recurringWeekly: 'Weekly',
   recurringMonthly: 'Monthly',
+  recurringEvery: (unit: 'daily' | 'weekly' | 'monthly', n: number) => {
+    if (unit === 'daily') return n === 1 ? 'Every day' : `Every ${n} days`;
+    if (unit === 'weekly') return n === 1 ? 'Every week' : `Every ${n} weeks`;
+    return n === 1 ? 'Every month' : `Every ${n} months`;
+  },
+  recurringIntervalUnit: (unit: 'daily' | 'weekly' | 'monthly', n: number) => {
+    const one = n === 1;
+    if (unit === 'daily') return one ? 'day' : 'days';
+    if (unit === 'weekly') return one ? 'week' : 'weeks';
+    return one ? 'month' : 'months';
+  },
   recurringHint: (start: string, end: string, label: string) => `Repeats ${label} from ${start} to ${end}`,
   recurringHintDefault: (label: string) => `Repeats ${label} from start date to end date.`,
 
@@ -679,6 +703,7 @@ const en: typeof ko = {
   errNotesLength: (n: number) => `Notes must be ${n} characters or fewer.`,
   errRecurringUntilRequired: 'Please select a repeat end date.',
   errRecurringUntilAfterStart: 'Repeat end date must be after the start date.',
+  errRecurringInterval: (max: number) => `Enter a whole number from 1 to ${max}.`,
   errConflictDefault: 'This room is already booked for the selected time. Please choose a different time or room.',
 
   btnSubmitting: 'Submitting...',

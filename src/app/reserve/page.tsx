@@ -10,6 +10,7 @@ import { pacificDateKey, pacificTodayDate, addDaysToKey, DATE_RE } from '@/lib/d
 import { blackoutsOnDate, findBlackout, type RoomBlackout } from '@/lib/blackout';
 import { roomNoticeFor } from '@/lib/i18n';
 import { START_TIME_OPTIONS, endTimeOptions, endTimeForNewStart } from '@/lib/timeOptions';
+import { RECURRING_INTERVAL_MAX } from '@/lib/recurrence';
 
 type RecurringType = 'none' | 'daily' | 'weekly' | 'monthly';
 
@@ -35,6 +36,7 @@ interface FormErrors {
   email?: string;
   notes?: string;
   recurring_until?: string;
+  recurring_interval?: string;
   access_code?: string;
   conflict?: string;
   conflictDates?: string[];
@@ -54,6 +56,14 @@ function todayStr(): string {
 
 function oneMonthLaterStr(): string {
   return format(addMonths(pacificTodayDate(), 1), 'yyyy-MM-dd');
+}
+
+/** Whole number from 1 through the cap. Anything else is rejected, not rounded. */
+function parseRecurringInterval(raw: string): number | null {
+  if (!/^\d+$/.test(raw)) return null;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1 || n > RECURRING_INTERVAL_MAX) return null;
+  return n;
 }
 
 /**
@@ -128,6 +138,7 @@ function ReserveForm() {
   }, []);
 
   const [recurring, setRecurring] = useState<RecurringType>('none');
+  const [recurringInterval, setRecurringInterval] = useState('1');
   const [recurringUntil, setRecurringUntil] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
@@ -160,6 +171,10 @@ function ReserveForm() {
     weekly: t.recurringWeekly,
     monthly: t.recurringMonthly,
   };
+  const parsedInterval = parseRecurringInterval(recurringInterval);
+  const everyLabel = recurring !== 'none' && parsedInterval != null
+    ? t.recurringEvery(recurring, parsedInterval)
+    : recurringLabels[recurring];
 
   const loadRooms = useCallback(() => {
     setRoomsError(null);
@@ -290,6 +305,9 @@ function ReserveForm() {
       errs.access_code = t.errAccessCodeRequired;
     }
     if (recurring !== 'none') {
+      if (parseRecurringInterval(recurringInterval) == null) {
+        errs.recurring_interval = t.errRecurringInterval(RECURRING_INTERVAL_MAX);
+      }
       if (!recurringUntil) {
         errs.recurring_until = t.errRecurringUntilRequired;
       } else if (recurringUntil <= form.date) {
@@ -324,6 +342,7 @@ function ReserveForm() {
           email: form.email.trim(),
           notes: form.notes.trim() || undefined,
           recurring: recurring !== 'none' ? recurring : undefined,
+          recurring_interval: recurring !== 'none' ? parseRecurringInterval(recurringInterval) ?? undefined : undefined,
           recurring_until: recurring !== 'none' ? recurringUntil : undefined,
           access_code: accessCode.trim() || undefined,
           // Says "this member is deliberately booking as an administrator", which
@@ -797,30 +816,59 @@ function ReserveForm() {
             </div>
 
             {recurring !== 'none' && (
-              <div>
-                <label htmlFor="reserve-recurring-until" className="block text-sm font-medium text-gray-700 mb-1">
-                  {t.fieldRecurringUntil} <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="reserve-recurring-until"
-                  type="date"
-                  value={recurringUntil}
-                  min={form.date || todayStr()}
-                  onChange={(e) => {
-                    setRecurringUntil(e.target.value);
-                    setErrors((prev) => { const next = { ...prev }; delete next.recurring_until; return next; });
-                  }}
-                  className={`w-full min-w-0 appearance-none bg-white border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    errors.recurring_until ? 'border-red-400 bg-red-50' : 'border-gray-300'
-                  }`}
-                />
-                {errors.recurring_until && <p className="mt-1 text-xs text-red-500">{errors.recurring_until}</p>}
-                <p className="mt-1.5 text-xs text-gray-400">
-                  {form.date && recurringUntil && recurringUntil > form.date
-                    ? t.recurringHint(form.date, recurringUntil, recurringLabels[recurring])
-                    : t.recurringHintDefault(recurringLabels[recurring])}
-                </p>
-              </div>
+              <>
+                <div>
+                  <label htmlFor="reserve-recurring-interval" className="block text-sm font-medium text-gray-700 mb-1">
+                    {t.fieldRecurringInterval}
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="reserve-recurring-interval"
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={RECURRING_INTERVAL_MAX}
+                      step={1}
+                      value={recurringInterval}
+                      onChange={(e) => {
+                        setRecurringInterval(e.target.value);
+                        setErrors((prev) => { const next = { ...prev }; delete next.recurring_interval; return next; });
+                      }}
+                      className={`w-24 min-w-0 border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        errors.recurring_interval ? 'border-red-400 bg-red-50' : 'border-gray-300 bg-white'
+                      }`}
+                    />
+                    <span className="text-sm text-gray-600">
+                      {t.recurringIntervalUnit(recurring, parsedInterval ?? 2)}
+                    </span>
+                  </div>
+                  {errors.recurring_interval && <p className="mt-1 text-xs text-red-500">{errors.recurring_interval}</p>}
+                </div>
+                <div>
+                  <label htmlFor="reserve-recurring-until" className="block text-sm font-medium text-gray-700 mb-1">
+                    {t.fieldRecurringUntil} <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="reserve-recurring-until"
+                    type="date"
+                    value={recurringUntil}
+                    min={form.date || todayStr()}
+                    onChange={(e) => {
+                      setRecurringUntil(e.target.value);
+                      setErrors((prev) => { const next = { ...prev }; delete next.recurring_until; return next; });
+                    }}
+                    className={`w-full min-w-0 appearance-none bg-white border rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.recurring_until ? 'border-red-400 bg-red-50' : 'border-gray-300'
+                    }`}
+                  />
+                  {errors.recurring_until && <p className="mt-1 text-xs text-red-500">{errors.recurring_until}</p>}
+                  <p className="mt-1.5 text-xs text-gray-400">
+                    {form.date && recurringUntil && recurringUntil > form.date
+                      ? t.recurringHint(form.date, recurringUntil, everyLabel)
+                      : t.recurringHintDefault(everyLabel)}
+                  </p>
+                </div>
+              </>
             )}
           </div>}
 

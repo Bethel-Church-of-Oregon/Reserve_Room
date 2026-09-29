@@ -76,7 +76,7 @@ npm run restore -- ~/받은파일/backup-2026-09-01.json --yes   # 메일 첨부
 ## DB 스키마
 - `app_settings`: key(PK), value, updated_at — 런타임 설정 key/value. 현재 키: `reservation_access_code`
 - `rooms`: id, name, color, hidden, sort_order — 비전홀 + 은혜성전 21개 시드 데이터
-- `reservation_series`: id(TEXT/UUID), title, room_id, person_in_charge, email, notes, recurring, recurring_until, status(pending/approved/rejected/cancelled), rejection_reason, created_at
+- `reservation_series`: id(TEXT/UUID), title, room_id, person_in_charge, email, notes, recurring, recurring_until, recurring_interval(1=매주, 2=격주), status(pending/approved/rejected/cancelled), rejection_reason, created_at
 - `reservations`: id, series_id(→reservation_series), series_index, title, room_id, start_time, end_time, person_in_charge, email, notes, status(pending/approved/rejected/cancellation_requested), rejection_reason, cancellation_reason, cancellation_requested_at, previous_status, created_at, updated_at, previous_start_time, previous_end_time
 - Postgres: Vercel Marketplace에서 Neon 연동 시 `POSTGRES_URL` 또는 `DATABASE_URL` 자동 주입
 - 시드는 rooms 테이블이 비어있을 때만 실행 (`count === 0` 체크)
@@ -331,8 +331,8 @@ approved → cancelled (취소 신청 시 즉시 처리)
 - 모든 예약은 신청 즉시 `approved`로 확정 (승인 대기 없음)
 - 취소는 즉시 `cancelled` 처리 (삭제 대신 DB 보존, 캘린더에서는 필터링)
 - 캘린더 뷰: 상태 배지 없음, 장소 색상 솔리드 블록만 표시 (빗금 패턴 없음)
-- 반복 예약: 관리자 전용 (`/reserve?admin=true`). daily/weekly/monthly, 최대 500회 (매주 약 9.6년)
-  - `recurring` 값과 `recurring_until` 형식을 검증한 뒤 **occurrence를 먼저 생성**하고, 비어 있으면 400
+- 반복 예약: 관리자 전용 (`/reserve?admin=true`). daily/weekly/monthly + 간격 1~4 (2주마다 = 격주), 최대 500회 (매주 약 9.6년)
+  - `recurring` 값, `recurring_interval`(없으면 1), `recurring_until` 형식을 검증한 뒤 **occurrence를 먼저 생성**하고, 비어 있으면 400
   - **`reservation_series` INSERT는 모든 조기 return을 통과한 뒤에 수행.** 예전에는 맨 앞에서 만들어서, 종료일이 시작일보다 이른 경우(`occurrences[0]`에서 크래시 → 500)와 모든 날짜가 충돌한 경우(409) 양쪽 모두 **고아 series 행**을 남겼음 (2026-09 수정)
   - bulk INSERT가 경합으로 실패하는 드문 경우에만 고아 행이 남을 수 있음. 트랜잭션 왕복을 매번 추가할 만한 빈도가 아니라고 판단해 그대로 둠
   - 충돌 날짜 자동 제외하고 나머지만 bulk INSERT

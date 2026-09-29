@@ -24,7 +24,7 @@ function getSql() {
  * finds this value already recorded skips the entire migration block — 36 round
  * trips to Neon, about 2.6 seconds, paid by every new serverless instance.
  */
-const SCHEMA_VERSION = '2026-09-22';
+const SCHEMA_VERSION = '2026-09-28';
 const SCHEMA_VERSION_KEY = 'schema_version';
 
 type Sql = ReturnType<typeof getSql>;
@@ -82,6 +82,7 @@ async function runSchemaMigrations(sql: Sql): Promise<void> {
         notes TEXT,
         recurring TEXT NOT NULL,
         recurring_until TEXT NOT NULL,
+        recurring_interval INTEGER NOT NULL DEFAULT 1,
         status TEXT NOT NULL DEFAULT 'pending',
         rejection_reason TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -119,6 +120,17 @@ async function runSchemaMigrations(sql: Sql): Promise<void> {
       await sql`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS series_index INTEGER`;
     } catch {
       // Columns may already exist; ignore
+    }
+
+    // Gap between occurrences: 1 is every week, 2 is every other week.
+    // Existing series were all interval 1, so the default matches them.
+    try {
+      await sql`ALTER TABLE reservation_series ADD COLUMN IF NOT EXISTS recurring_interval INTEGER NOT NULL DEFAULT 1`;
+    } catch (e) {
+      if (!isConcurrentCatalogRace(e)) {
+        console.error('[db] reservation_series.recurring_interval 추가 실패:', e);
+        complete = false;
+      }
     }
 
     // Cancellation request columns (idempotent)
@@ -598,6 +610,8 @@ export interface ReservationSeries {
   notes: string | null;
   recurring: string;
   recurring_until: string;
+  /** 1 = every day/week/month, 2 = every other, and so on. */
+  recurring_interval: number;
   status: ReservationSeriesStatus;
   rejection_reason: string | null;
   created_at: string;
@@ -715,11 +729,12 @@ export async function createReservationSeries(data: {
   notes?: string;
   recurring: string;
   recurring_until: string;
+  recurring_interval: number;
 }): Promise<ReservationSeries> {
   await ensureDbReady();
   const rows = (await getSql()`
-    INSERT INTO reservation_series (id, title, room_id, person_in_charge, email, notes, recurring, recurring_until, status)
-    VALUES (${data.id}, ${data.title}, ${data.room_id}, ${data.person_in_charge}, ${data.email}, ${data.notes ?? null}, ${data.recurring}, ${data.recurring_until}, 'approved')
+    INSERT INTO reservation_series (id, title, room_id, person_in_charge, email, notes, recurring, recurring_until, recurring_interval, status)
+    VALUES (${data.id}, ${data.title}, ${data.room_id}, ${data.person_in_charge}, ${data.email}, ${data.notes ?? null}, ${data.recurring}, ${data.recurring_until}, ${data.recurring_interval}, 'approved')
     RETURNING *
   `) as ReservationSeries[];
   return rows[0];

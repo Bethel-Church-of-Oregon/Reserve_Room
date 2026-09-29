@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { addMonths, addDays, format } from 'date-fns';
+import { addMonths, format } from 'date-fns';
 import { getReservations, createReservation, createReservationSeries, checkConflict, getRooms, getConflictingReservationsForRange, createReservationsBulk, getReservationAccessCode, isOverlapViolation, getBlackouts } from '@/lib/db';
 import { findBlackout } from '@/lib/blackout';
+import { generateOccurrences, RECURRING_INTERVAL_MAX, type RecurringFrequency } from '@/lib/recurrence';
 import { checkReservationLimit, checkReservationEmailLimit } from '@/lib/ratelimit';
 import { LIMITS } from '@/lib/constants';
 import { sendReservationCreatedEmail, sendReservationCreatedBulkEmail } from '@/lib/email';
@@ -44,52 +45,6 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// Date helpers (timezone-safe: uses date-fns for correct month boundaries, e.g. Jan 31 + 1 month = Feb 28/29)
-function dateAdd(dateStr: string, days: number): string {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const date = addDays(new Date(y, m - 1, d), days);
-  return format(date, 'yyyy-MM-dd');
-}
-
-function monthAdd(dateStr: string, months: number): string {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const date = addMonths(new Date(y, m - 1, d), months);
-  return format(date, 'yyyy-MM-dd');
-}
-
-function generateOccurrences(
-  startTime: string,      // '2024-03-10T09:00:00'
-  endTime: string,        // '2024-03-10T10:00:00'
-  recurring: string,      // 'daily' | 'weekly' | 'monthly'
-  recurringUntil: string  // '2024-06-10'
-): Array<{ start_time: string; end_time: string }> {
-  const startTimeSuffix = startTime.slice(10); // 'T09:00:00'
-  const endTimeSuffix = endTime.slice(10);     // 'T10:00:00'
-
-  const results: Array<{ start_time: string; end_time: string }> = [];
-  let currentDate = startTime.slice(0, 10); // '2024-03-10'
-  const MAX_OCCURRENCES = 500;
-
-  while (currentDate <= recurringUntil && results.length < MAX_OCCURRENCES) {
-    results.push({
-      start_time: currentDate + startTimeSuffix,
-      end_time: currentDate + endTimeSuffix,
-    });
-
-    if (recurring === 'daily') {
-      currentDate = dateAdd(currentDate, 1);
-    } else if (recurring === 'weekly') {
-      currentDate = dateAdd(currentDate, 7);
-    } else if (recurring === 'monthly') {
-      currentDate = monthAdd(currentDate, 1);
-    } else {
-      break;
-    }
-  }
-
-  return results;
-}
-
 export async function POST(req: NextRequest) {
   try {
     const { limited } = await checkReservationLimit(req);
@@ -101,7 +56,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { title, room_id, start_time, end_time, person_in_charge, email, notes, recurring, recurring_until } = body;
+    const { title, room_id, start_time, end_time, person_in_charge, email, notes, recurring, recurring_until, recurring_interval } = body;
 
     // Admin status comes from the signed session cookie, never from the URL. The
     // `?admin=true` query parameter is only a client-side hint about which form
@@ -241,11 +196,25 @@ export async function POST(req: NextRequest) {
       if (!DATE_RE.test(untilStr)) {
         return NextResponse.json({ error: '반복 종료일 형식이 올바르지 않습니다.' }, { status: 400 });
       }
+      // Absent means every week (or day, or month) — the only gap that existed
+      // before the interval control. A non-integer or an out-of-range gap is
+      // rejected rather than rounded, so "every 2.5 weeks" cannot sneak in.
+      const intervalRaw = recurring_interval === undefined || recurring_interval === null || recurring_interval === ''
+        ? 1
+        : Number(recurring_interval);
+      if (!Number.isInteger(intervalRaw) || intervalRaw < 1 || intervalRaw > RECURRING_INTERVAL_MAX) {
+        return NextResponse.json(
+          { error: `반복 간격은 1부터 ${RECURRING_INTERVAL_MAX}까지입니다.` },
+          { status: 400 }
+        );
+      }
+      const interval = intervalRaw;
+      const frequency = recurring as RecurringFrequency;
 
       // Generated before the series row is written. The other order meant an end
       // date earlier than the start date produced an empty list, threw on
       // `occurrences[0]` below, and left an orphaned reservation_series behind.
-      const occurrences = generateOccurrences(startStr, endStr, recurring, untilStr);
+      const occurrences = generateOccurrences(startStr, endStr, frequency, untilStr, interval);
       if (occurrences.length === 0) {
         return NextResponse.json(
           { error: '반복 종료일이 시작일보다 빠릅니다. 종료일을 다시 선택해 주세요.' },
@@ -301,6 +270,7 @@ export async function POST(req: NextRequest) {
         notes: notesStr || undefined,
         recurring,
         recurring_until: untilStr,
+        recurring_interval: interval,
       });
 
       // Bulk INSERT all non-conflicting occurrences in a single query
