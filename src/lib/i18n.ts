@@ -299,7 +299,7 @@ const ko = {
     if (unit === 'weekly') return n === 1 ? '매주' : n === 2 ? '격주' : `${n}주마다`;
     return n === 1 ? '매월' : `${n}개월마다`;
   },
-  recurringIntervalUnit: (unit: 'daily' | 'weekly' | 'monthly', _n: number) => {
+  recurringIntervalUnit: (unit: 'daily' | 'weekly' | 'monthly', _n: number): string => {
     if (unit === 'daily') return '일';
     if (unit === 'weekly') return '주';
     return '개월';
