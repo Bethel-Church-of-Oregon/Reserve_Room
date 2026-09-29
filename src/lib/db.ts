@@ -24,7 +24,7 @@ function getSql() {
  * finds this value already recorded skips the entire migration block — 36 round
  * trips to Neon, about 2.6 seconds, paid by every new serverless instance.
  */
-const SCHEMA_VERSION = '2026-09-28';
+const SCHEMA_VERSION = '2026-09-29';
 const SCHEMA_VERSION_KEY = 'schema_version';
 
 type Sql = ReturnType<typeof getSql>;
@@ -367,6 +367,28 @@ async function runSchemaMigrations(sql: Sql): Promise<void> {
       console.error('[db] 은혜성전 장소명 변경 실패:', e);
     }
 
+    // 비전홀 영아부실 -> 비전홀 영아실(자모실) (2026-09). Renamed in place, so the
+    // room keeps its id and every booking already attached to it.
+    //
+    // The seed above carries the new name for a fresh database; this is what
+    // moves one that was seeded with the old one. Three other places key off the
+    // room name and had to move with it: ROOM_ORDER (a name it cannot find gets
+    // sort_order 0 and jumps to the top of the list), roomNameMap, and — least
+    // obvious — the roomNotices entry, whose key is the stored name. Miss that
+    // one and the nursery's care notes simply stop appearing, with nothing to
+    // say they have.
+    try {
+      const marker = 'rooms_nursery_rename_v1';
+      const done = (await sql`SELECT 1 FROM app_settings WHERE key = ${marker}`) as unknown[];
+      if (done.length === 0) {
+        await sql`UPDATE rooms SET name = '비전홀 영아실(자모실)' WHERE name = '비전홀 영아부실'`;
+        await sql`INSERT INTO app_settings (key, value) VALUES (${marker}, 'done')
+                  ON CONFLICT (key) DO NOTHING`;
+      }
+    } catch (e) {
+      console.error('[db] 영아실 장소명 변경 실패:', e);
+    }
+
     // Seed rooms if empty
     const countRows = (await sql`SELECT COUNT(*)::int as c FROM rooms`) as { c: number }[];
     const count = Number(countRows[0]?.c ?? 0);
@@ -374,7 +396,7 @@ async function runSchemaMigrations(sql: Sql): Promise<void> {
       const rooms = [
         { name: '비전홀 대예배실',         color: '#E74C3C' },
         { name: '비전홀 새가족실',         color: '#E67E22' },
-        { name: '비전홀 영아부실',         color: '#F1C40F' },
+        { name: '비전홀 영아실(자모실)',   color: '#F1C40F' },
         { name: '비전홀 유아부실',         color: '#2ECC71' },
         { name: '비전홀 유치부실',         color: '#1ABC9C' },
         { name: '비전홀 찬양대실',         color: '#3498DB' },
@@ -480,7 +502,7 @@ async function applyRoomOrder(sql: Sql): Promise<void> {
     const ROOM_ORDER = [
       '비전홀 대예배실',
       '비전홀 새가족실',
-      '비전홀 영아부실',
+      '비전홀 영아실(자모실)',
       '비전홀 유아부실',
       '비전홀 유치부실',
       '비전홀 찬양대실',

@@ -14,7 +14,7 @@ export const buildingNameMap: Record<string, string> = {
 export const roomNameMap: Record<string, string> = {
   '대예배실': 'Main Sanctuary',
   '새가족실': 'New Members Room',
-  '영아부실': 'Nursery',
+  '영아실(자모실)': "Nursery (Mothers' Room)",
   '유아부실': 'Toddler Room',
   '유치부실': 'Preschool Room',
   '찬양대실': 'Choir Room',
@@ -91,9 +91,9 @@ const roomNotices: Record<string, Record<Lang, RoomNotice>> = {
       footer: 'Young children worship in this room. Please keep it clean and leave it as you found it.',
     },
   },
-  '비전홀 영아부실': {
+  '비전홀 영아실(자모실)': {
     ko: {
-      title: '영아부실 사용 시 주의사항',
+      title: '영아실(자모실) 사용 시 주의사항',
       items: [
         '모임 후 사용하신 책상과 의자, 장난감 등 모든 물품을 제자리에 정리해 주시기 바랍니다.',
         '모임 후 청소기를 돌려 주시고 쓰레기를 버려 주시기 바랍니다.',
